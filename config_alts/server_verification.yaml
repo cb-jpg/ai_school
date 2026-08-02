@@ -1,0 +1,68 @@
+system_config:
+  conf_version: 'v1.2.1'
+  host: '${APP_HOST}'
+  port: ${APP_PORT}
+  config_alts_dir: 'config_alts'
+  tool_prompts:
+    live2d_expression_prompt: 'live2d_expression_prompt'
+  enable_proxy: false
+
+character_config:
+  conf_name: 'server_verification'
+  conf_uid: 'server_verification_001'
+  live2d_model_name: 'mao_pro'
+  character_name: '技术验证助手'
+  human_name: '用户'
+  avatar: ''
+  persona_prompt: |
+    你是一名用于技术验证的中文校园问答助手。
+    回答应简洁、清楚、礼貌。当前尚未接入学校知识库，不要声称了解任何具体学校信息。
+    遇到学校具体事实时，明确说明当前处于技术验证阶段。
+    不要输出内心活动、动作描述、表格、Markdown 或不适合语音播报的符号。
+  agent_config:
+    conversation_agent_choice: 'basic_memory_agent'
+    agent_settings:
+      basic_memory_agent:
+        llm_provider: 'openai_compatible_llm'
+        faster_first_response: true
+        segment_method: 'pysbd'
+        use_mcpp: false
+        mcp_enabled_servers: []
+    llm_configs:
+      openai_compatible_llm:
+        base_url: '${LLM_BASE_URL}'
+        llm_api_key: '${LLM_API_KEY}'
+        organization_id: null
+        project_id: null
+        model: '${LLM_MODEL}'
+        temperature: ${LLM_TEMPERATURE}
+        timeout: ${LLM_TIMEOUT_SECONDS}
+        interrupt_method: 'user'
+  asr_config:
+    asr_model: 'sherpa_onnx_asr'
+    sherpa_onnx_asr:
+      model_type: 'sense_voice'
+      sense_voice: './models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/model.int8.onnx'
+      tokens: './models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/tokens.txt'
+      num_threads: ${SHERPA_ONNX_NUM_THREADS}
+      use_itn: true
+      language: 'zh'
+      provider: '${SHERPA_ONNX_PROVIDER}'
+  tts_config:
+    tts_model: 'edge_tts'
+    edge_tts:
+      voice: '${EDGE_TTS_VOICE}'
+  vad_config:
+    vad_model: null
+    silero_vad: null
+  tts_preprocessor_config:
+    remove_special_char: true
+    ignore_brackets: true
+    ignore_parentheses: true
+    ignore_asterisks: true
+    ignore_angle_brackets: true
+    translator_config:
+      translate_audio: false
+      translate_provider: 'deeplx'
+      deeplx: null
+      tencent: null

@@ -1,0 +1,2 @@
+browser,browser_version,os,case_id,interim_text,final_text,latency_ms,meaning_preserved,network_error,fallback,status
+PENDING,PENDING,PENDING,1,,,,,,PENDING
