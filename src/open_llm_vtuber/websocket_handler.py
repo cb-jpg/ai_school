@@ -27,6 +27,11 @@ from .conversations.conversation_handler import (
     handle_group_interrupt,
     handle_individual_interrupt,
 )
+from .conversations.static_narration import (
+    normalize_narration_segments,
+    normalize_narration_title,
+    process_static_narration,
+)
 
 
 class MessageType(Enum):
@@ -39,7 +44,12 @@ class MessageType(Enum):
         "create-new-history",
         "delete-history",
     ]
-    CONVERSATION = ["mic-audio-end", "text-input", "ai-speak-signal"]
+    CONVERSATION = [
+        "mic-audio-end",
+        "text-input",
+        "ai-speak-signal",
+        "static-narration",
+    ]
     CONFIG = ["fetch-configs", "switch-config"]
     CONTROL = ["interrupt-signal", "audio-play-start"]
     DATA = ["mic-audio-data"]
@@ -58,6 +68,9 @@ class WSMessage(TypedDict, total=False):
     display_text: Optional[dict]
     utterance_id: Optional[str]
     input_type: Optional[str]
+    title: Optional[str]
+    segments: Optional[List[str]]
+    narration_id: Optional[str]
 
 
 class WebSocketHandler:
@@ -69,6 +82,7 @@ class WebSocketHandler:
         self.client_contexts: Dict[str, ServiceContext] = {}
         self.chat_group_manager = ChatGroupManager()
         self.current_conversation_tasks: Dict[str, Optional[asyncio.Task]] = {}
+        self.static_narration_tasks: Dict[str, asyncio.Task] = {}
         self.default_context_cache = default_context_cache
         self.received_data_buffers: Dict[str, np.ndarray] = {}
         self.accepted_utterances: Dict[str, set[str]] = {}
@@ -92,6 +106,7 @@ class WebSocketHandler:
             "raw-audio-data": self._handle_raw_audio_data,
             "text-input": self._handle_conversation_trigger,
             "ai-speak-signal": self._handle_conversation_trigger,
+            "static-narration": self._handle_static_narration,
             "fetch-configs": self._handle_fetch_configs,
             "switch-config": self._handle_config_switch,
             "fetch-backgrounds": self._handle_fetch_backgrounds,
@@ -321,6 +336,7 @@ class WebSocketHandler:
         self.client_contexts.pop(client_uid, None)
         self.received_data_buffers.pop(client_uid, None)
         self.accepted_utterances.pop(client_uid, None)
+        self.static_narration_tasks.pop(client_uid, None)
         if client_uid in self.current_conversation_tasks:
             task = self.current_conversation_tasks[client_uid]
             if task and not task.done():
@@ -341,6 +357,7 @@ class WebSocketHandler:
         self.client_contexts.pop(client_uid, None)
         self.received_data_buffers.pop(client_uid, None)
         self.accepted_utterances.pop(client_uid, None)
+        self.static_narration_tasks.pop(client_uid, None)
         self.chat_group_manager.client_group_map.pop(client_uid, None)
 
         if client_uid in self.current_conversation_tasks:
@@ -391,6 +408,20 @@ class WebSocketHandler:
         self, websocket: WebSocket, client_uid: str, data: WSMessage
     ) -> None:
         """Handle conversation interruption"""
+        static_task = self.static_narration_tasks.get(client_uid)
+        if static_task and not static_task.done():
+            static_task.cancel()
+            try:
+                await static_task
+            except asyncio.CancelledError:
+                pass
+            self.static_narration_tasks.pop(client_uid, None)
+            if self.current_conversation_tasks.get(client_uid) is static_task:
+                self.current_conversation_tasks.pop(client_uid, None)
+            logger.info("Static narration interrupted for client {}", client_uid)
+            return
+        self.static_narration_tasks.pop(client_uid, None)
+
         heard_response = data.get("text", "")
         context = self.client_contexts[client_uid]
         group = self.chat_group_manager.get_client_group(client_uid)
@@ -548,6 +579,63 @@ class WebSocketHandler:
             current_conversation_tasks=self.current_conversation_tasks,
             broadcast_to_group=self.broadcast_to_group,
         )
+
+    async def _handle_static_narration(
+        self, websocket: WebSocket, client_uid: str, data: WSMessage
+    ) -> None:
+        """Speak static campus copy through the configured TTS engine."""
+        try:
+            title = normalize_narration_title(data.get("title"))
+            segments = normalize_narration_segments(data.get("segments"))
+        except ValueError as error:
+            logger.warning("Rejected static narration request: {}", error)
+            await websocket.send_text(
+                json.dumps(
+                    {
+                        "type": "error",
+                        "message": f"静态讲解内容无效：{error}",
+                    },
+                    ensure_ascii=False,
+                )
+            )
+            return
+
+        narration_id = data.get("narration_id")
+        if narration_id:
+            request_key = f"static-narration:{narration_id}"
+            accepted = self.accepted_utterances.setdefault(client_uid, set())
+            if request_key in accepted:
+                logger.warning("Ignoring duplicate narration_id {}", narration_id)
+                return
+            accepted.add(request_key)
+
+        current_task = self.current_conversation_tasks.get(client_uid)
+        if current_task and not current_task.done():
+            current_task.cancel()
+            try:
+                await current_task
+            except asyncio.CancelledError:
+                pass
+        if self.static_narration_tasks.get(client_uid) is current_task:
+            self.static_narration_tasks.pop(client_uid, None)
+
+        logger.info(
+            "Starting static narration: client_uid={} title={} segments={}",
+            client_uid,
+            title,
+            len(segments),
+        )
+        narration_task = asyncio.create_task(
+            process_static_narration(
+                context=self.client_contexts[client_uid],
+                websocket_send=websocket.send_text,
+                client_uid=client_uid,
+                title=title,
+                segments=segments,
+            )
+        )
+        self.current_conversation_tasks[client_uid] = narration_task
+        self.static_narration_tasks[client_uid] = narration_task
 
     async def _handle_fetch_configs(
         self, websocket: WebSocket, client_uid: str, data: WSMessage

@@ -29,13 +29,28 @@ import Background from "./components/canvas/background";
 import WebSocketStatus from "./components/canvas/ws-status";
 import Subtitle from "./components/canvas/subtitle";
 import { ModeProvider, useMode } from "./context/mode-context";
+import CampusKnowledge from "./components/campus/campus-knowledge";
+import { CampusTopicId, isCampusTopicId } from "./data/campus-knowledge";
+
+const readCampusTopicFromLocation = (): CampusTopicId | null => {
+  if (typeof window === 'undefined') return null;
+  const match = window.location.hash.match(/^#\/campus\/([^/?#]+)/);
+  const topicId = match?.[1] || '';
+  return isCampusTopicId(topicId) ? topicId : null;
+};
 
 function AppContent(): JSX.Element {
   const [showSidebar, setShowSidebar] = useState(true);
   const [isFooterCollapsed, setIsFooterCollapsed] = useState(false);
+  const [activeCampusTopic, setActiveCampusTopic] = useState<CampusTopicId | null>(
+    readCampusTopicFromLocation,
+  );
   const { mode } = useMode();
   const isElectron = window.api !== undefined;
   const live2dContainerRef = useRef<HTMLDivElement>(null);
+  const currentLayoutRef = useRef({ showSidebar, isFooterCollapsed });
+  const previousLayoutRef = useRef<{ showSidebar: boolean; isFooterCollapsed: boolean } | null>(null);
+  currentLayoutRef.current = { showSidebar, isFooterCollapsed };
 
   useEffect(() => {
     const handleResize = () => {
@@ -47,6 +62,53 @@ function AppContent(): JSX.Element {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  useEffect(() => {
+    const syncCampusRoute = () => {
+      setActiveCampusTopic(readCampusTopicFromLocation());
+    };
+    window.addEventListener('hashchange', syncCampusRoute);
+    window.addEventListener('popstate', syncCampusRoute);
+    return () => {
+      window.removeEventListener('hashchange', syncCampusRoute);
+      window.removeEventListener('popstate', syncCampusRoute);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (activeCampusTopic) {
+      if (!previousLayoutRef.current) {
+        previousLayoutRef.current = { ...currentLayoutRef.current };
+      }
+      setShowSidebar(false);
+      setIsFooterCollapsed(true);
+      return;
+    }
+
+    if (previousLayoutRef.current) {
+      setShowSidebar(previousLayoutRef.current.showSidebar);
+      setIsFooterCollapsed(previousLayoutRef.current.isFooterCollapsed);
+      previousLayoutRef.current = null;
+    }
+  }, [activeCampusTopic]);
+
+  const navigateToCampusTopic = (topicId: CampusTopicId) => {
+    setActiveCampusTopic(topicId);
+    window.history.pushState(
+      { campusTopic: topicId },
+      '',
+      `${window.location.pathname}${window.location.search}#/campus/${topicId}`,
+    );
+  };
+
+  const closeCampusTopic = () => {
+    setActiveCampusTopic(null);
+    window.history.pushState(
+      { campusTopic: null },
+      '',
+      `${window.location.pathname}${window.location.search}`,
+    );
+  };
+
     
   document.documentElement.style.overflow = 'hidden';
   document.body.style.overflow = 'hidden';
@@ -57,51 +119,55 @@ function AppContent(): JSX.Element {
   document.documentElement.style.width = '100%';
   document.body.style.width = '100%';
 
-  // Define base style properties shared across modes/breakpoints
-  const live2dBaseStyle = {
+  const live2dWindowFrameStyle = {
     position: "absolute" as const,
-    overflow: "hidden",
-    transition: "all 0.3s ease-in-out", // Optional transition
-    pointerEvents: "auto" as const,
-  };
-
-  // Define styles specifically for the "window" mode, using responsive syntax
-  const getResponsiveLive2DWindowStyle = (sidebarVisible: boolean) => ({
-    ...live2dBaseStyle,
     top: isElectron ? "30px" : "0px",
     height: `calc(100% - ${isElectron ? "30px" : "0px"})`,
-    zIndex: 5, // Ensure it's layered correctly below UI but above background
+    zIndex: 5,
     left: {
-      base: "0px", // Column layout (base): Start from left edge
-      md: sidebarVisible ? "440px" : "24px", // Row layout (md+): Offset by sidebar width
+      base: "0px",
+      md: showSidebar ? "440px" : "24px",
     },
-    width: {
-      base: "100%", // Column layout (base): Full width
-      md: `calc(100% - ${sidebarVisible ? "440px" : "24px"})`, // Row layout (md+): Adjust width based on sidebar
-    },
-  });
+    right: "0px",
+    overflow: "hidden",
+    transition: "left 0.3s ease-in-out",
+    pointerEvents: "none" as const,
+  };
 
   // Define styles specifically for the "pet" mode
   const live2dPetStyle = {
-    ...live2dBaseStyle,
-    top: 0, // Override position for pet mode
+    position: "absolute" as const,
+    overflow: "hidden",
+    transition: "all 0.3s ease-in-out",
+    pointerEvents: "none" as const,
+    top: 0,
     left: 0,
-    width: "100vw", // Full viewport
+    width: "100vw",
     height: "100vh",
-    zIndex: 15, // Higher zIndex for pet mode overlay
+    zIndex: 15,
   };
 
   return (
     <>
       <Box
-        ref={live2dContainerRef}
-        // Apply styles conditionally based on mode
-        // Use the function to get dynamic responsive styles for window mode
         {...(mode === "window"
-          ? getResponsiveLive2DWindowStyle(showSidebar)
+          ? live2dWindowFrameStyle
           : live2dPetStyle)}
       >
-        <Live2D />
+        <Box
+          ref={live2dContainerRef}
+          position="absolute"
+          top="0"
+          right="0"
+          width={mode === 'window' && activeCampusTopic
+            ? { base: '100%', lg: '42%' }
+            : '100%'}
+          height="100%"
+          pointerEvents="auto"
+          transition="width 0.35s cubic-bezier(0.4, 0, 0.2, 1)"
+        >
+          <Live2D showSidebar={showSidebar} />
+        </Box>
       </Box>
 
       {/* Conditional Rendering of Window UI */}
@@ -121,16 +187,22 @@ function AppContent(): JSX.Element {
             </Box>
             <Box {...layoutStyles.mainContent}>
               <Background />
+              <CampusKnowledge
+                activeTopicId={activeCampusTopic}
+                onNavigate={navigateToCampusTopic}
+                onClose={closeCampusTopic}
+              />
               <Box position="absolute" top="20px" left="20px" zIndex={10}>
                 <WebSocketStatus />
               </Box>
               <Box
                 position="absolute"
                 bottom={isFooterCollapsed ? "39px" : "185px"}
-                left="50%"
+                left={activeCampusTopic ? { base: '50%', lg: '79%' } : '50%'}
                 transform="translateX(-50%)"
                 zIndex={10}
-                width="60%"
+                width={activeCampusTopic ? { base: '80%', lg: '36%' } : '60%'}
+                transition="all 0.3s ease"
               >
                 <Subtitle />
               </Box>

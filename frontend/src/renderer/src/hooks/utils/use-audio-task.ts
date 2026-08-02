@@ -26,6 +26,11 @@ interface AudioTaskOptions {
   forwarded?: boolean
 }
 
+// Multiple components consume this hook. Keep the active playback references
+// shared so an interrupt issued from any consumer can stop the real audio task.
+const currentAudioRef: { current: HTMLAudioElement | null } = { current: null };
+const currentModelRef: { current: Live2DModel | null } = { current: null };
+
 /**
  * Custom hook for handling audio playback tasks with Live2D lip sync
  */
@@ -45,10 +50,6 @@ export const useAudioTask = () => {
     appendAIMessage,
   });
 
-  // Track current audio and model
-  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
-  const currentModelRef = useRef<Live2DModel | null>(null);
-
   stateRef.current = {
     aiState,
     setSubtitleText,
@@ -60,6 +61,7 @@ export const useAudioTask = () => {
    * Stop current audio playback and lip sync
    */
   const stopCurrentAudioAndLipSync = useCallback(() => {
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     if (currentAudioRef.current) {
       console.log('Stopping current audio and lip sync');
       const audio = currentAudioRef.current;
