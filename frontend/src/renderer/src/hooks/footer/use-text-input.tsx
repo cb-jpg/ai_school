@@ -29,21 +29,30 @@ export function useTextInput() {
     const images = await captureAllMedia();
 
     const utteranceId = crypto.randomUUID();
-    appendHumanMessage(text.trim());
-    wsContext.sendMessage({
+    const sent = wsContext.sendMessage({
       type: 'text-input',
       text: text.trim(),
       images,
       utterance_id: utteranceId,
       input_type: inputType,
     });
+    if (!sent) {
+      throw new Error(`websocket-not-open: ${wsContext.wsState}`);
+    }
+    appendHumanMessage(text.trim());
 
     setAiState('thinking-speaking');
     if (autoStopMic) stopMic();
     setInputText('');
   }, [aiState, appendHumanMessage, autoStopMic, captureAllMedia, inputText, interrupt, setAiState, stopMic, wsContext]);
 
-  const handleSend = async () => submitText(inputText, 'text');
+  const handleSend = async () => {
+    try {
+      await submitText(inputText, 'text');
+    } catch (error) {
+      console.error('Failed to submit text:', error);
+    }
+  };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (isComposing) return;

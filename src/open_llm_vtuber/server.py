@@ -37,6 +37,14 @@ class CORSStaticFiles(StarletteStaticFiles):
         if path.endswith(".js"):
             response.headers["Content-Type"] = "application/javascript"
 
+        # The frontend bundle uses content hashes, but index.html selects the
+        # current hash. Never let Chrome keep an old index that points at a
+        # stale ASR implementation after a rebuild.
+        content_type = response.headers.get("Content-Type", "")
+        if "text/html" in content_type or path.endswith(".html"):
+            response.headers["Cache-Control"] = "no-store, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+
         return response
 
 

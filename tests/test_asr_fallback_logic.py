@@ -13,7 +13,8 @@ def test_frontend_keeps_auto_fallback_and_manual_modes():
     assert "permissionAlreadyGranted" in source
     assert "no-speech" in source
     assert "getAudioTrack" in source
-    assert "decoded.numberOfChannels" in source
+    assert "createScriptProcessor" in source
+    assert "server PCM capture stopped" in source
     assert "lastError" in source
 
 

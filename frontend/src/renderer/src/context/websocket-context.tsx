@@ -1,10 +1,44 @@
 /* eslint-disable react/jsx-no-constructed-context-values */
-import React, { useContext, useCallback } from 'react';
+import React, {
+  useContext, useCallback, useEffect,
+} from 'react';
 import { wsService } from '@/services/websocket-service';
 import { useLocalStorage } from '@/hooks/utils/use-local-storage';
 
-const DEFAULT_WS_URL = 'ws://127.0.0.1:12393/client-ws';
-const DEFAULT_BASE_URL = 'http://127.0.0.1:12393';
+const LEGACY_WS_URL = 'ws://127.0.0.1:12393/client-ws';
+const LEGACY_BASE_URL = 'http://127.0.0.1:12393';
+
+const getDefaultUrls = () => {
+  if (typeof window !== 'undefined' && ['http:', 'https:'].includes(window.location.protocol)) {
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return {
+      wsUrl: `${wsProtocol}//${window.location.host}/client-ws`,
+      baseUrl: window.location.origin,
+    };
+  }
+  return { wsUrl: LEGACY_WS_URL, baseUrl: LEGACY_BASE_URL };
+};
+
+const defaults = getDefaultUrls();
+const DEFAULT_WS_URL = defaults.wsUrl;
+const DEFAULT_BASE_URL = defaults.baseUrl;
+
+const LEGACY_WS_URLS = new Set([
+  LEGACY_WS_URL,
+  'ws://localhost:12393/client-ws',
+]);
+const LEGACY_BASE_URLS = new Set([
+  LEGACY_BASE_URL,
+  'http://localhost:12393',
+]);
+
+export const normalizeWsUrl = (value: string) => (
+  DEFAULT_WS_URL !== LEGACY_WS_URL && LEGACY_WS_URLS.has(value) ? DEFAULT_WS_URL : value
+);
+
+export const normalizeBaseUrl = (value: string) => (
+  DEFAULT_BASE_URL !== LEGACY_BASE_URL && LEGACY_BASE_URLS.has(value) ? DEFAULT_BASE_URL : value
+);
 
 export interface HistoryInfo {
   uid: string;
@@ -17,7 +51,7 @@ export interface HistoryInfo {
 }
 
 interface WebSocketContextProps {
-  sendMessage: (message: object) => void;
+  sendMessage: (message: object) => boolean;
   wsState: string;
   reconnect: () => void;
   wsUrl: string;
@@ -48,8 +82,18 @@ export const defaultWsUrl = DEFAULT_WS_URL;
 export const defaultBaseUrl = DEFAULT_BASE_URL;
 
 export function WebSocketProvider({ children }: { children: React.ReactNode }) {
-  const [wsUrl, setWsUrl] = useLocalStorage('wsUrl', DEFAULT_WS_URL);
-  const [baseUrl, setBaseUrl] = useLocalStorage('baseUrl', DEFAULT_BASE_URL);
+  const [storedWsUrl, setStoredWsUrl] = useLocalStorage('wsUrl', DEFAULT_WS_URL);
+  const [storedBaseUrl, setStoredBaseUrl] = useLocalStorage('baseUrl', DEFAULT_BASE_URL);
+  const wsUrl = normalizeWsUrl(storedWsUrl);
+  const baseUrl = normalizeBaseUrl(storedBaseUrl);
+  const setWsUrl = useCallback((url: string) => setStoredWsUrl(url), [setStoredWsUrl]);
+  const setBaseUrl = useCallback((url: string) => setStoredBaseUrl(url), [setStoredBaseUrl]);
+
+  useEffect(() => {
+    if (storedWsUrl !== wsUrl) setStoredWsUrl(wsUrl);
+    if (storedBaseUrl !== baseUrl) setStoredBaseUrl(baseUrl);
+  }, [baseUrl, storedBaseUrl, storedWsUrl, wsUrl]);
+
   const handleSetWsUrl = useCallback((url: string) => {
     setWsUrl(url);
     wsService.connect(url);

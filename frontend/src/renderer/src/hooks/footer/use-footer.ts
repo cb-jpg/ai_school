@@ -6,6 +6,7 @@ import { useAiState, AiStateEnum } from '@/context/ai-state-context';
 import { useTriggerSpeak } from '@/hooks/utils/use-trigger-speak';
 import { useProactiveSpeak } from '@/context/proactive-speak-context';
 import { useDualAsr } from '@/hooks/footer/use-dual-asr';
+import { useWebSocket } from '@/context/websocket-context';
 
 export const useFooter = () => {
   const {
@@ -18,16 +19,21 @@ export const useFooter = () => {
   } = useTextInput();
 
   const { interrupt } = useInterrupt();
-  const { startMic, autoStartMicOn } = useVAD();
+  const { startMic, stopMic, autoStartMicOn, micOn } = useVAD();
   const { setAiState, aiState } = useAiState();
   const { sendTriggerSignal } = useTriggerSpeak();
   const { settings } = useProactiveSpeak();
+  const { wsState } = useWebSocket();
   const asr = useDualAsr(submitText);
 
   const handleMicToggle = async () => {
     if (asr.recording) {
       await asr.stop();
     } else {
+      // The legacy VAD path is started automatically by the websocket
+      // handshake. Stop it while the manual dual-ASR session owns the mic;
+      // otherwise two recognizers can submit competing utterances.
+      if (micOn) stopMic();
       await asr.start();
     }
   };
@@ -61,6 +67,6 @@ export const useFooter = () => {
     handleInterrupt,
     handleMicToggle,
     micOn: asr.recording,
-    asr,
+    asr: { ...asr, wsState },
   };
 };

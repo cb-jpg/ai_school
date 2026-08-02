@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { wsService, MessageEvent } from '@/services/websocket-service';
 import {
   WebSocketContext, HistoryInfo, defaultWsUrl, defaultBaseUrl,
+  normalizeWsUrl, normalizeBaseUrl,
 } from '@/context/websocket-context';
 import { ModelInfo, useLive2DConfig } from '@/context/live2d-config-context';
 import { useSubtitle } from '@/context/subtitle-context';
@@ -25,8 +26,12 @@ import { useBrowser } from '@/context/browser-context';
 function WebSocketHandler({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   const [wsState, setWsState] = useState<string>('CLOSED');
-  const [wsUrl, setWsUrl] = useLocalStorage<string>('wsUrl', defaultWsUrl);
-  const [baseUrl, setBaseUrl] = useLocalStorage<string>('baseUrl', defaultBaseUrl);
+  const [storedWsUrl, persistWsUrl] = useLocalStorage<string>('wsUrl', defaultWsUrl);
+  const [storedBaseUrl, persistBaseUrl] = useLocalStorage<string>('baseUrl', defaultBaseUrl);
+  const wsUrl = normalizeWsUrl(storedWsUrl);
+  const baseUrl = normalizeBaseUrl(storedBaseUrl);
+  const setWsUrl = (url: string) => persistWsUrl(url);
+  const setBaseUrl = (url: string) => persistBaseUrl(url);
   const { aiState, setAiState, backendSynthComplete, setBackendSynthComplete } = useAiState();
   const { setModelInfo } = useLive2DConfig();
   const { setSubtitleText } = useSubtitle();
@@ -44,6 +49,17 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     autoStartMicOnConvEndRef.current = autoStartMicOnConvEnd;
   }, [autoStartMicOnConvEnd]);
+
+  useEffect(() => {
+    if (storedWsUrl !== wsUrl) {
+      console.info('[WebSocket] migrated legacy URL', { from: storedWsUrl, to: wsUrl });
+      persistWsUrl(wsUrl);
+    }
+    if (storedBaseUrl !== baseUrl) {
+      console.info('[WebSocket] migrated legacy base URL', { from: storedBaseUrl, to: baseUrl });
+      persistBaseUrl(baseUrl);
+    }
+  }, [baseUrl, storedBaseUrl, storedWsUrl, wsUrl]);
 
   useEffect(() => {
     if (pendingModelInfo && confUid) {

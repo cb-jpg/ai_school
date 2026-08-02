@@ -11,7 +11,7 @@ interface SubtitleTextProps {
 
 // Reusable components
 const SubtitleText = memo(({ text }: SubtitleTextProps) => (
-  <Text {...canvasStyles.subtitle.text}>
+  <Text data-testid="subtitle-text" {...canvasStyles.subtitle.text}>
     {text}
   </Text>
 ));

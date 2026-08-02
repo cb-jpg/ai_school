@@ -173,6 +173,11 @@ def init_webtool_routes(default_context_cache: ServiceContext) -> APIRouter:
 
         try:
             contents = await file.read()
+            logger.info(
+                "Received browser ASR upload: filename={} bytes={}",
+                file.filename,
+                len(contents),
+            )
 
             # Validate minimum file size
             if len(contents) < 44:  # Minimum WAV header size

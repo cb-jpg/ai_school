@@ -185,9 +185,10 @@ class WebSocketService {
     }
   }
 
-  sendMessage(message: object) {
+  sendMessage(message: object): boolean {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
+      return true;
     } else {
       console.warn('WebSocket is not open. Unable to send message:', message);
       toaster.create({
@@ -195,6 +196,7 @@ class WebSocketService {
         type: 'error',
         duration: 2000,
       });
+      return false;
     }
   }
 

@@ -264,6 +264,12 @@ class WebSocketHandler:
                     logger.warning("Ignoring duplicate utterance_id %s", utterance_id)
                     return
                 accepted.add(utterance_id)
+            logger.info(
+                "Received text input: input_type={} chars={} utterance_id={}",
+                data.get("input_type", "text"),
+                len(data.get("text", "")),
+                utterance_id or "none",
+            )
 
         handler = self._message_handlers.get(msg_type)
         if handler:
