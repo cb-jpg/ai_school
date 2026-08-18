@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学校知识库管理后台 - 石实实验学校</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: #f5f7fa;
+            color: #333;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #002FA7 0%, #001f7a 100%);
+            color: white;
+            padding: 20px 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #002FA7;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e1e4e8;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            font-size: 16px;
+            color: #666;
+            transition: all 0.3s;
+        }
+
+        .tab:hover {
+            color: #002FA7;
+        }
+
+        .tab.active {
+            color: #002FA7;
+            border-bottom-color: #002FA7;
+            font-weight: 600;
+        }
+
+        .panel {
+            display: none;
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .panel.active {
+            display: block;
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #002FA7;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #002FA7;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #001f7a;
+        }
+
+        .btn-secondary {
+            background: #e1e4e8;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #d1d5d9;
+        }
+
+        .document-list {
+            margin-top: 20px;
+        }
+
+        .document-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #e1e4e8;
+            transition: background 0.2s;
+        }
+
+        .document-item:hover {
+            background: #f8f9fa;
+        }
+
+        .document-info {
+            flex: 1;
+        }
+
+        .document-title {
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .document-meta {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .document-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-category {
+            background: #e8eeff;
+            color: #002FA7;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .error {
+            background: #fee;
+            border-left: 4px solid #c33;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .success {
+            background: #efe;
+            border-left: 4px solid #3c3;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎓 学校知识库管理后台</h1>
+        <p>佛山市南海区石实实验学校 - AI 数字人问答系统</p>
+    </div>
+
+    <div class="container">
+        <!-- 统计卡片 -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="totalDocs">0</div>
+                <div class="stat-label">文档总数</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalCategories">0</div>
+                <div class="stat-label">分类数量</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalNodes">4</div>
+                <div class="stat-label">校史节点</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalStudents">3</div>
+                <div class="stat-label">学习标兵</div>
+            </div>
+        </div>
+
+        <!-- 标签页 -->
+        <div class="tabs">
+            <button class="tab active" onclick="showPanel('documents')">📄 文档管理</button>
+            <button class="tab" onclick="showPanel('upload')">📤 文件上传</button>
+            <button class="tab" onclick="showPanel('search')">🔍 知识检索</button>
+            <button class="tab" onclick="showPanel('statistics')">📊 统计信息</button>
+        </div>
+
+        <!-- 文档管理面板 -->
+        <div id="documents-panel" class="panel active">
+            <h2 class="section-title">文档列表</h2>
+            <div id="documentsList">
+                <div class="loading">加载中...</div>
+            </div>
+        </div>
+
+        <!-- 文件上传面板 -->
+        <div id="upload-panel" class="panel">
+            <h2 class="section-title">上传知识文档</h2>
+            <form id="uploadForm">
+                <div class="form-group">
+                    <label>选择文件</label>
+                    <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt,.md">
+                    <small style="color: #999;">支持格式: PDF, DOC, DOCX, TXT, MD</small>
+                </div>
+                <div class="form-group">
+                    <label>文档分类</label>
+                    <select id="categorySelect">
+                        <option value="">请选择分类</option>
+                        <option value="校史">校史</option>
+                        <option value="荣誉">荣誉</option>
+                        <option value="招生">招生</option>
+                        <option value="课程">课程</option>
+                        <option value="教师">教师</option>
+                        <option value="学生">学生</option>
+                        <option value="制度">制度</option>
+                        <option value="其他">其他</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>文档标题</label>
+                    <input type="text" id="docTitle" placeholder="输入文档标题（可选）">
+                </div>
+                <button type="submit" class="btn btn-primary">上传文档</button>
+            </form>
+        </div>
+
+        <!-- 知识检索面板 -->
+        <div id="search-panel" class="panel">
+            <h2 class="section-title">知识库检索</h2>
+            <div class="form-group">
+                <label>搜索查询</label>
+                <input type="text" id="searchQuery" placeholder="输入要搜索的内容...">
+            </div>
+            <div class="form-group">
+                <label>分类过滤</label>
+                <select id="searchCategory">
+                    <option value="">全部分类</option>
+                    <option value="校史">校史</option>
+                    <option value="荣誉">荣誉</option>
+                    <option value="招生">招生</option>
+                    <option value="课程">课程</option>
+                </select>
+            </div>
+            <button onclick="searchDocuments()" class="btn btn-primary">搜索</button>
+            <div id="searchResults" style="margin-top: 20px;"></div>
+        </div>
+
+        <!-- 统计信息面板 -->
+        <div id="statistics-panel" class="panel">
+            <h2 class="section-title">知识库统计</h2>
+            <div id="statisticsContent">
+                <div class="loading">加载中...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8001';
+
+        // 显示面板
+        function showPanel(panelName) {
+            // 隐藏所有面板
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+
+            // 显示选中的面板
+            document.getElementById(`${panelName}-panel`).classList.add('active');
+            event.target.classList.add('active');
+
+            // 加载对应数据
+            if (panelName === 'documents') loadDocuments();
+            if (panelName === 'statistics') loadStatistics();
+        }
+
+        // 加载文档列表
+        async function loadDocuments() {
+            try {
+                const response = await fetch(`${API_BASE}/api/statistics`);
+                const data = await response.json();
+
+                if (data.success) {
+                    const stats = data.statistics;
+                    document.getElementById('totalDocs').textContent = stats.total_documents || 0;
+                    document.getElementById('totalCategories').textContent = stats.categories?.length || 0;
+
+                    // 显示分类统计
+                    let html = '<h3 style="margin: 20px 0;">分类统计</h3>';
+                    if (stats.category_counts) {
+                        html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px;">';
+                        for (const [category, count] of Object.entries(stats.category_counts)) {
+                            html += `
+                                <div style="background: #f8f9fa; padding: 15px; border-radius: 4px;">
+                                    <div style="font-size: 24px; font-weight: 700; color: #002FA7;">${count}</div>
+                                    <div style="font-size: 14px; color: #666;">${category}</div>
+                                </div>
+                            `;
+                        }
+                        html += '</div>';
+                    }
+                    document.getElementById('documentsList').innerHTML = html;
+                }
+            } catch (error) {
+                document.getElementById('documentsList').innerHTML = `
+                    <div class="error">
+                        无法连接到服务器。请确保管理后台已启动：<br>
+                        <code>uv run python school_admin/app.py</code>
+                    </div>
+                `;
+            }
+        }
+
+        // 文件上传
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const fileInput = document.getElementById('fileInput');
+            const category = document.getElementById('categorySelect').value;
+            const title = document.getElementById('docTitle').value;
+
+            if (!fileInput.files.length) {
+                alert('请选择文件');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            if (category) formData.append('category', category);
+            if (title) formData.append('title', title);
+
+            try {
+                const response = await fetch(`${API_BASE}/api/documents/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('上传成功！');
+                    fileInput.value = '';
+                    document.getElementById('docTitle').value = '';
+                } else {
+                    alert('上传失败: ' + result.message);
+                }
+            } catch (error) {
+                alert('上传失败: ' + error.message);
+            }
+        });
+
+        // 搜索文档
+        async function searchDocuments() {
+            const query = document.getElementById('searchQuery').value;
+            const category = document.getElementById('searchCategory').value;
+
+            if (!query.trim()) {
+                alert('请输入搜索查询');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/search`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query, category, top_k: 5 })
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.results.length > 0) {
+                    let html = '<h3 style="margin: 20px 0;">搜索结果</h3>';
+                    data.results.forEach((result, index) => {
+                        html += `
+                            <div style="background: #f8f9fa; padding: 15px; margin-bottom: 10px; border-radius: 4px;">
+                                <div style="font-weight: 600; margin-bottom: 8px;">${index + 1}. ${result.metadata?.title || '无标题'}</div>
+                                <div style="font-size: 14px; color: #666;">${result.content?.substring(0, 200)}...</div>
+                                ${result.metadata?.category ? `<span class="badge badge-category">${result.metadata.category}</span>` : ''}
+                            </div>
+                        `;
+                    });
+                    document.getElementById('searchResults').innerHTML = html;
+                } else {
+                    document.getElementById('searchResults').innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">未找到相关结果</div>';
+                }
+            } catch (error) {
+                document.getElementById('searchResults').innerHTML = '<div class="error">搜索失败: ' + error.message + '</div>';
+            }
+        }
+
+        // 加载统计信息
+        async function loadStatistics() {
+            try {
+                const response = await fetch(`${API_BASE}/api/statistics`);
+                const data = await response.json();
+
+                if (data.success) {
+                    const stats = data.statistics;
+                    let html = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">';
+
+                    html += `
+                        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                            <h3 style="font-size: 16px; margin-bottom: 15px;">📄 文档统计</h3>
+                            <div>总文档数: <strong>${stats.total_documents || 0}</strong></div>
+                            <div>文档块数: <strong>${stats.total_chunks || 0}</strong></div>
+                        </div>
+                    `;
+
+                    html += `
+                        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                            <h3 style="font-size: 16px; margin-bottom: 15px;">🏷️ 分类统计</h3>
+                            <div>分类数量: <strong>${stats.categories?.length || 0}</strong></div>
+                        </div>
+                    `;
+
+                    html += '</div>';
+
+                    if (stats.category_counts) {
+                        html += '<h3 style="margin: 30px 0 15px;">分类详情</h3>';
+                        html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px;">';
+                        for (const [category, count] of Object.entries(stats.category_counts)) {
+                            html += `
+                                <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #e1e4e8;">
+                                    <div style="font-size: 20px; font-weight: 700; color: #002FA7;">${count}</div>
+                                    <div style="font-size: 14px;">${category}</div>
+                                </div>
+                            `;
+                        }
+                        html += '</div>';
+                    }
+
+                    document.getElementById('statisticsContent').innerHTML = html;
+                }
+            } catch (error) {
+                document.getElementById('statisticsContent').innerHTML = '<div class="error">加载失败: ' + error.message + '</div>';
+            }
+        }
+
+        // 页面加载时初始化
+        window.addEventListener('load', () => {
+            loadDocuments();
+        });
+    </script>
+</body>
+</html>
