@@ -59,9 +59,9 @@ async def process_single_conversation(
             user_input, context.asr_engine, websocket_send
         )
 
-        # Create batch input
+        # Create batch input with enriched text (after RAG retrieval)
         batch_input = create_batch_input(
-            input_text=input_text,
+            input_text=enriched_input_text,  # Use enriched text from RAG
             images=images,
             from_name=context.character_config.human_name,
             metadata=metadata,
@@ -84,6 +84,32 @@ async def process_single_conversation(
         logger.info(f"User input: {input_text}")
         if images:
             logger.info(f"With {len(images)} images")
+
+        # RAG 检索集成：检查是否需要从学校知识库检索相关信息
+        enriched_input_text = input_text
+        try:
+            from school_rag.school_rag_integration import get_rag_integration
+            rag_integration = get_rag_integration()
+
+            if rag_integration._initialized and rag_integration.needs_rag_retrieval(input_text):
+                logger.info("检测到学校相关问题，执行 RAG 检索...")
+                rag_result = await rag_integration.retrieve_and_enrich_input(
+                    query=input_text,
+                    top_k=3,
+                )
+
+                if rag_result.get("has_context"):
+                    enriched_input_text = rag_result.get("enriched_query", input_text)
+                    logger.info(f"RAG 检索成功，检索到 {len(rag_result.get('retrieved_docs', []))} 条相关资料")
+
+                    # 发送 RAG 检索状态到前端
+                    await websocket_send(json.dumps({
+                        "type": "rag-status",
+                        "has_context": True,
+                        "doc_count": len(rag_result.get("retrieved_docs", [])),
+                    }))
+        except Exception as e:
+            logger.warning(f"RAG 检索失败，继续使用原始输入: {e}")
 
         try:
             # agent.chat yields Union[SentenceOutput, Dict[str, Any]]
