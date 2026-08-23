@@ -171,9 +171,62 @@ function AppContent(): JSX.Element {
     zIndex: 15,
   };
 
-  // Show Hero Landing page on hero route
+  // Show Hero Landing page on hero route (still wrapped in all providers)
   if (currentRoute === 'hero') {
-    return <HeroLanding />;
+    return (
+      <>
+        {/* Live2D layer for hero route */}
+        <Box
+          position="absolute"
+          top={0}
+          left={0}
+          width="100%"
+          height={isElectron ? "calc(100vh - 30px)" : "100vh"}
+          zIndex={1}
+          pointerEvents="none"
+        >
+          <Live2D showSidebar={false} />
+        </Box>
+
+        {/* CampusKnowledge overlay for topic pages */}
+        <Box
+          position="absolute"
+          top={0}
+          left={0}
+          width="100%"
+          height={isElectron ? "calc(100vh - 30px)" : "100vh"}
+          zIndex={2}
+          pointerEvents="none"
+        >
+          <CampusKnowledge
+            activeTopicId={activeCampusTopic}
+            onNavigate={navigateToCampusTopic}
+            onClose={closeCampusTopic}
+          />
+        </Box>
+
+        {/* WebSocketStatus indicator */}
+        <Box position="absolute" top="20px" left="20px" zIndex={10}>
+          <WebSocketStatus />
+        </Box>
+
+        {/* Subtitle overlay */}
+        <Box
+          position="absolute"
+          bottom="20%"
+          left="50%"
+          transform="translateX(-50%)"
+          zIndex={10}
+          width="80%"
+          maxWidth="600px"
+        >
+          <Subtitle />
+        </Box>
+
+        {/* Hero UI overlay */}
+        <HeroLanding />
+      </>
+    );
   }
 
   return (

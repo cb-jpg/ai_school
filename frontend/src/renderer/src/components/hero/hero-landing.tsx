@@ -11,7 +11,6 @@ import { FiHome, FiBook, FiAward, FiUsers } from 'react-icons/fi';
 import Navbar from './navbar';
 import MobileMenu from './mobile-menu';
 import DialogBox from './dialog-box';
-import Live2DContainer from './live2d-container';
 
 // 明亮简洁风格配色
 const lightColors = {
@@ -94,20 +93,19 @@ export default function HeroLanding() {
           />
         </Box>
 
-        {/* Right Side: Live2D Character */}
+        {/* Right Side: Live2D Character Area (Transparent for Live2D background) */}
         <Box
           flex="1"
           maxWidth={{ base: '100%', md: '50%', lg: '55%' }}
           height="full"
           zIndex={5}
+          pointerEvents="none"
           display="flex"
           alignItems="center"
           justifyContent="center"
-          bg={lightColors.accent}
-          rounded="2xl"
           ml={4}
         >
-          <Live2DContainer />
+          {/* Empty space - Live2D renders as background from App.tsx */}
         </Box>
       </Flex>
     </Box>
