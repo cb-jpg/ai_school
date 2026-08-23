@@ -8,13 +8,14 @@ It uses FastAPI for the server and Starlette for static file serving.
 
 import os
 import shutil
+from loguru import logger
 
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import Response
 from starlette.staticfiles import StaticFiles as StarletteStaticFiles
 
-from .routes import init_client_ws_route, init_webtool_routes, init_proxy_route
+from .routes import init_client_ws_route, init_webtool_routes, init_proxy_route, init_knowledge_management_routes
 from .campus_routes import init_campus_topics_route
 from .service_context import ServiceContext
 from .config_manager.utils import Config
@@ -108,6 +109,9 @@ class WebSocketServer:
         # Include campus topics routes
         self.app.include_router(init_campus_topics_route())
 
+        # Include knowledge base management routes
+        self.app.include_router(init_knowledge_management_routes())
+
         # Initialize and include proxy routes if proxy is enabled
         system_config = config.system_config
         if hasattr(system_config, "enable_proxy") and system_config.enable_proxy:
@@ -154,7 +158,16 @@ class WebSocketServer:
 
         # Prefer the reproducible web build from the v1.2.1 frontend source.
         # Keep the checked-in deployment artifact as a fallback for upstream checkouts.
-        frontend_directory = "frontend/dist/web" if os.path.exists("frontend/dist/web/index.html") else "frontend"
+        # Check for different possible build output directories
+        if os.path.exists("frontend/dist/web/index.html"):
+            frontend_directory = "frontend/dist/web"
+        elif os.path.exists("frontend/out/renderer/index.html"):
+            frontend_directory = "frontend/out/renderer"
+        elif os.path.exists("frontend/index.html"):
+            frontend_directory = "frontend"
+        else:
+            frontend_directory = "frontend"  # fallback
+        logger.info(f"Using frontend directory: {frontend_directory}")
         self.app.mount(
             "/",
             CORSStaticFiles(directory=frontend_directory, html=True),

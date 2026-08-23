@@ -31,6 +31,28 @@ import Subtitle from "./components/canvas/subtitle";
 import { ModeProvider, useMode } from "./context/mode-context";
 import CampusKnowledge from "./components/campus/campus-knowledge";
 import { CampusTopicId, isCampusTopicId } from "./data/campus-knowledge";
+import HeroLanding from "./components/hero/hero-landing";
+
+// 定义路由类型
+type AppRoute = 'hero' | 'main' | 'campus';
+
+const getCurrentRoute = (): AppRoute => {
+  if (typeof window === 'undefined') return 'main';
+  const hash = window.location.hash;
+
+  // Hero landing page route
+  if (hash === '#/hero' || hash === '#/landing' || hash === '' || hash === '#/') {
+    return 'hero';
+  }
+
+  // Campus routes
+  if (hash.startsWith('#/campus/')) {
+    return 'campus';
+  }
+
+  // Default main app
+  return 'main';
+};
 
 const readCampusTopicFromLocation = (): CampusTopicId | null => {
   if (typeof window === 'undefined') return null;
@@ -45,6 +67,7 @@ function AppContent(): JSX.Element {
   const [activeCampusTopic, setActiveCampusTopic] = useState<CampusTopicId | null>(
     readCampusTopicFromLocation,
   );
+  const [currentRoute, setCurrentRoute] = useState<AppRoute>(() => getCurrentRoute());
   const { mode } = useMode();
   const isElectron = window.api !== undefined;
   const live2dContainerRef = useRef<HTMLDivElement>(null);
@@ -63,14 +86,15 @@ function AppContent(): JSX.Element {
   }, []);
 
   useEffect(() => {
-    const syncCampusRoute = () => {
+    const syncRoute = () => {
+      setCurrentRoute(getCurrentRoute());
       setActiveCampusTopic(readCampusTopicFromLocation());
     };
-    window.addEventListener('hashchange', syncCampusRoute);
-    window.addEventListener('popstate', syncCampusRoute);
+    window.addEventListener('hashchange', syncRoute);
+    window.addEventListener('popstate', syncRoute);
     return () => {
-      window.removeEventListener('hashchange', syncCampusRoute);
-      window.removeEventListener('popstate', syncCampusRoute);
+      window.removeEventListener('hashchange', syncRoute);
+      window.removeEventListener('popstate', syncRoute);
     };
   }, []);
 
@@ -146,6 +170,11 @@ function AppContent(): JSX.Element {
     height: "100vh",
     zIndex: 15,
   };
+
+  // Show Hero Landing page on hero route
+  if (currentRoute === 'hero') {
+    return <HeroLanding />;
+  }
 
   return (
     <>

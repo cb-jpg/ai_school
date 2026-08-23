@@ -5,3 +5,31 @@ body, html {
     background-color: transparent;
 }
 
+/* Hero Landing Page Animations */
+@keyframes fadeSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(24px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-\[fadeSlideUp_0\.8s_ease_0\.2s_both\] {
+    animation: fadeSlideUp 0.8s ease 0.2s both;
+}
+
+.animate-\[fadeSlideUp_0\.8s_ease_0\.4s_both\] {
+    animation: fadeSlideUp 0.8s ease 0.4s both;
+}
+
+.animate-\[fadeSlideUp_0\.8s_ease_0\.7s_both\] {
+    animation: fadeSlideUp 0.8s ease 0.7s both;
+}
+
+.animate-\[fadeSlideUp_0\.8s_ease_0\.9s_both\] {
+    animation: fadeSlideUp 0.8s ease 0.9s both;
+}
+

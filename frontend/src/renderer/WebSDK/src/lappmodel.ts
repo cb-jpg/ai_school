@@ -84,9 +84,18 @@ export class LAppModel extends CubismUserModel {
   public loadAssets(dir: string, fileName: string): void {
     this._modelHomeDir = dir;
 
-    fetch(`${this._modelHomeDir}${fileName}`)
-      .then((response) => response.arrayBuffer())
+    const fullUrl = `${this._modelHomeDir}${fileName}`;
+    console.log(`[LAppModel] Loading model from: ${fullUrl}`);
+
+    fetch(fullUrl)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.arrayBuffer();
+      })
       .then((arrayBuffer) => {
+        console.log(`[LAppModel] Successfully loaded model3.json, size: ${arrayBuffer.byteLength}`);
         const setting: ICubismModelSetting = new CubismModelSettingJson(
           arrayBuffer,
           arrayBuffer.byteLength
@@ -100,7 +109,8 @@ export class LAppModel extends CubismUserModel {
       })
       .catch((error) => {
         // model3.json読み込みでエラーが発生した時点で描画は不可能なので、setupせずエラーをcatchして何もしない
-        CubismLogError(`Failed to load file ${this._modelHomeDir}${fileName}`);
+        CubismLogError(`Failed to load file ${this._modelHomeDir}${fileName}: ${error}`);
+        console.error(`[LAppModel] Failed to load model:`, error);
       });
   }
 
@@ -847,6 +857,11 @@ export class LAppModel extends CubismUserModel {
       return false;
     }
 
+    // Check if model setting is initialized
+    if (this._modelSetting == null) {
+      return false;
+    }
+
     const count: number = this._modelSetting.getHitAreasCount();
 
     for (let i = 0; i < count; i++) {
@@ -868,6 +883,12 @@ export class LAppModel extends CubismUserModel {
   public anyhitTest(x: number, y: number): string | null {
     // If opacity is less than 1, no hit detection
     if (this._opacity < 1) {
+      return null;
+    }
+
+    // Check if model setting is initialized
+    if (this._modelSetting == null) {
+      console.warn('[LAppModel] Model setting not initialized yet');
       return null;
     }
 

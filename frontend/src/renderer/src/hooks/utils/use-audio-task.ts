@@ -173,11 +173,16 @@ export const useAudioTask = () => {
 
         // Start talk motion
         if (LAppDefine && LAppDefine.PriorityNormal) {
-          console.log("Starting random 'Talk' motion");
-          model.startRandomMotion(
-            "Talk",
-            LAppDefine.PriorityNormal,
-          );
+          // Check if modelSetting is initialized before starting motion
+          if (model._modelSetting) {
+            console.log("Starting random 'Talk' motion");
+            model.startRandomMotion(
+              "Talk",
+              LAppDefine.PriorityNormal,
+            );
+          } else {
+            console.warn("Model setting not initialized - cannot start talk motion");
+          }
         } else {
           console.warn("LAppDefine.PriorityNormal not found - cannot start talk motion");
         }

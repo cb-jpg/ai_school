@@ -15,6 +15,7 @@ from .asr.audio_preprocessor import (
     prepare_browser_audio,
 )
 from verification.asr_config import build_asr_config, public_browser_config
+from .knowledge.routes import init_knowledge_routes
 
 
 def init_client_ws_route(default_context_cache: ServiceContext) -> APIRouter:
@@ -296,3 +297,16 @@ def init_webtool_routes(default_context_cache: ServiceContext) -> APIRouter:
             await websocket.close()
 
     return router
+
+
+def init_knowledge_management_routes(knowledge_dir: str = "data/knowledge") -> APIRouter:
+    """
+    Create and return API routes for knowledge base management.
+
+    Args:
+        knowledge_dir: Directory for knowledge data storage.
+
+    Returns:
+        APIRouter: Configured router with knowledge endpoints.
+    """
+    return init_knowledge_routes(knowledge_dir)

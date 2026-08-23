@@ -48,6 +48,24 @@ const createConfig = async (outDir: string) => ({
   base: "./",
   server: {
     port: 3000,
+    proxy: {
+      // Proxy WebSocket connections to backend
+      '/client-ws': {
+        target: 'ws://localhost:12393',
+        ws: true,
+        changeOrigin: true,
+      },
+      // Proxy HTTP requests to backend
+      '/api': {
+        target: 'http://localhost:12393',
+        changeOrigin: true,
+      },
+      // Proxy health check and other backend routes
+      '/health': {
+        target: 'http://localhost:12393',
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     outDir: path.join(__dirname, outDir),

@@ -30,6 +30,7 @@ function parseModelUrl(url: string): { baseUrl: string; modelDir: string; modelF
     const urlObj = new URL(url);
     const { pathname } = urlObj;
 
+    // Find the model3.json file
     const lastSlashIndex = pathname.lastIndexOf('/');
     if (lastSlashIndex === -1) {
       throw new Error('Invalid model URL format');
@@ -38,13 +39,12 @@ function parseModelUrl(url: string): { baseUrl: string; modelDir: string; modelF
     const fullFileName = pathname.substring(lastSlashIndex + 1);
     const modelFileName = fullFileName.replace('.model3.json', '');
 
-    const secondLastSlashIndex = pathname.lastIndexOf('/', lastSlashIndex - 1);
-    if (secondLastSlashIndex === -1) {
-      throw new Error('Invalid model URL format');
-    }
+    // baseUrl should be the server root (protocol + host)
+    const baseUrl = `${urlObj.protocol}//${urlObj.host}`;
 
-    const modelDir = pathname.substring(secondLastSlashIndex + 1, lastSlashIndex);
-    const baseUrl = `${urlObj.protocol}//${urlObj.host}${pathname.substring(0, secondLastSlashIndex + 1)}`;
+    // modelDir should be the full directory path containing the model3.json
+    // e.g., "/live2d-models/mao_pro/runtime" for "/live2d-models/mao_pro/runtime/mao_pro.model3.json"
+    const modelDir = pathname.substring(0, lastSlashIndex);
 
     return { baseUrl, modelDir, modelFileName };
   } catch (error) {

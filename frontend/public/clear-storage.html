@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>清理LocalStorage工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 600px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #002FA7;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .status.info {
+            background: #E8EEFF;
+            color: #002FA7;
+            border-left: 4px solid #002FA7;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border-left: 4px solid #28a745;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid #dc3545;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 150px;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #002FA7;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #001f73;
+            transform: scale(1.05);
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+            transform: scale(1.05);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: scale(1.05);
+        }
+
+        .key-list {
+            margin-top: 20px;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .key-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .key-item:last-child {
+            border-bottom: none;
+        }
+
+        .key-name {
+            font-family: monospace;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .key-status {
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .key-status.valid {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .key-status.invalid {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 LocalStorage 清理工具</h1>
+
+        <div id="status" class="status info">
+            正在检查 localStorage 数据...
+        </div>
+
+        <div class="button-group">
+            <button class="btn-primary" onclick="checkLocalStorage()">检查数据</button>
+            <button class="btn-danger" onclick="clearInvalidData()">清理错误数据</button>
+            <button class="btn-secondary" onclick="clearAllData()">清除全部数据</button>
+        </div>
+
+        <div id="keyList" class="key-list" style="display: none;">
+            <h3 style="margin-bottom: 10px; font-size: 14px; color: #495057;">存储的键值:</h3>
+            <div id="keysContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        const keysToCheck = ['wsUrl', 'baseUrl', 'micOn', 'autoStopMic'];
+
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        function checkLocalStorage() {
+            const keysContainer = document.getElementById('keysContainer');
+            const keyList = document.getElementById('keyList');
+            keysContainer.innerHTML = '';
+
+            let validCount = 0;
+            let invalidCount = 0;
+
+            keysToCheck.forEach(key => {
+                const item = localStorage.getItem(key);
+                if (item === null) return;
+
+                let isValid = false;
+                try {
+                    JSON.parse(item);
+                    isValid = true;
+                    validCount++;
+                } catch (e) {
+                    invalidCount++;
+                }
+
+                const keyItem = document.createElement('div');
+                keyItem.className = 'key-item';
+                keyItem.innerHTML = `
+                    <span class="key-name">${key}</span>
+                    <span class="key-status ${isValid ? 'valid' : 'invalid'}">
+                        ${isValid ? '✓ 有效' : '✗ 无效'}
+                    </span>
+                `;
+                keysContainer.appendChild(keyItem);
+            });
+
+            // 显示所有localStorage键
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && !keysToCheck.includes(key)) {
+                    const keyItem = document.createElement('div');
+                    keyItem.className = 'key-item';
+                    keyItem.innerHTML = `
+                        <span class="key-name">${key}</span>
+                        <span class="key-status valid">其他</span>
+                    `;
+                    keysContainer.appendChild(keyItem);
+                }
+            }
+
+            keyList.style.display = 'block';
+
+            if (invalidCount > 0) {
+                showStatus(`发现 ${invalidCount} 个错误数据项，建议清理`, 'error');
+            } else if (validCount === 0 && invalidCount === 0) {
+                showStatus('LocalStorage 为空或没有需要检查的键', 'info');
+            } else {
+                showStatus('所有数据都有效！', 'success');
+            }
+        }
+
+        function clearInvalidData() {
+            let clearedCount = 0;
+
+            keysToCheck.forEach(key => {
+                const item = localStorage.getItem(key);
+                if (item !== null) {
+                    try {
+                        JSON.parse(item);
+                        // 数据有效，保留
+                    } catch (e) {
+                        // 数据无效，删除
+                        localStorage.removeItem(key);
+                        clearedCount++;
+                    }
+                }
+            });
+
+            if (clearedCount > 0) {
+                showStatus(`已清理 ${clearedCount} 个错误数据项！请刷新页面`, 'success');
+            } else {
+                showStatus('没有发现需要清理的错误数据', 'info');
+            }
+
+            // 重新检查
+            setTimeout(checkLocalStorage, 500);
+        }
+
+        function clearAllData() {
+            if (confirm('确定要清除所有 localStorage 数据吗？此操作不可恢复！')) {
+                localStorage.clear();
+                showStatus('已清除所有数据！请刷新页面', 'success');
+                document.getElementById('keyList').style.display = 'none';
+            }
+        }
+
+        // 页面加载时自动检查
+        window.onload = function() {
+            checkLocalStorage();
+        };
+    </script>
+</body>
+</html>

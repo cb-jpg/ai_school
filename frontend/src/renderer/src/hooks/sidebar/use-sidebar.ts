@@ -1,15 +1,23 @@
-import { useDisclosure } from '@chakra-ui/react';
+import { useState, useCallback } from 'react';
 import { useWebSocket } from '@/context/websocket-context';
 import { useInterrupt } from '@/components/canvas/live2d';
 import { useChatHistory } from '@/context/chat-history-context';
 import { useMode, ModeType } from '@/context/mode-context';
 
 export const useSidebar = () => {
-  const disclosure = useDisclosure();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const { sendMessage } = useWebSocket();
   const { interrupt } = useInterrupt();
   const { currentHistoryUid, messages, updateHistoryList } = useChatHistory();
   const { setMode, mode, isElectron } = useMode();
+
+  const onSettingsOpen = useCallback(() => {
+    setSettingsOpen(true);
+  }, []);
+
+  const onSettingsClose = useCallback(() => {
+    setSettingsOpen(false);
+  }, []);
 
   const createNewHistory = (): void => {
     if (currentHistoryUid && messages.length > 0) {
@@ -24,9 +32,9 @@ export const useSidebar = () => {
   };
 
   return {
-    settingsOpen: disclosure.open,
-    onSettingsOpen: disclosure.onOpen,
-    onSettingsClose: disclosure.onClose,
+    settingsOpen,
+    onSettingsOpen,
+    onSettingsClose,
     createNewHistory,
     setMode,
     currentMode: mode,

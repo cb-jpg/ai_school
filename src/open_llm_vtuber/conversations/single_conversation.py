@@ -59,34 +59,15 @@ async def process_single_conversation(
             user_input, context.asr_engine, websocket_send
         )
 
-        # Create batch input with enriched text (after RAG retrieval)
-        batch_input = create_batch_input(
-            input_text=enriched_input_text,  # Use enriched text from RAG
-            images=images,
-            from_name=context.character_config.human_name,
-            metadata=metadata,
-        )
-
-        # Store user message (check if we should skip storing to history)
-        skip_history = metadata and metadata.get("skip_history", False)
-        if context.history_uid and not skip_history:
-            store_message(
-                conf_uid=context.character_config.conf_uid,
-                history_uid=context.history_uid,
-                role="human",
-                content=input_text,
-                name=context.character_config.human_name,
-            )
-
-        if skip_history:
-            logger.debug("Skipping storing user input to history (proactive speak)")
-
         logger.info(f"User input: {input_text}")
+
+        # Initialize enriched_input_text with original input (MUST be before any usage)
+        enriched_input_text = input_text
+
         if images:
             logger.info(f"With {len(images)} images")
 
         # RAG 检索集成：检查是否需要从学校知识库检索相关信息
-        enriched_input_text = input_text
         try:
             from school_rag.school_rag_integration import get_rag_integration
             rag_integration = get_rag_integration()
@@ -110,6 +91,25 @@ async def process_single_conversation(
                     }))
         except Exception as e:
             logger.warning(f"RAG 检索失败，继续使用原始输入: {e}")
+
+        # Create batch input with enriched text (after RAG retrieval)
+        batch_input = create_batch_input(
+            input_text=enriched_input_text,  # Use enriched text from RAG
+            images=images,
+            from_name=context.character_config.human_name,
+            metadata=metadata,
+        )
+
+        # Store user message (check if we should skip storing to history)
+        skip_history = metadata and metadata.get("skip_history", False)
+        if context.history_uid and not skip_history:
+            store_message(
+                conf_uid=context.character_config.conf_uid,
+                history_uid=context.history_uid,
+                role="human",
+                content=input_text,
+                name=context.character_config.human_name,
+            )
 
         try:
             # agent.chat yields Union[SentenceOutput, Dict[str, Any]]

@@ -127,13 +127,15 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
         if (message.client_uid) {
           setSelfUid(message.client_uid);
         }
-        setPendingModelInfo(message.model_info);
-        // setModelInfo(message.model_info);
-        // We don't know when the confRef in live2d-config-context will be updated, so we set a delay here for convenience
-        if (message.model_info && !message.model_info.url.startsWith("http")) {
-          const modelUrl = baseUrl + message.model_info.url;
-          // eslint-disable-next-line no-param-reassign
-          message.model_info.url = modelUrl;
+        // Directly set model info instead of using pending
+        if (message.model_info) {
+          if (!message.model_info.url.startsWith("http")) {
+            const modelUrl = baseUrl + message.model_info.url;
+            // eslint-disable-next-line no-param-reassign
+            message.model_info.url = modelUrl;
+          }
+          setModelInfo(message.model_info);
+          console.log('Model info set:', message.model_info);
         }
 
         setAiState('idle');

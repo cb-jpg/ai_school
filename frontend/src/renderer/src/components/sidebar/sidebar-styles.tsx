@@ -200,7 +200,7 @@ export const sidebarStyles = {
     },
     deleteButton: {
       variant: 'ghost' as const,
-      colorScheme: 'red' as const,
+      colorPalette: 'red' as const,
       size: 'sm' as const,
       color: 'red.300',
       opacity: 0.8,

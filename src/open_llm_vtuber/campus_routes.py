@@ -19,9 +19,9 @@ def init_campus_topics_route() -> APIRouter:
 
     router = APIRouter(prefix="/api/topics", tags=["专题展示"])
 
-    # 数据存储路径
-    project_root = Path(__file__).parent.parent.parent.parent
-    data_dir = project_root / "school_rag" / "models"
+    # 数据存储路径 - 修复为使用相对于脚本文件的正确路径
+    # 从 campus_routes.py 到 school_rag/models 需要向上 3 级然后进入 school_rag/models
+    data_dir = Path(__file__).parent.parent.parent / "school_rag" / "models"
     history_data_file = data_dir / "data.json"
     achievements_data_file = data_dir / "achievements.json"
     students_data_file = data_dir / "students.json"

@@ -40,14 +40,20 @@ export let ModelFileNames: string[] = []; // New array to store model file names
 // Function to update model configuration with both directory and file name
 export function updateModelConfig(resourcePath: string, modelDirectory: string, modelFileName: string, kScale?: number) {
   console.log('Updating model config:', { resourcePath, modelDirectory, modelFileName, kScale });
-  ResourcesPath = resourcePath;
-  ModelDir = [modelDirectory];
+
+  // Ensure resourcePath ends with / for proper URL concatenation
+  ResourcesPath = resourcePath.endsWith('/') ? resourcePath : resourcePath + '/';
+
+  // Remove leading slash from modelDirectory if present (for proper path joining)
+  ModelDir = [modelDirectory.startsWith('/') ? modelDirectory.substring(1) : modelDirectory];
   ModelFileNames = [modelFileName]; // Store the actual model file name
   if (kScale !== undefined) {
     CurrentKScale = kScale;
   }
   // Update ModelDirSize when ModelDir changes
   ModelDirSize = ModelDir.length;
+
+  console.log('Updated config:', { ResourcesPath, ModelDir, ModelFileNames, CurrentKScale });
 }
 
 // Export ModelDirSize as a variable instead of a constant

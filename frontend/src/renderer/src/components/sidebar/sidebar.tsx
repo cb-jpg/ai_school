@@ -1,7 +1,7 @@
 /* eslint-disable react/require-default-props */
 import { Box, Button, Menu } from '@chakra-ui/react';
 import {
-  FiSettings, FiClock, FiPlus, FiChevronLeft, FiUsers, FiLayers
+  FiSettings, FiClock, FiPlus, FiChevronLeft, FiUsers, FiLayers, FiBook
 } from 'react-icons/fi';
 import { memo } from 'react';
 import { sidebarStyles } from './sidebar-styles';
@@ -9,9 +9,13 @@ import SettingUI from './setting/setting-ui';
 import ChatHistoryPanel from './chat-history-panel';
 import BottomTab from './bottom-tab';
 import HistoryDrawer from './history-drawer';
+import KnowledgeDrawer from '../knowledge/knowledge-drawer';
 import { useSidebar } from '@/hooks/sidebar/use-sidebar';
 import GroupDrawer from './group-drawer';
 import { ModeType } from '@/context/mode-context';
+import WelcomeCard from './welcome-card';
+import TopicNav from './topic-nav';
+import AdminEntry from './admin-entry';
 
 // Type definitions
 interface SidebarProps {
@@ -100,6 +104,12 @@ const HeaderButtons = memo(({ onSettingsOpen, onNewHistory, setMode, currentMode
       </Button>
     </HistoryDrawer>
 
+    <KnowledgeDrawer>
+      <Button>
+        <FiBook />
+      </Button>
+    </KnowledgeDrawer>
+
     <Button onClick={onNewHistory}>
       <FiPlus />
     </Button>
@@ -110,10 +120,10 @@ const HeaderButtons = memo(({ onSettingsOpen, onNewHistory, setMode, currentMode
 
 HeaderButtons.displayName = 'HeaderButtons';
 
-const SidebarContent = memo(({ 
-  onSettingsOpen, 
-  onNewHistory, 
-  setMode, 
+const SidebarContent = memo(({
+  onSettingsOpen,
+  onNewHistory,
+  setMode,
   currentMode,
   isElectron
 }: HeaderButtonsProps) => (
@@ -127,6 +137,22 @@ const SidebarContent = memo(({
         isElectron={isElectron}
       />
     </Box>
+
+    {/* Welcome Card - 新用户引导 */}
+    <Box px="4" pt="4">
+      <WelcomeCard />
+    </Box>
+
+    {/* Topic Navigation - 专题导航 */}
+    <Box px="4">
+      <TopicNav />
+    </Box>
+
+    {/* Admin Entry - 管理后台入口 */}
+    <Box px="4" pb="2">
+      <AdminEntry variant="menuItem" />
+    </Box>
+
     <ChatHistoryPanel />
     <BottomTab />
   </Box>
