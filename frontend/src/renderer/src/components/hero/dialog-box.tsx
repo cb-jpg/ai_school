@@ -4,7 +4,7 @@
  * 集成现有的对话系统，明亮简洁风格
  */
 
-import { memo, useRef, useEffect } from 'react';
+import { memo, useRef, useEffect, useState } from 'react';
 import {
   Box,
   VStack,
@@ -15,7 +15,7 @@ import {
   IconButton,
   Badge,
   Flex,
-  Switch,
+  Switch as ChakraSwitch,
 } from '@chakra-ui/react';
 import { BsMicFill, BsMicMuteFill, BsMic } from 'react-icons/bs';
 import { IoSend } from 'react-icons/io5';
@@ -259,12 +259,17 @@ const DialogBox = memo(({ schoolName, tagline, description }: DialogBoxProps) =>
                 <Text fontSize="sm" color="gray.600">
                   说话后自动关闭
                 </Text>
-                <Switch
-                  isChecked={autoStopMic}
-                  onChange={(e) => setAutoStopMic(e.target.checked)}
+                <ChakraSwitch.Root
+                  checked={autoStopMic}
+                  onCheckedChange={(details) => setAutoStopMic(details.checked)}
                   size="sm"
                   colorScheme="blue"
-                />
+                >
+                  <ChakraSwitch.HiddenInput />
+                  <ChakraSwitch.Control>
+                    <ChakraSwitch.Thumb />
+                  </ChakraSwitch.Control>
+                </ChakraSwitch.Root>
               </HStack>
 
               <Text fontSize="xs" color="gray.500" whiteSpace="nowrap">
