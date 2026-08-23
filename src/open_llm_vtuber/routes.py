@@ -135,20 +135,38 @@ def init_webtool_routes(default_context_cache: ServiceContext) -> APIRouter:
         for entry in os.scandir(live2d_dir):
             if entry.is_dir():
                 folder_name = entry.name.replace("\\", "/")
+
+                # Try to find model3.json in runtime directory first, then directly
                 model3_file = os.path.join(
-                    live2d_dir, folder_name, f"{folder_name}.model3.json"
+                    live2d_dir, folder_name, "runtime", f"{folder_name}.model3.json"
                 ).replace("\\", "/")
 
+                # If not found in runtime, try direct path
+                if not os.path.isfile(model3_file):
+                    model3_file = os.path.join(
+                        live2d_dir, folder_name, f"{folder_name}.model3.json"
+                    ).replace("\\", "/")
+
                 if os.path.isfile(model3_file):
-                    # Find avatar file if it exists
+                    # Find avatar file if it exists (try both runtime and direct paths)
                     avatar_file = None
                     for ext in supported_extensions:
+                        # Try runtime directory first
                         avatar_path = os.path.join(
-                            live2d_dir, folder_name, f"{folder_name}{ext}"
+                            live2d_dir, folder_name, "runtime", f"{folder_name}{ext}"
                         )
                         if os.path.isfile(avatar_path):
                             avatar_file = avatar_path.replace("\\", "/")
                             break
+
+                        # If not found in runtime, try direct path
+                        if not avatar_file:
+                            avatar_path = os.path.join(
+                                live2d_dir, folder_name, f"{folder_name}{ext}"
+                            )
+                            if os.path.isfile(avatar_path):
+                                avatar_file = avatar_path.replace("\\", "/")
+                                break
 
                     valid_characters.append(
                         {

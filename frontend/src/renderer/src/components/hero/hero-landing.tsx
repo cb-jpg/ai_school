@@ -84,6 +84,8 @@ export default function HeroLanding() {
         <Box
           flex="1"
           maxWidth={{ base: '100%', md: '50%', lg: '45%' }}
+          maxWidth="600px"
+          height="75vh"
           zIndex={10}
         >
           <DialogBox

@@ -189,38 +189,27 @@ function AppContent(): JSX.Element {
         </Box>
 
         {/* CampusKnowledge overlay for topic pages */}
-        <Box
-          position="absolute"
-          top={0}
-          left={0}
-          width="100%"
-          height={isElectron ? "calc(100vh - 30px)" : "100vh"}
-          zIndex={2}
-          pointerEvents="none"
-        >
-          <CampusKnowledge
-            activeTopicId={activeCampusTopic}
-            onNavigate={navigateToCampusTopic}
-            onClose={closeCampusTopic}
-          />
-        </Box>
+        {activeCampusTopic && (
+          <Box
+            position="absolute"
+            top={0}
+            left={0}
+            width="100%"
+            height={isElectron ? "calc(100vh - 30px)" : "100vh"}
+            zIndex={2}
+            pointerEvents="auto"
+          >
+            <CampusKnowledge
+              activeTopicId={activeCampusTopic}
+              onNavigate={navigateToCampusTopic}
+              onClose={closeCampusTopic}
+            />
+          </Box>
+        )}
 
         {/* WebSocketStatus indicator */}
         <Box position="absolute" top="20px" left="20px" zIndex={10}>
           <WebSocketStatus />
-        </Box>
-
-        {/* Subtitle overlay */}
-        <Box
-          position="absolute"
-          bottom="20%"
-          left="50%"
-          transform="translateX(-50%)"
-          zIndex={10}
-          width="80%"
-          maxWidth="600px"
-        >
-          <Subtitle />
         </Box>
 
         {/* Hero UI overlay */}

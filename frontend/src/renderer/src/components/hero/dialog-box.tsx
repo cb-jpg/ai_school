@@ -16,16 +16,21 @@ import {
   Badge,
   Flex,
   Switch as ChakraSwitch,
+  Alert,
+  AlertIcon,
+  AlertTitle,
+  Spinner,
 } from '@chakra-ui/react';
 import { BsMicFill, BsMicMuteFill, BsMic } from 'react-icons/bs';
 import { IoSend } from 'react-icons/io5';
-import { FiArrowRight } from 'react-icons/fi';
+import { FiArrowRight, FiInfo } from 'react-icons/fi';
 import { useTextInput } from '@/hooks/footer/use-text-input';
 import { useWebSocket } from '@/context/websocket-context';
 import { useAiState, AiStateEnum } from '@/context/ai-state-context';
 import { useSubtitleDisplay } from '@/hooks/canvas/use-subtitle-display';
 import { useVAD } from '@/context/vad-context';
 import { useChatHistory } from '@/context/chat-history-context';
+import { useLive2DConfig } from '@/context/live2d-config-context';
 
 // 明亮简洁风格配色
 const lightColors = {
@@ -52,6 +57,7 @@ const DialogBox = memo(({ schoolName, tagline, description }: DialogBoxProps) =>
   const { subtitleText } = useSubtitleDisplay();
   const { micOn, startMic, stopMic, autoStopMic, setAutoStopMic } = useVAD();
   const { messages } = useChatHistory();
+  const { modelInfo, isLoading: modelLoading } = useLive2DConfig();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // 确保麦克风不会自动启动（仅在首次加载时执行）
@@ -75,7 +81,9 @@ const DialogBox = memo(({ schoolName, tagline, description }: DialogBoxProps) =>
   };
 
   const getStatusText = () => {
-    if (wsState !== 'connected') return '等待连接...';
+    if (wsState !== 'OPEN' && wsState !== 'CONNECTING') return '等待连接...';
+    if (modelLoading) return '加载模型中...';
+    if (!modelInfo && wsState === 'OPEN') return '等待模型配置...';
     switch (aiState) {
       case AiStateEnum.THINKING_SPEAKING: return '思考中...';
       case AiStateEnum.LISTENING: return '聆听中...';
@@ -84,12 +92,49 @@ const DialogBox = memo(({ schoolName, tagline, description }: DialogBoxProps) =>
     }
   };
 
+  const getStatusColor = () => {
+    if (wsState !== 'OPEN' && wsState !== 'CONNECTING') return 'red';
+    if (modelLoading) return 'yellow';
+    if (!modelInfo && wsState === 'OPEN') return 'orange';
+    switch (aiState) {
+      case AiStateEnum.THINKING_SPEAKING: return 'blue';
+      case AiStateEnum.LISTENING: return 'purple';
+      case AiStateEnum.IDLE: return 'green';
+      default: return 'gray';
+    }
+  };
+
   return (
     <Flex
       flexDirection="column"
       h="full"
-      maxHeight="calc(100vh - 160px)"
+      maxHeight="75vh"
+      minHeight="500px"
     >
+      {/* Connection Status Alert */}
+      {wsState !== 'OPEN' && (
+        <Alert status="warning" mb={4} borderRadius="md">
+          <AlertIcon />
+          <Box flex="1">
+            <AlertTitle fontSize="sm" mb={1}>正在连接服务器...</AlertTitle>
+            <Text fontSize="xs">请确保后端服务器正在运行 (端口12393)</Text>
+          </Box>
+          <Spinner size="sm" />
+        </Alert>
+      )}
+
+      {wsState === 'OPEN' && !modelInfo && (
+        <Alert status="info" mb={4} borderRadius="md">
+          <AlertIcon as={FiInfo} />
+          <Box flex="1">
+            <AlertTitle fontSize="sm" mb={1}>等待模型配置</AlertTitle>
+            <Text fontSize="xs">虚拟人模型配置将在WebSocket连接后自动加载</Text>
+          </Box>
+          <Spinner size="sm" />
+        </Alert>
+      )}
+
+      <VStack spacing={6} align="stretch" flex={1} overflow="hidden">
       <VStack spacing={6} align="stretch" flex={1} overflow="hidden">
         {/* Welcome Badge */}
         <Box>
@@ -111,11 +156,16 @@ const DialogBox = memo(({ schoolName, tagline, description }: DialogBoxProps) =>
                 w={2}
                 h={2}
                 rounded="full"
-                bg={wsState === 'connected' ? 'green.500' : 'gray.400'}
+                bg={getStatusColor()}
               />
               <Text fontSize="sm" color={lightColors.textSecondary}>
                 {getStatusText()}
               </Text>
+              {wsState === 'OPEN' && !modelInfo && (
+                <Text fontSize="xs" color="orange.600" ml={2}>
+                  (模型未配置)
+                </Text>
+              )}
             </HStack>
           </HStack>
 
