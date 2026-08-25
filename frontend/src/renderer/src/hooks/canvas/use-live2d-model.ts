@@ -27,6 +27,7 @@ const DRAG_DISTANCE_THRESHOLD_PX = 5; // Min distance to be considered a drag
 
 function parseModelUrl(url: string): { baseUrl: string; modelDir: string; modelFileName: string } {
   try {
+    console.log('[parseModelUrl] Parsing URL:', url);
     const urlObj = new URL(url);
     const { pathname } = urlObj;
 
@@ -46,9 +47,10 @@ function parseModelUrl(url: string): { baseUrl: string; modelDir: string; modelF
     // e.g., "/live2d-models/mao_pro/runtime" for "/live2d-models/mao_pro/runtime/mao_pro.model3.json"
     const modelDir = pathname.substring(0, lastSlashIndex);
 
+    console.log('[parseModelUrl] Result:', { baseUrl, modelDir, modelFileName });
     return { baseUrl, modelDir, modelFileName };
   } catch (error) {
-    console.error('Error parsing model URL:', error);
+    console.error('[parseModelUrl] Error parsing model URL:', error, 'URL was:', url);
     return { baseUrl: '', modelDir: '', modelFileName: '' };
   }
 }
@@ -125,17 +127,35 @@ export const useLive2DModel = ({
         const { baseUrl, modelDir, modelFileName } = parseModelUrl(currentUrl);
 
         if (baseUrl && modelDir) {
+          console.log('[useLive2DModel] Updating model config:', { baseUrl, modelDir, modelFileName });
           updateModelConfig(baseUrl, modelDir, modelFileName, Number(modelInfo.kScale));
 
+          // Wait for canvas to be rendered before initializing Live2D
           setTimeout(() => {
+            // Check if canvas exists before proceeding
+            const canvasElement = document.getElementById('canvas');
+            if (!canvasElement) {
+              console.warn('[useLive2DModel] Canvas not found, skipping initialization');
+              return;
+            }
+
+            // 释放现有实例
             if ((window as any).LAppLive2DManager?.releaseInstance) {
+              console.log('[useLive2DModel] Releasing existing Live2D manager');
               (window as any).LAppLive2DManager.releaseInstance();
             }
-            initializeLive2D();
+
+            // 重新初始化Live2D
+            console.log('[useLive2DModel] Reinitializing Live2D');
+            try {
+              initializeLive2D();
+            } catch (error) {
+              console.error('[useLive2DModel] Error during Live2D initialization:', error);
+            }
           }, 500);
         }
       } catch (error) {
-        console.error('Error processing model URL:', error);
+        console.error('[useLive2DModel] Error processing model URL:', error);
       }
     }
   }, [modelInfo?.url, modelInfo?.kScale]);

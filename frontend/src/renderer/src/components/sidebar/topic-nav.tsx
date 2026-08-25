@@ -18,6 +18,7 @@ import {
   FiUsers
 } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
+import { useInterrupt } from '@/hooks/utils/use-interrupt';
 
 const swissFont = '"Helvetica Neue", Arial, sans-serif';
 
@@ -62,8 +63,12 @@ export default function TopicNav({ onNavigate }: TopicNavProps) {
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   const textColor = useColorModeValue('gray.800', 'gray.100');
   const hoverBg = useColorModeValue('blue.50', 'blue.900');
+  const { interrupt } = useInterrupt();
 
   const handleTopicClick = (topicId: string) => {
+    // 切换界面时打断语音播报
+    interrupt();
+
     // 更新 URL hash
     window.location.hash = `#/campus/${topicId}`;
     if (onNavigate) {

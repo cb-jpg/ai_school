@@ -4,14 +4,24 @@
  */
 
 import { memo } from 'react';
-import { Flex, Text, Button, HStack, IconButton, Box } from '@chakra-ui/react';
-import { FiMenu } from 'react-icons/fi';
+import { Flex, Text, Button, HStack, IconButton } from '@chakra-ui/react';
+import { FiMenu, FiHome, FiBook, FiClock, FiAward, FiUsers } from 'react-icons/fi';
+import { useInterrupt } from '@/hooks/utils/use-interrupt';
 
 interface NavItem {
   id: string;
   label: string;
   icon: any;
 }
+
+// 图标映射
+const iconMap: Record<string, React.ElementType> = {
+  home: FiHome,
+  intro: FiBook,
+  history: FiClock,
+  achievements: FiAward,
+  'role-models': FiUsers,
+};
 
 interface NavbarProps {
   schoolName: string;
@@ -20,7 +30,12 @@ interface NavbarProps {
   mobileMenuOpen: boolean;
 }
 
-const handleNavClick = (itemId: string) => {
+const handleNavClick = (itemId: string, onInterrupt?: () => void) => {
+  // 切换界面时打断语音播报
+  if (onInterrupt) {
+    onInterrupt();
+  }
+
   switch (itemId) {
     case 'home':
       window.location.hash = '#/hero';
@@ -48,6 +63,16 @@ const Navbar = memo(({
   onMobileMenuToggle,
   mobileMenuOpen
 }: NavbarProps) => {
+  const { interrupt } = useInterrupt();
+
+  const handleLogin = () => {
+    // 切换界面时打断语音播报
+    interrupt();
+    // 跳转到main界面（工作台模式）
+    window.location.hash = '#/main';
+    window.dispatchEvent(new Event('hashchange'));
+  };
+
   return (
     <Flex
       position="absolute"
@@ -70,9 +95,9 @@ const Navbar = memo(({
           fontSize={{ base: 'lg', sm: 'xl' }}
           fontWeight="bold"
           tracking="tight"
-          color="#002FA7"
+          color="#1E5494"
           cursor="pointer"
-          onClick={() => handleNavClick('home')}
+          onClick={() => handleNavClick('home', interrupt)}
         >
           {schoolName}
         </Text>
@@ -82,45 +107,45 @@ const Navbar = memo(({
       <HStack
         spacing={8}
         display={{ base: 'none', md: 'flex' }}
+        gap={{ md: 6, lg: 8 }}
       >
-        {navigation.map((item) => (
-          <Text
-            key={item.id}
-            fontSize="sm"
-            color="gray.600"
-            _hover={{ color: '#002FA7' }}
-            transition="colors 0.2s"
-            cursor="pointer"
-            fontWeight="500"
-            onClick={() => handleNavClick(item.id)}
-          >
-            {item.label}
-          </Text>
-        ))}
+        {navigation.map((item) => {
+          const Icon = iconMap[item.id] || item.icon;
+          return (
+            <HStack
+              key={item.id}
+              spacing={2}
+              fontSize="sm"
+              color="gray.600"
+              _hover={{ color: '#1E5494' }}
+              transition="all 0.2s"
+              cursor="pointer"
+              fontWeight="500"
+              onClick={() => handleNavClick(item.id, interrupt)}
+            >
+              <Icon size={16} />
+              <Text>{item.label}</Text>
+            </HStack>
+          );
+        })}
       </HStack>
 
       {/* Right Side: CTA Button (Desktop) */}
       <HStack spacing={4}>
         <Button
           display={{ base: 'none', md: 'inline-flex' }}
-          bg="#002FA7"
+          bg="#1E5494"
           color="white"
           px={5}
           py={2}
           fontSize="sm"
           fontWeight="medium"
           rounded="lg"
-          _hover={{ bg: 'blue.800', transform: 'scale(1.05)' }}
+          _hover={{ bg: '#152C5E', transform: 'scale(1.05)' }}
           transition="all 0.2s"
-          onClick={() => {
-            // Focus on the input field
-            const textarea = document.querySelector('textarea[placeholder*="问题"]');
-            if (textarea instanceof HTMLTextAreaElement) {
-              textarea.focus();
-            }
-          }}
+          onClick={handleLogin}
         >
-          开始咨询
+          登录
         </Button>
 
         {/* Mobile Menu Toggle */}

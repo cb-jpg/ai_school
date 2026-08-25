@@ -21,6 +21,17 @@ from .schemas import (
     UnansweredQuestion,
     LowConfidenceQuestion
 )
+from .embeddings import (
+    EmbeddingModel,
+    CachedEmbeddingModel,
+    get_embedding_model,
+    clear_embedding_model
+)
+from .vector_store import (
+    VectorStore,
+    get_vector_store,
+    reset_vector_store
+)
 
 __all__ = [
     # Models
@@ -41,4 +52,13 @@ __all__ = [
     'KnowledgeStatsResponse',
     'UnansweredQuestion',
     'LowConfidenceQuestion',
+    # Embeddings
+    'EmbeddingModel',
+    'CachedEmbeddingModel',
+    'get_embedding_model',
+    'clear_embedding_model',
+    # Vector Store
+    'VectorStore',
+    'get_vector_store',
+    'reset_vector_store',
 ]

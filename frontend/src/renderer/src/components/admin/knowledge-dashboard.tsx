@@ -10,9 +10,9 @@ import {
   Flex,
   HStack,
   VStack,
-  Spinner
+  Spinner,
+  createToaster
 } from '@chakra-ui/react';
-import { toaster } from '@/components/ui/toaster';
 import {
   FiFileText,
   FiDatabase,
@@ -22,6 +22,12 @@ import {
 } from 'react-icons/fi';
 import { useEffect, useState } from 'react';
 import { useKnowledgeAdminAPI, type Statistics } from '@/services/knowledge-admin-api';
+
+const toaster = createToaster({
+  placement: 'top-end',
+  overlap: true,
+  max: 3
+});
 
 const swissFont = '"Helvetica Neue", Arial, sans-serif';
 const ink = '#121826';
@@ -138,7 +144,7 @@ export default function KnowledgeDashboard() {
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : '未知错误';
         setError(errorMessage);
-        toast({
+        toaster.create({
           title: '加载失败',
           description: errorMessage,
           status: 'error',
@@ -151,7 +157,7 @@ export default function KnowledgeDashboard() {
     }
 
     loadStatistics();
-  }, [getStatistics, toast]);
+  }, [getStatistics]);
 
   if (loading) {
     return (

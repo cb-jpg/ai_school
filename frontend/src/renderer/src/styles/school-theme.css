@@ -1,0 +1,212 @@
+/* 石实实验学校 - 学校主题样式 */
+
+/* 学校主题色板 - 基于学校品牌色 */
+.school-theme {
+  /* 主色 - 深蓝色（代表专业、信任） */
+  --school-primary: #1a4d8f;
+  --school-primary-light: #2d6ab3;
+  --school-primary-dark: #0f3a6e;
+
+  /* 辅色 - 红色（代表活力、热情） */
+  --school-secondary: #c41e3a;
+  --school-secondary-light: #e64d5e;
+
+  /* 点缀色 - 金色（代表品质、成就） */
+  --school-accent: #d4a520;
+  --school-accent-light: #f0c660;
+
+  /* 中性色 */
+  --school-gray-50: #f8fafc;
+  --school-gray-100: #f1f5f9;
+  --school-gray-200: #e2e8f0;
+  --school-gray-600: #475569;
+  --school-gray-800: #1e293b;
+
+  /* 背景色 */
+  --school-bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --school-bg-subtle: linear-gradient(to bottom, #f8fafc 0%, #e2e8f0 100%);
+
+  /* 文字色 */
+  --school-text-primary: #1e293b;
+  --school-text-secondary: #64748b;
+}
+
+/* 学校风格背景 - 淡雅的几何图案 */
+.school-background {
+  background: linear-gradient(
+    135deg,
+    rgba(26, 77, 143, 0.02) 0%,
+    rgba(196, 30, 58, 0.02) 50%,
+    rgba(212, 165, 32, 0.02) 100%
+  );
+  background-size: 400% 400%;
+  animation: gradientShift 15s ease infinite;
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* 学校Logo区域 */
+.school-logo-area {
+  background: linear-gradient(135deg, var(--school-primary) 0%, var(--school-primary-dark) 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.school-logo-area::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+  animation: pulse 8s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 0.3; }
+  50% { transform: scale(1.1); opacity: 0.5; }
+}
+
+/* 侧边栏菜单样式 */
+.school-sidebar-menu {
+  background: linear-gradient(
+    to bottom,
+    #ffffff 0%,
+    #f8fafc 100%
+  );
+}
+
+.school-menu-item {
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.school-menu-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 3px;
+  background: var(--school-primary);
+  transform: scaleY(0);
+  transition: transform 0.2s ease;
+}
+
+.school-menu-item:hover::before,
+.school-menu-item.active::before {
+  transform: scaleY(1);
+}
+
+.school-menu-item.active {
+  background: linear-gradient(90deg, rgba(26, 77, 143, 0.08) 0%, transparent 100%);
+}
+
+/* 统计卡片样式 */
+.school-stat-card {
+  background: white;
+  border-radius: 12px;
+  border-left: 4px solid var(--school-primary);
+  box-shadow: 0 2px 8px rgba(26, 77, 143, 0.08);
+  transition: all 0.3s ease;
+}
+
+.school-stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(26, 77, 143, 0.12);
+}
+
+.school-stat-card.accent {
+  border-left-color: var(--school-accent);
+}
+
+.school-stat-card.secondary {
+  border-left-color: var(--school-secondary);
+}
+
+/* 按钮样式 */
+.school-button-primary {
+  background: linear-gradient(135deg, var(--school-primary) 0%, var(--school-primary-dark) 100%);
+  color: white;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.school-button-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(26, 77, 143, 0.3);
+}
+
+.school-button-secondary {
+  background: white;
+  color: var(--school-primary);
+  border: 2px solid var(--school-primary);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.school-button-secondary:hover {
+  background: var(--school-primary);
+  color: white;
+}
+
+/* 标题样式 */
+.school-header {
+  background: white;
+  border-bottom: 3px solid var(--school-primary);
+}
+
+.school-title {
+  font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
+  color: var(--school-primary);
+  font-weight: 600;
+}
+
+/* 表格样式 */
+.school-table-header {
+  background: linear-gradient(90deg, var(--school-primary) 0%, var(--school-primary-light) 100%);
+  color: white;
+}
+
+.school-table-row:nth-child(even) {
+  background: var(--school-gray-50);
+}
+
+.school-table-row:hover {
+  background: rgba(26, 77, 143, 0.05);
+}
+
+/* 徽章样式 */
+.school-badge {
+  background: var(--school-accent);
+  color: white;
+  border-radius: 12px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* 搜索框样式 */
+.school-search-box {
+  border: 2px solid var(--school-gray-200);
+  border-radius: 8px;
+  transition: border-color 0.3s ease;
+}
+
+.school-search-box:focus {
+  border-color: var(--school-primary);
+  box-shadow: 0 0 0 3px rgba(26, 77, 143, 0.1);
+}
+
+/* 数字人预览区域样式 */
+.school-avatar-preview {
+  background: linear-gradient(135deg, rgba(26, 77, 143, 0.05) 0%, rgba(212, 165, 32, 0.05) 100%);
+  border-radius: 16px;
+  border: 2px solid var(--school-gray-200);
+}

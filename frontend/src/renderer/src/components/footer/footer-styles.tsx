@@ -41,9 +41,13 @@ export const footerStyles: {
     },
     actionButton: {
       borderRadius: '12px',
-      width: '50px',
-      height: '50px',
-      minW: '50px',
+      width: '48px',
+      height: '48px',
+      minW: '48px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '20px',
     },
     input: {
       bg: 'gray.700',
@@ -52,7 +56,7 @@ export const footerStyles: {
       borderRadius: '12px',
       fontSize: '18px',
       pl: '12',
-      pr: '4',
+      pr: '50px', // 增加右边距为麦克风按钮留出空间
       color: 'whiteAlpha.900',
       _placeholder: {
         color: 'whiteAlpha.500',

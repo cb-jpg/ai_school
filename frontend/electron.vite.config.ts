@@ -4,6 +4,37 @@ import react from '@vitejs/plugin-react';
 import { viteStaticCopy } from 'vite-plugin-static-copy'
 import { normalizePath } from 'vite';
 
+// Custom middleware to serve live2d-models from parent directory
+function serveLive2DModels() {
+  return {
+    name: 'serve-live2d-models',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url.startsWith('/live2d-models')) {
+          const fs = require('fs');
+          const path = require('path');
+          const filePath = path.resolve(__dirname, '..', req.url.substring(1));
+
+          if (fs.existsSync(filePath)) {
+            const ext = path.extname(filePath);
+            const contentType = ext === '.json' ? 'application/json' :
+                               ext === '.png' ? 'image/png' :
+                               ext === '.moc3' ? 'application/octet-stream' :
+                               'application/octet-stream';
+
+            res.setHeader('Content-Type', contentType);
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            const stream = fs.createReadStream(filePath);
+            stream.pipe(res);
+            return;
+          }
+        }
+        next();
+      });
+    }
+  };
+}
+
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
@@ -24,7 +55,15 @@ export default defineConfig({
         "/src": resolve("src/renderer/src"),
       },
     },
+    server: {
+      fs: {
+        // Allow serving files from parent directories
+        strict: false,
+      },
+    },
+    publicDir: 'src/renderer/public',
     plugins: [
+      serveLive2DModels(),
       viteStaticCopy({
         targets: [
           {
@@ -46,6 +85,11 @@ export default defineConfig({
           {
             src: normalizePath(resolve(__dirname, 'src/renderer/WebSDK/Core/live2dcubismcore.js')),
             dest: './libs/'
+          },
+          // Copy live2d-models from project root
+          {
+            src: normalizePath(resolve(__dirname, '../live2d-models')),
+            dest: './'
           }
         ],
       }),

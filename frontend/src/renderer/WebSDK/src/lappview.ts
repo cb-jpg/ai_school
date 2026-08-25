@@ -93,11 +93,17 @@ export class LAppView {
     // this._gear.release();
     // this._gear = null;
 
-    this._back.release();
-    this._back = null;
+    // Fix: Check if _back exists before calling release
+    // Background sprite initialization is commented out in initializeSprite()
+    if (this._back) {
+      this._back.release();
+      this._back = null;
+    }
 
-    gl.deleteProgram(this._programId);
-    this._programId = null;
+    if (this._programId) {
+      gl.deleteProgram(this._programId);
+      this._programId = null;
+    }
   }
 
   /**

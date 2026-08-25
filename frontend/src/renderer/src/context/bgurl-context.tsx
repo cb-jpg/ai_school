@@ -42,7 +42,7 @@ const BgUrlContext = createContext<BgUrlContextState | null>(null);
  */
 export function BgUrlProvider({ children }: { children: React.ReactNode }) {
   const { baseUrl } = useWebSocket();
-  const DEFAULT_BACKGROUND = `${baseUrl}/bg/ceiling-window-room-night.jpeg`;
+  const DEFAULT_BACKGROUND = ''; // 空字符串表示使用默认背景色
 
   // Local storage for persistent background URL
   const [backgroundUrl, setBackgroundUrl] = useLocalStorage<string>(

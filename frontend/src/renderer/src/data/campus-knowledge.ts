@@ -1,4 +1,4 @@
-export type CampusTopicId = 'history' | 'achievements' | 'role-models';
+export type CampusTopicId = 'intro' | 'history' | 'achievements' | 'role-models';
 
 export interface CampusStat {
   value: string;
@@ -104,6 +104,78 @@ const officialSources = {
 };
 
 export const campusTopics: CampusTopic[] = [
+  {
+    id: 'intro',
+    navLabel: '学校简介',
+    eyebrow: 'SCHOOL INTRODUCTION',
+    title: '佛山市南海区石实实验学校',
+    subtitle: '一所致力于让每一个孩子都能成长、成才、成功的现代化实验学校。',
+    statusLabel: '公开资料整理',
+    notice: '以下信息来自公开百科资料及政府官方公开文件，仅供参考。具体招生政策以教育行政部门和学校当年公布为准。',
+    accent: '#002FA7',
+    softAccent: '#E8EEFF',
+    stats: [
+      { value: '1999', label: '建校年份' },
+      { value: '寄宿制', label: '办学特色' },
+      { value: '大沥镇', label: '所属区域' },
+    ],
+    introNarration: '欢迎了解佛山市南海区石实实验学校。学校原名佛山市南海区石门实验学校，始建于1999年，是一所全日制寄宿制民办实验学校。2023年经南海区教育局批复更名为石实实验学校。学校位于佛山市南海区大沥镇，以让每一个孩子都能成长、成才、成功为办学理念，致力于为学生提供优质的教育服务。',
+    sections: [
+      {
+        id: 'intro-basic-info',
+        eyebrow: '基本信息',
+        title: '学校概况',
+        summary: '石实实验学校是一所全日制寄宿制民办实验学校，位于佛山市南海区大沥镇。',
+        facts: [
+          '现用全称：佛山市南海区石实实验学校',
+          '曾用名：佛山市南海区石门实验学校',
+          '建校时间：1999年',
+          '办学类型：全日制寄宿制民办实验学校',
+          '所属区域：佛山市南海区大沥镇',
+          '日常管理：大沥镇教育办公室负责',
+        ],
+        narration: '石实实验学校是一所全日制寄宿制民办实验学校，始建于1999年。学校原名佛山市南海区石门实验学校，于2023年9月8日经南海区教育局批复更名为佛山市南海区石实实验学校。学校位于佛山市南海区大沥镇太平体育南路一带，由大沥镇教育办公室负责日常业务管理。寄宿制办学为学生提供了全天候的学习生活环境，也让教师陪伴和同伴合作成为校园文化的重要组成部分。',
+      },
+      {
+        id: 'intro-philosophy',
+        eyebrow: '办学理念',
+        title: '让每一个孩子都能成长、成才、成功',
+        summary: '学校以"让每一个孩子都能成长、成才、成功"为办学理念和育人目标。',
+        facts: [
+          '办学理念：让每一个孩子都能成长、成才、成功',
+          '培养目标：注重学生全面素质发展',
+          '教育特色：寄宿制管理与个性化培养相结合',
+        ],
+        narration: '石实实验学校的办学理念是让每一个孩子都能成长、成才、成功。这一理念体现了学校对学生全面发展的重视，不仅关注学业成绩，更注重学生的品格养成、能力提升和兴趣发展。学校通过寄宿制管理和个性化培养相结合的方式，为不同特点的学生提供适合的成长路径。',
+      },
+      {
+        id: 'intro-location',
+        eyebrow: '地理位置',
+        title: '位于大沥镇太平校区',
+        summary: '学校现址位于佛山市南海区大沥镇太平体育南路一带。',
+        facts: [
+          '现校区位置：大沥镇太平体育南路',
+          '迁址时间：2019年前后（根据公开资料）',
+          '校区特点：教学、住宿、体育设施完善',
+        ],
+        narration: '石实实验学校现址位于佛山市南海区大沥镇太平体育南路一带。根据公开资料记载，学校于2019年前后完成了从大沥黄岐到大沥太平新校区的迁址工作。新校区为教学、住宿、体育和综合实践提供了更大的空间，能够更好地满足寄宿制办学的需求，也为学生提供了更优质的学习和生活环境。',
+      },
+      {
+        id: 'intro-academics',
+        eyebrow: '教学特色',
+        title: '多元课程与特色发展',
+        summary: '学校开设多样化课程，注重信息学、艺术、体育等特色发展方向。',
+        facts: [
+          '信息学特色：长期重视信息学特长培养',
+          '美育艺术：参与市区级美育赛事并获佳绩',
+          '体育活动：防震减灾科普教育融入日常',
+          '课后服务：开设体育、艺术、心理等特色社团',
+        ],
+        narration: '在教学特色方面，石实实验学校形成了多元化的课程体系。学校长期重视信息学特长培养，在信息学竞赛和升学方面取得了显著成绩。同时，学校积极参与美育和艺术活动，在区级美育赛事中表现优异。学校还将防震减灾科普教育融入日常教学，被评为全国防震减灾科普示范学校。课后服务方面，学校开设了体育、艺术、心理等特色社团，为学生提供多样化的成长平台。',
+      },
+    ],
+    sources: [officialSources.publicReference, officialSources.rename],
+  },
   {
     id: 'history',
     navLabel: '校史',
@@ -316,6 +388,9 @@ export async function fetchTopicFromAPI(topicId: CampusTopicId): Promise<CampusT
   try {
     let endpoint = '';
     switch (topicId) {
+      case 'intro':
+        endpoint = '/api/topics/intro';
+        break;
       case 'history':
         endpoint = '/api/topics/history';
         break;
@@ -350,6 +425,43 @@ export async function fetchTopicFromAPI(topicId: CampusTopicId): Promise<CampusT
  */
 function convertAPIToTopic(topicId: CampusTopicId, data: any): CampusTopic {
   switch (topicId) {
+    case 'intro': {
+      const sections: CampusKnowledgeSection[] = (data.sections || []).map((section: any) => ({
+        id: section.id,
+        eyebrow: section.eyebrow || section.category,
+        title: section.title,
+        summary: section.summary,
+        facts: section.facts || [],
+        narration: section.content || section.narration,
+      }));
+
+      return {
+        id: 'intro',
+        navLabel: '学校简介',
+        eyebrow: 'SCHOOL INTRODUCTION',
+        title: '佛山市南海区石实实验学校',
+        subtitle: '一所致力于让每一个孩子都能成长、成才、成功的现代化实验学校。',
+        statusLabel: '公开资料整理',
+        notice: '以下信息来自公开百科资料及政府官方公开文件，仅供参考。',
+        accent: '#002FA7',
+        softAccent: '#E8EEFF',
+        stats: [
+          { value: '1999', label: '建校年份' },
+          { value: '寄宿制', label: '办学特色' },
+          { value: '大沥镇', label: '所属区域' },
+        ],
+        introNarration: '欢迎了解佛山市南海区石实实验学校。学校原名佛山市南海区石门实验学校，始建于1999年，是一所全日制寄宿制民办实验学校。',
+        sections,
+        sources: [
+          {
+            title: '佛山市南海区石实实验学校（用户提供的公开百科页面）',
+            publisher: '公开百科资料',
+            publishedAt: '页面信息，待校方档案进一步核验',
+            url: 'https://baike.baidu.com/item/佛山市南海区石实实验学校',
+          },
+        ],
+      };
+    }
     case 'history': {
       const sections: CampusKnowledgeSection[] = (data.nodes || []).map((node: any) => ({
         id: node.id,
@@ -494,6 +606,7 @@ export async function fetchAllTopics(useAPI = true): Promise<CampusTopic[]> {
 
   try {
     const topics = await Promise.all([
+      fetchTopicFromAPI('intro'),
       fetchTopicFromAPI('history'),
       fetchTopicFromAPI('achievements'),
       fetchTopicFromAPI('role-models'),

@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import './index.css';
+import './styles/school-theme.css';
 import App from './App';
 import { LAppAdapter } from '../WebSDK/src/lappadapter';
 import './i18n';

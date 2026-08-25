@@ -1,7 +1,7 @@
 [
     {
         "name": "mao_pro",
-        "description": "",
+        "description": "Mao Pro - 猫咪角色",
         "url": "/live2d-models/mao_pro/runtime/mao_pro.model3.json",
         "kScale": 0.5,
         "initialXshift": 0,
@@ -17,6 +17,90 @@
             "smirk": 3,
             "sadness": 1,
             "surprise": 3
+        },
+        "tapMotions": {
+            "HitAreaHead": {
+                "": 1
+            },
+            "HitAreaBody": {
+                "": 1
+            }
+        }
+    },
+    {
+        "name": "shizuku",
+        "description": "Shizuku - 栀子",
+        "url": "/live2d-models/shizuku/runtime/shizuku.model3.json",
+        "kScale": 0.5,
+        "initialXshift": 0,
+        "initialYshift": -0.1,
+        "kXOffset": 1150,
+        "idleMotionGroupName": "Idle",
+        "emotionMap": {
+            "neutral": 0,
+            "anger": 1,
+            "disgust": 1,
+            "fear": 1,
+            "joy": 2,
+            "smirk": 2,
+            "sadness": 1,
+            "surprise": 2
+        },
+        "tapMotions": {
+            "HitAreaHead": {
+                "Tap": 1
+            },
+            "HitAreaBody": {
+                "Tap": 1
+            }
+        }
+    },
+    {
+        "name": "hiyori_free",
+        "description": "Hiyori Free - 日葵",
+        "url": "/live2d-models/hiyori_free/runtime/hiyori_free_t08.model3.json",
+        "kScale": 0.5,
+        "initialXshift": 0,
+        "initialYshift": 0,
+        "kXOffset": 1150,
+        "idleMotionGroupName": "Idle",
+        "emotionMap": {
+            "neutral": 0,
+            "anger": 1,
+            "disgust": 1,
+            "fear": 1,
+            "joy": 2,
+            "smirk": 2,
+            "sadness": 1,
+            "surprise": 2
+        },
+        "tapMotions": {
+            "HitAreaHead": {
+                "": 1
+            },
+            "HitAreaBody": {
+                "": 1
+            }
+        }
+    },
+    {
+        "name": "hiyori_pro",
+        "description": "Hiyori Pro - 日葵",
+        "url": "/live2d-models/hiyori_pro/runtime/hiyori_pro_t11.model3.json",
+        "kScale": 0.5,
+        "initialXshift": 0,
+        "initialYshift": 0,
+        "kXOffset": 1150,
+        "idleMotionGroupName": "Idle",
+        "emotionMap": {
+            "neutral": 0,
+            "anger": 1,
+            "disgust": 1,
+            "fear": 1,
+            "joy": 2,
+            "smirk": 2,
+            "sadness": 1,
+            "surprise": 2
         },
         "tapMotions": {
             "HitAreaHead": {

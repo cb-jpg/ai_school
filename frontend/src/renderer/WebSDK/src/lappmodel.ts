@@ -86,6 +86,7 @@ export class LAppModel extends CubismUserModel {
 
     const fullUrl = `${this._modelHomeDir}${fileName}`;
     console.log(`[LAppModel] Loading model from: ${fullUrl}`);
+    console.log(`[LAppModel] Model directory: ${dir}, File name: ${fileName}`);
 
     fetch(fullUrl)
       .then((response) => {
@@ -110,7 +111,11 @@ export class LAppModel extends CubismUserModel {
       .catch((error) => {
         // model3.json読み込みでエラーが発生した時点で描画は不可能なので、setupせずエラーをcatchして何もしない
         CubismLogError(`Failed to load file ${this._modelHomeDir}${fileName}: ${error}`);
-        console.error(`[LAppModel] Failed to load model:`, error);
+        console.error(`[LAppModel] Failed to load model from: ${fullUrl}`, error);
+        console.error(`[LAppModel] Please check:`);
+        console.error(`[LAppModel] 1. Server is running and serving static files`);
+        console.error(`[LAppModel] 2. Model files exist at the expected path`);
+        console.error(`[LAppModel] 3. CORS is properly configured if using remote server`);
       });
   }
 

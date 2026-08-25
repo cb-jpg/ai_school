@@ -1,1 +1,24 @@
-{}
+{
+  "08908918-30c5-4f5f-9e4d-9d3939728a7b": {
+    "id": "08908918-30c5-4f5f-9e4d-9d3939728a7b",
+    "title": "石实实验学校简介",
+    "category": "school_intro",
+    "tags": [
+      "学校简介",
+      "荣誉",
+      "特色"
+    ],
+    "source_type": "manual",
+    "source_url": null,
+    "file_path": null,
+    "file_name": null,
+    "status": "indexed",
+    "chunk_count": 1,
+    "summary": "石实实验学校的基本信息、荣誉和特色教育",
+    "error_message": null,
+    "created_at": "2026-08-24 21:21:17.164968",
+    "updated_at": "2026-08-24 21:21:17.164968",
+    "published_at": null,
+    "created_by": null
+  }
+}

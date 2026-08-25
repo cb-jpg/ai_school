@@ -15,7 +15,8 @@ import {
   Checkbox,
   IconButton,
   SimpleGrid,
-  Badge
+  Badge,
+  createToaster
 } from '@chakra-ui/react';
 import {
   DialogRoot,
@@ -24,7 +25,6 @@ import {
   DialogBody,
   DialogFooter
 } from '@/components/ui/dialog';
-import { toaster } from '@/components/ui/toaster';
 import {
   FiSearch,
   FiTrash2,
@@ -35,6 +35,12 @@ import {
 } from 'react-icons/fi';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useKnowledgeAdminAPI, type SearchResult, type Document } from '@/services/knowledge-admin-api';
+
+const toaster = createToaster({
+  placement: 'top-end',
+  overlap: true,
+  max: 3
+});
 
 const swissFont = '"Helvetica Neue", Arial, sans-serif';
 const ink = '#121826';
@@ -314,7 +320,7 @@ export default function KnowledgeList() {
         setDocuments(response.results);
       }
     } catch (error) {
-      toast({
+      toaster.create({
         title: '搜索失败',
         description: error instanceof Error ? error.message : '未知错误',
         status: 'error',
@@ -324,7 +330,7 @@ export default function KnowledgeList() {
     } finally {
       setLoading(false);
     }
-  }, [searchDocuments, toast]);
+  }, [searchDocuments]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {

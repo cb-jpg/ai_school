@@ -191,15 +191,37 @@ export class LAppLive2DManager {
 
     // Use the directory name and file name from our configuration
     const model: string = LAppDefine.ModelDir[index];
-    const modelPath: string = LAppDefine.ResourcesPath + model + '/';
-    
+
+    console.log('[LAppLive2DManager] Model directory from config:', model);
+    console.log('[LAppLive2DManager] ResourcesPath:', LAppDefine.ResourcesPath);
+
+    // Build model path - ensure proper slash handling
+    // ResourcesPath already ends with '/', model doesn't start with '/'
+    let modelPath: string;
+    if (LAppDefine.ResourcesPath.endsWith('/')) {
+      modelPath = LAppDefine.ResourcesPath + model;
+    } else {
+      modelPath = LAppDefine.ResourcesPath + '/' + model;
+    }
+
+    // Ensure modelPath ends with '/' for file concatenation
+    if (!modelPath.endsWith('/')) {
+      modelPath += '/';
+    }
+
     // Use ModelFileNames if available, otherwise fall back to ModelDir
-    let modelJsonName: string = LAppDefine.ModelFileNames && 
-                                LAppDefine.ModelFileNames[index] ? 
-                                LAppDefine.ModelFileNames[index] : 
+    let modelJsonName: string = LAppDefine.ModelFileNames &&
+                                LAppDefine.ModelFileNames[index] ?
+                                LAppDefine.ModelFileNames[index] :
                                 LAppDefine.ModelDir[index];
-                                
+
     modelJsonName += '.model3.json';
+
+    const fullUrl = modelPath + modelJsonName;
+
+    console.log('[LAppLive2DManager] Model path:', modelPath);
+    console.log('[LAppLive2DManager] Model JSON name:', modelJsonName);
+    console.log('[LAppLive2DManager] Full URL:', fullUrl);
 
     if (LAppDefine.DebugLogEnable) {
       LAppPal.printMessage(`[APP]model path: ${modelPath}${modelJsonName}`);

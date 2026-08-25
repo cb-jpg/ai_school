@@ -19,7 +19,7 @@ import {
   FiUsers,
 } from 'react-icons/fi';
 import type { IconType } from 'react-icons';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useWebSocket } from '@/context/websocket-context';
 import { useAiState } from '@/context/ai-state-context';
 import { useSubtitle } from '@/context/subtitle-context';
@@ -37,20 +37,34 @@ interface CampusKnowledgeProps {
   activeTopicId: CampusTopicId | null;
   onNavigate: (topicId: CampusTopicId) => void;
   onClose: () => void;
+  onStartConsultation?: () => void;  // 新增：开始对话的回调
+  mode?: 'hero' | 'main';
 }
 
 const topicIcons: Record<CampusTopicId, IconType> = {
+  intro: FiBookOpen,
   history: FiClock,
   achievements: FiAward,
   'role-models': FiUsers,
 };
 
+// 使用与首页一致的明亮风格配色
+const lightColors = {
+  bg: '#FAFAFA',
+  primary: '#002FA7',
+  text: '#121826',
+  textSecondary: '#586174',
+  border: '#E5E7EB',
+  white: '#FFFFFF',
+  accent: '#E8EEFF',
+};
+
 const swissFont = '"Helvetica Neue", Arial, sans-serif';
 const ink = '#121826';
 const muted = '#586174';
-const hairline = '#D9DEE8';
+const hairline = '#E5E7EB';
 const paper = '#FFFFFF';
-const surface = '#F7F7F8';
+const surface = '#FAFAFA';
 const blue = '#002FA7';
 const blueWash = '#E8EEFF';
 
@@ -76,26 +90,22 @@ function TopicNavigationButton({
       aria-label={`进入${topic.navLabel}页面`}
       onClick={onClick}
       height="40px"
-      px={{ base: '10px', lg: '14px' }}
-      borderRadius="0"
-      border="1px solid"
-      borderColor={active ? blue : hairline}
-      borderBottomWidth={active ? '3px' : '1px'}
-      background={active ? blueWash : paper}
-      color={ink}
+      px={{ base: '12px', lg: '16px' }}
+      borderRadius="md"
+      background={active ? blue : 'transparent'}
+      color={active ? 'white' : ink}
       fontFamily={swissFont}
+      fontWeight="500"
+      fontSize="sm"
       _hover={{
-        borderColor: blue,
-        background: blueWash,
-        color: blue,
+        background: active ? blue : blueWash,
+        color: active ? 'white' : blue,
       }}
-      transition="background 160ms ease, border-color 160ms ease, color 160ms ease"
+      transition="all 200ms ease"
     >
-      <HStack gap="7px">
-        <Icon size="15" color={blue} />
-        <Text fontSize={{ base: '12px', lg: '13px' }} fontWeight="700">
-          {topic.navLabel}
-        </Text>
+      <HStack gap="8px">
+        <Icon size={16} />
+        <Text>{topic.navLabel}</Text>
       </HStack>
     </Button>
   );
@@ -115,33 +125,30 @@ function KnowledgeSectionCard({
   return (
     <Box
       data-testid={`campus-section-${section.id}`}
-      borderTop="1px solid"
+      py="6"
+      borderBottom="1px solid"
       borderColor={hairline}
-      py={{ base: '20px', xl: '24px' }}
-      fontFamily={swissFont}
-      _hover={{ background: blueWash }}
+      _hover={{ background: surface }}
       transition="background 160ms ease"
     >
-      <Flex align="flex-start" gap={{ base: '14px', md: '24px' }}>
-        <Box width={{ base: '54px', md: '92px' }} flexShrink={0}>
+      <Flex align="flex-start" gap={{ base: '4', md: '6' }} direction={{ base: 'column', md: 'row' }}>
+        {/* Index Number */}
+        <Box width={{ base: 'auto', md: '60px' }} flexShrink={0} mb={{ base: '4', md: '0' }}>
           <Text
             color={blue}
-            fontSize={{ base: '22px', md: '28px' }}
+            fontSize="24px"
             lineHeight="1"
-            fontWeight="800"
-            fontVariantNumeric="tabular-nums"
+            fontWeight="700"
+            fontFamily={swissFont}
           >
             {String(index + 1).padStart(2, '0')}
           </Text>
-          <Box mt="12px" width="28px" height="4px" background={blue} />
-          <Text mt="10px" color={muted} fontSize="10px" lineHeight="1.45">
-            {section.eyebrow}
-          </Text>
         </Box>
 
+        {/* Content */}
         <Box flex="1" minWidth="0">
-          <Flex align={{ base: 'flex-start', md: 'center' }} justify="space-between" gap="16px" flexWrap="wrap">
-            <Text color={ink} fontSize={{ base: '18px', xl: '21px' }} lineHeight="1.3" fontWeight="800">
+          <Flex align="center" justify="space-between" gap="4" mb="3" flexWrap="wrap">
+            <Text color={ink} fontSize="18px" lineHeight="1.3" fontWeight="700">
               {section.title}
             </Text>
             <Button
@@ -149,35 +156,36 @@ function KnowledgeSectionCard({
               disabled={disabled}
               onClick={onNarrate}
               aria-label={`讲解${section.title}`}
-              height="32px"
-              px="10px"
-              borderRadius="0"
-              border="1px solid"
-              borderColor={blue}
-              background={paper}
-              color={blue}
+              height="36px"
+              px="4"
+              borderRadius="md"
+              background={blue}
+              color="white"
               fontFamily={swissFont}
-              _hover={{ background: blue, color: paper }}
+              fontWeight="500"
+              fontSize="sm"
+              _hover={{ background: 'rgba(0, 47, 167, 0.9)' }}
+              _disabled={{ opacity: 0.5, cursor: 'not-allowed' }}
             >
-              <FiMic />
-              讲解这一段
+              <FiMic size={14} style={{ marginRight: '6px' }} />
+              讲解
             </Button>
           </Flex>
 
-          <Text mt="9px" maxWidth="680px" color={muted} fontSize="14px" lineHeight="1.7">
+          <Text color={muted} fontSize="14px" lineHeight="1.7" mb="4">
             {section.summary}
           </Text>
 
-          <SimpleGrid columns={{ base: 1, md: 2 }} gap={{ base: '7px', md: '8px 20px' }} mt="14px">
-            {section.facts.map((fact) => (
-              <Flex key={fact} align="flex-start" gap="9px">
-                <Box mt="7px" width="5px" height="5px" flexShrink={0} background={blue} />
-                <Text color={ink} fontSize="12px" lineHeight="1.6">
+          <Flex gap="3" flexWrap="wrap">
+            {section.facts.map((fact, idx) => (
+              <Flex key={idx} align="flex-start" gap="2">
+                <Box mt="2" width="4" height="4" flexShrink={0} background={blue} borderRadius="full" />
+                <Text color={muted} fontSize="13px" lineHeight="1.6">
                   {fact}
                 </Text>
               </Flex>
             ))}
-          </SimpleGrid>
+          </Flex>
         </Box>
       </Flex>
     </Box>
@@ -188,6 +196,8 @@ export default function CampusKnowledge({
   activeTopicId,
   onNavigate,
   onClose,
+  onStartConsultation,
+  mode = 'main',
 }: CampusKnowledgeProps) {
   const { sendMessage, wsState } = useWebSocket();
   const { aiState, setAiState } = useAiState();
@@ -196,6 +206,12 @@ export default function CampusKnowledge({
   const [narrationError, setNarrationError] = useState('');
   const activeTopic = activeTopicId ? campusTopicMap[activeTopicId] : null;
   const isSpeaking = aiState === 'thinking-speaking';
+  const isHeroMode = mode === 'hero';
+
+  // Debug logging
+  useEffect(() => {
+    console.log('[CampusKnowledge] mode:', mode, 'isHeroMode:', isHeroMode, 'activeTopicId:', activeTopicId);
+  }, [mode, isHeroMode, activeTopicId]);
 
   const narrate = useCallback((title: string, segments: string[]) => {
     const cleanedSegments = segments.map((segment) => segment.trim()).filter(Boolean);
@@ -243,42 +259,55 @@ export default function CampusKnowledge({
   ), [activeTopic]);
 
   const handleClose = () => {
+    // 在关闭时总是打断语音播报，不仅是在 isSpeaking 状态时
+    interrupt();
     if (isSpeaking) stopNarration();
     onClose();
+
+    // 如果是 Hero 模式且有开始对话的回调，延迟触发进入对话模式
+    if (isHeroMode && onStartConsultation) {
+      setTimeout(() => {
+        onStartConsultation();
+      }, 100);
+    }
   };
 
   return (
     <>
+      {/* Navigation Bar - 在所有模式下都显示，但在 Hero 模式下样式调整 */}
       <Box
         data-testid="campus-navigation"
+        display="block"
         position="absolute"
         top={{ base: '10px', lg: '16px' }}
         left={{ base: '12px', lg: '24px' }}
         right={{ base: '12px', lg: '24px' }}
         zIndex={30}
-        px={{ base: '8px', lg: '12px' }}
-        py="8px"
+        px={{ base: '16px', md: '20px', lg: '24px' }}
+        py={{ base: '16px', md: '20px' }}
+        background={paper}
+        borderRadius="lg"
+        boxShadow="sm"
         border="1px solid"
         borderColor={hairline}
-        background={paper}
         fontFamily={swissFont}
       >
-        <Flex align="center" justify="space-between" gap="10px" flexWrap="wrap">
-          <Flex align="center" gap="10px" px={{ base: '4px', lg: '8px' }}>
-            <Box width="26px" height="26px" background={blue} color={paper} display="grid" placeItems="center">
-              <FiBookOpen size="14" />
+        <Flex align="center" justify="space-between" gap="16px" flexWrap="wrap">
+          <Flex align="center" gap="16px">
+            <Box width="40px" height="40px" background={blue} color={paper} display="grid" placeItems="center" borderRadius="lg">
+              <FiBookOpen size={20} />
             </Box>
             <Box>
-              <Text color={ink} fontSize="12px" fontWeight="800" lineHeight="1.1">
+              <Text color={ink} fontSize="16px" fontWeight="600" lineHeight="1.1">
                 {demoSchool.shortName}
               </Text>
-              <Text mt="3px" color={muted} fontSize="10px" lineHeight="1.1">
+              <Text mt="2px" color={muted} fontSize="12px" lineHeight="1.1">
                 校园专题档案
               </Text>
             </Box>
           </Flex>
 
-          <Flex align="center" justify="flex-end" gap="6px" flexWrap="wrap">
+          <Flex align="center" justify="flex-end" gap="8px" flexWrap="wrap">
             {campusTopics.map((topic) => (
               <TopicNavigationButton
                 key={topic.id}
@@ -293,16 +322,16 @@ export default function CampusKnowledge({
                 aria-label="返回普通对话页面"
                 onClick={handleClose}
                 height="40px"
-                px="11px"
-                borderRadius="0"
-                border="1px solid"
-                borderColor={hairline}
-                background={paper}
+                px="16px"
+                borderRadius="md"
+                variant="ghost"
                 color={muted}
                 fontFamily={swissFont}
-                _hover={{ borderColor: blue, color: blue, background: blueWash }}
+                fontWeight="500"
+                fontSize="sm"
+                _hover={{ background: blueWash, color: blue }}
               >
-                <FiArrowLeft />
+                <FiArrowLeft size={16} style={{ marginRight: '8px' }} />
                 返回对话
               </Button>
             )}
@@ -315,170 +344,152 @@ export default function CampusKnowledge({
           data-testid="campus-topic-page"
           data-topic={activeTopic.id}
           position="absolute"
-          top={{ base: '116px', lg: '86px' }}
+          top={isHeroMode ? { base: '80px', lg: '76px' } : { base: '116px', lg: '86px' }}
           left={{ base: '12px', lg: '24px' }}
-          bottom={{ base: '44px', lg: '50px' }}
-          width={{ base: 'calc(100% - 24px)', lg: '55%' }}
+          bottom={{ base: '20px', lg: '24px' }}
+          width={isHeroMode ? { base: 'calc(100% - 24px)', lg: 'calc(50% - 24px)' } : { base: 'calc(100% - 24px)', lg: '55%' }}
           zIndex={22}
-          border="1px solid"
-          borderColor={hairline}
-          background={surface}
+          background={paper}
           overflow="hidden"
           fontFamily={swissFont}
+          borderRadius="lg"
+          boxShadow="sm"
+          border="1px solid"
+          borderColor={hairline}
         >
           <Box
             height="100%"
             overflowY="auto"
-            backgroundImage="linear-gradient(to right, rgba(0, 47, 167, 0.045) 1px, transparent 1px), linear-gradient(to bottom, rgba(0, 47, 167, 0.045) 1px, transparent 1px)"
-            backgroundSize="32px 32px"
+            CSS={{
+              '&::-webkit-scrollbar': {
+              width: '6px',
+              },
+              '&::-webkit-scrollbar-track': {
+              background: surface,
+              },
+              '&::-webkit-scrollbar-thumb': {
+              background: hairline,
+              borderRadius: '3px',
+              },
+              '&::-webkit-scrollbar-thumb:hover': {
+              background: muted,
+              },
+            }}
           >
             <Box
-              mx={{ base: '14px', md: '24px', xl: '32px' }}
-              mt={{ base: '14px', md: '24px' }}
-              background={paper}
-              border="1px solid"
-              borderColor={hairline}
+              mx={{ base: '16px', md: '24px' }}
+              mt={{ base: '20px', md: '24px' }}
+              mb={{ base: '20px', md: '24px' }}
+              p={{ base: '20px', md: '24px' }}
             >
-              <Box px={{ base: '16px', md: '26px', xl: '34px' }} pt={{ base: '22px', md: '30px' }}>
-                <Flex align="flex-start" justify="space-between" gap="24px" flexWrap="wrap">
-                  <Box maxWidth="700px">
-                    <Flex align="center" gap="10px" mb="16px">
-                      <Text color={blue} fontSize="11px" fontWeight="800" letterSpacing="0.16em">
-                        {activeTopic.eyebrow}
-                      </Text>
-                      <Box width="42px" height="1px" background={blue} />
-                      <Text color={muted} fontSize="11px" fontVariantNumeric="tabular-nums">
-                        {activeTopic.statusLabel}
-                      </Text>
-                    </Flex>
-                    <Text
-                      data-testid="campus-topic-title"
-                      color={ink}
-                      fontSize={{ base: '29px', md: '39px', xl: '47px' }}
-                      lineHeight="1.08"
-                      fontWeight="800"
-                      letterSpacing="-0.04em"
-                    >
-                      {activeTopic.title}
-                    </Text>
-                    <Text mt="16px" maxWidth="650px" color={muted} fontSize={{ base: '14px', md: '16px' }} lineHeight="1.75">
-                      {activeTopic.subtitle}
-                    </Text>
-                    <Text mt="14px" color={muted} fontSize="11px" lineHeight="1.55">
-                      {demoSchool.name} · 原名：{demoSchool.formerName}
-                    </Text>
-                  </Box>
-
-                  <Box minWidth={{ base: '100%', sm: '190px' }}>
-                    <Text color={muted} fontSize="10px" letterSpacing="0.13em">
-                      ARCHIVE / {activeTopic.id.toUpperCase()}
-                    </Text>
-                    <Text mt="6px" color={blue} fontSize={{ base: '32px', md: '42px' }} lineHeight="1" fontWeight="800" fontVariantNumeric="tabular-nums">
-                      {String(activeTopic.sections.length).padStart(2, '0')}
-                    </Text>
-                    <Text mt="8px" color={muted} fontSize="11px" lineHeight="1.5">
-                      个主题单元
-                    </Text>
-                    <Button
-                      data-testid="campus-play-all"
-                      mt="18px"
-                      onClick={() => narrate(`${demoSchool.name}·${activeTopic.navLabel}完整讲解`, fullNarration)}
-                      disabled={isSpeaking}
-                      height="38px"
-                      px="13px"
-                      borderRadius="0"
-                      border="1px solid"
-                      borderColor={blue}
-                      background={blue}
-                      color={paper}
-                      fontFamily={swissFont}
-                      fontWeight="700"
-                      _hover={{ background: ink, borderColor: ink }}
-                    >
-                      <FiPlay />
-                      完整讲解
-                    </Button>
-                    {isSpeaking && (
-                      <Button
-                        data-testid="campus-stop-narration"
-                        mt="8px"
-                        onClick={stopNarration}
-                        height="32px"
-                        px="11px"
-                        borderRadius="0"
-                        border="1px solid"
-                        borderColor="#B3261E"
-                        background={paper}
-                        color="#B3261E"
-                        fontFamily={swissFont}
-                        _hover={{ background: '#FCE8E6' }}
-                      >
-                        停止讲解
-                      </Button>
-                    )}
-                  </Box>
-                </Flex>
+              {/* Badge */}
+              <Box mb="6">
+                <Text
+                  color={blue}
+                  fontSize={{ base: '12px', md: '14px' }}
+                  fontWeight="600"
+                  letterSpacing="0.05em"
+                  textTransform="uppercase"
+                >
+                  {activeTopic.eyebrow}
+                </Text>
               </Box>
 
-              <SimpleGrid
-                columns={{ base: 1, sm: 3 }}
-                mt={{ base: '24px', md: '32px' }}
-                borderTop="1px solid"
-                borderBottom="1px solid"
-                borderColor={hairline}
+              {/* Title */}
+              <Text
+                data-testid="campus-topic-title"
+                color={ink}
+                fontSize={{ base: '32px', md: '42px', lg: '48px' }}
+                lineHeight="1.1"
+                fontWeight="700"
+                letterSpacing="-0.02em"
+                mb="6"
               >
+                {activeTopic.title}
+              </Text>
+
+              {/* Subtitle */}
+              <Text
+                maxWidth="600px"
+                color={muted}
+                fontSize={{ base: '14px', md: '16px' }}
+                lineHeight="1.7"
+                mb="8"
+              >
+                {activeTopic.subtitle}
+              </Text>
+
+              {/* Stats */}
+              <SimpleGrid columns={{ base: 2, md: 3 }} gap="6" mb="8" pb="8" borderBottom="1px solid" borderColor={hairline}>
                 {activeTopic.stats.map((stat, index) => (
-                  <Box
-                    key={stat.label}
-                    px={{ base: '16px', md: '26px' }}
-                    py="17px"
-                    borderLeft={{ base: 'none', sm: index === 0 ? 'none' : '1px solid' }}
-                    borderTop={{ base: index === 0 ? 'none' : '1px solid', sm: 'none' }}
-                    borderColor={hairline}
-                  >
-                    <Text color={blue} fontSize={{ base: '22px', md: '27px' }} lineHeight="1" fontWeight="800" fontVariantNumeric="tabular-nums">
+                  <Box key={stat.label}>
+                    <Text
+                      color={blue}
+                      fontSize={{ base: '24px', md: '28px' }}
+                      lineHeight="1"
+                      fontWeight="700"
+                      mb="2"
+                    >
                       {stat.value}
                     </Text>
-                    <Text mt="7px" color={muted} fontSize="11px" lineHeight="1.45">
+                    <Text color={muted} fontSize="12px" lineHeight="1.4">
                       {stat.label}
                     </Text>
                   </Box>
                 ))}
               </SimpleGrid>
 
-              {narrationError && (
-                <Box mx={{ base: '16px', md: '26px' }} mt="20px" px="13px" py="10px" borderLeft="3px solid" borderColor="#B3261E" background="#FCE8E6">
-                  <Text color="#8C1D18" fontSize="12px">{narrationError}</Text>
-                </Box>
-              )}
-
-              <Flex
-                align="flex-start"
-                gap="12px"
-                mx={{ base: '16px', md: '26px' }}
-                mt="22px"
-                px="14px"
-                py="13px"
-                borderLeft="3px solid"
-                borderColor={blue}
-                background={blueWash}
-              >
-                <Text color={blue} fontSize="12px" fontWeight="800" lineHeight="1.4">资料说明</Text>
-                <Box>
-                  <Text color={ink} fontSize="12px" lineHeight="1.65">{activeTopic.notice}</Text>
-                  <Text mt="4px" color={muted} fontSize="10px" lineHeight="1.55">
-                    更新：{demoSchool.updatedAt} · {demoSchool.disclaimer}
-                  </Text>
-                </Box>
+              {/* Control Buttons */}
+              <Flex gap="4" mb="8">
+                <Button
+                  onClick={() => narrate(`${demoSchool.name}·${activeTopic.navLabel}完整讲解`, fullNarration)}
+                  disabled={isSpeaking}
+                  height="44px"
+                  px="6"
+                  borderRadius="md"
+                  background={blue}
+                  color="white"
+                  fontFamily={swissFont}
+                  fontWeight="500"
+                  fontSize="sm"
+                  _hover={{ background: 'rgba(0, 47, 167, 0.9)' }}
+                  _disabled={{ opacity: 0.5, cursor: 'not-allowed' }}
+                >
+                  <FiPlay size={16} style={{ marginRight: '8px' }} />
+                  完整讲解
+                </Button>
+                {isSpeaking && (
+                  <Button
+                    onClick={stopNarration}
+                    height="44px"
+                    px="6"
+                    borderRadius="md"
+                    variant="outline"
+                    color={ink}
+                    fontFamily={swissFont}
+                    fontWeight="500"
+                    fontSize="sm"
+                    _hover={{ background: surface }}
+                  >
+                    停止讲解
+                  </Button>
+                )}
               </Flex>
 
-              <Box px={{ base: '16px', md: '26px' }} pt={{ base: '24px', md: '32px' }} pb="8px">
-                <Flex align="baseline" justify="space-between" gap="12px" borderBottom="2px solid" borderColor={ink} pb="10px">
-                  <Text color={ink} fontSize="14px" fontWeight="800">内容索引</Text>
-                  <Text color={muted} fontSize="10px" fontVariantNumeric="tabular-nums">
-                    {activeTopic.sections.length} 个主题单元
-                  </Text>
-                </Flex>
+              {/* Sections */}
+              <Box>
+                <Text
+                  color={ink}
+                  fontSize="16px"
+                  fontWeight="700"
+                  mb="6"
+                  pb="4"
+                  borderBottom="2px solid"
+                  borderColor={ink}
+                >
+                  内容索引
+                </Text>
+
                 {activeTopic.sections.map((section, index) => (
                   <KnowledgeSectionCard
                     key={section.id}
@@ -491,13 +502,19 @@ export default function CampusKnowledge({
               </Box>
 
               {activeTopic.sources.length > 0 && (
-                <Box px={{ base: '16px', md: '26px' }} pt="10px" pb={{ base: '24px', md: '34px' }}>
-                  <Flex align="center" gap="8px" borderBottom="2px solid" borderColor={ink} pb="10px">
-                    <FiExternalLink color={blue} />
-                    <Text color={ink} fontSize="14px" fontWeight="800">公开资料来源</Text>
-                    <Text color={muted} fontSize="10px">点击标题打开原文</Text>
-                  </Flex>
-                  <SimpleGrid columns={{ base: 1, md: 2 }} gap="0 20px">
+                <Box mt="8">
+                  <Text
+                    color={ink}
+                    fontSize="14px"
+                    fontWeight="700"
+                    mb="4"
+                    pb="4"
+                    borderBottom="1px solid"
+                    borderColor={hairline}
+                  >
+                    参考来源
+                  </Text>
+                  <SimpleGrid columns={{ base: 1, md: 2 }} gap="4">
                     {activeTopic.sources.map((source, index) => (
                       <Link
                         key={source.url}
@@ -505,22 +522,22 @@ export default function CampusKnowledge({
                         target="_blank"
                         rel="noreferrer"
                         display="block"
-                        py="13px"
-                        borderBottom="1px solid"
-                        borderColor={hairline}
-                        _hover={{ color: blue, background: blueWash }}
-                        transition="background 160ms ease, color 160ms ease"
+                        py="3"
+                        px="4"
+                        borderRadius="md"
+                        _hover={{ background: surface, color: blue }}
+                        transition="background 160ms ease"
                       >
-                        <Flex align="flex-start" gap="10px">
-                          <Text color={blue} fontSize="11px" fontWeight="800" fontVariantNumeric="tabular-nums">
+                        <Flex align="flex-start" gap="8px">
+                          <Text color={blue} fontSize="12px" fontWeight="700" fontFamily={swissFont}>
                             {String(index + 1).padStart(2, '0')}
                           </Text>
                           <Box minWidth="0">
-                            <Text color={ink} fontSize="12px" lineHeight="1.55">
+                            <Text color={ink} fontSize="13px" lineHeight="1.4" display="flex" alignItems="center">
                               {source.title}
-                              <FiArrowUpRight size="12" style={{ display: 'inline', marginLeft: '5px', verticalAlign: '-1px' }} />
+                              <FiArrowUpRight size={12} style={{ marginLeft: '4px', flexShrink: 0 }} />
                             </Text>
-                            <Text mt="4px" color={muted} fontSize="10px">
+                            <Text mt="2px" color={muted} fontSize="11px">
                               {source.publisher} · {source.publishedAt}
                             </Text>
                           </Box>

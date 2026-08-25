@@ -18,7 +18,7 @@ except ImportError:
     WEBSUPPORT = False
     logger.warning("aiohttp or beautifulsoup4 not installed. Web scraping disabled.")
 
-from .models import KnowledgeEntry, Chunk, SourceType, KnowledgeCategory
+from .models import KnowledgeEntry, Chunk, SourceType, KnowledgeCategory, KnowledgeStatus
 
 
 class DocumentProcessor:

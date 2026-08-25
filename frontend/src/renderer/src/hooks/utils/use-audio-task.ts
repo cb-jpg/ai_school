@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useAiState } from '@/context/ai-state-context';
 import { useSubtitle } from '@/context/subtitle-context';
 import { useChatHistory } from '@/context/chat-history-context';
+import { useVolume } from '@/context/volume-context';
 import { audioTaskQueue } from '@/utils/task-queue';
 import { toaster } from '@/components/ui/toaster';
 import { useWebSocket } from '@/context/websocket-context';
@@ -41,6 +42,7 @@ export const useAudioTask = () => {
   const { appendResponse, appendAIMessage } = useChatHistory();
   const { sendMessage } = useWebSocket();
   const { setExpression } = useLive2DExpression();
+  const { volume } = useVolume();
 
   // State refs to avoid stale closures
   const stateRef = useRef({
@@ -189,6 +191,7 @@ export const useAudioTask = () => {
 
         // Setup audio element
         const audio = new Audio(audioDataUrl);
+        audio.volume = volume / 100; // 设置音量 (0-1)
         currentAudioRef.current = audio;
         let isFinished = false;
 

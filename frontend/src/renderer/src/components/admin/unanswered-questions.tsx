@@ -15,7 +15,8 @@ import {
   Badge,
   Icon,
   Input,
-  SimpleGrid
+  SimpleGrid,
+  createToaster
 } from '@chakra-ui/react';
 import {
   FiHelpCircle,
@@ -27,6 +28,12 @@ import {
 import { BiBulb } from 'react-icons/bi';
 import { useState } from 'react';
 import { useKnowledgeAdminAPI } from '@/services/knowledge-admin-api';
+
+const toaster = createToaster({
+  placement: 'top-end',
+  overlap: true,
+  max: 3
+});
 
 const swissFont = '"Helvetica Neue", Arial, sans-serif';
 const ink = '#121826';
@@ -408,7 +415,7 @@ export default function UnansweredQuestions() {
 
   const handleSubmitAnswer = async () => {
     if (!answerForm.answer.trim() || !answerForm.title.trim()) {
-      toast({
+      toaster.create({
         title: '请填写完整',
         description: '请填写标题和答案内容',
         status: 'warning',
@@ -434,7 +441,7 @@ export default function UnansweredQuestions() {
       });
 
       if (result.success) {
-        toast({
+        toaster.create({
           title: '添加成功',
           description: `已添加 ${result.document_ids.length} 个知识块到知识库`,
           status: 'success',
@@ -449,7 +456,7 @@ export default function UnansweredQuestions() {
         handleCancelAnswer();
       }
     } catch (error) {
-      toast({
+      toaster.create({
         title: '添加失败',
         description: error instanceof Error ? error.message : '未知错误',
         status: 'error',
@@ -473,7 +480,7 @@ export default function UnansweredQuestions() {
         });
 
         if (result.success && result.results.length > 0) {
-          toast({
+          toaster.create({
             title: '找到相关知识',
             description: `知识库中有 ${result.results.length} 条相关内容`,
             status: 'info',

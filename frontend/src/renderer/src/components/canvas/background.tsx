@@ -1,4 +1,4 @@
-import { Box, Image } from '@chakra-ui/react';
+import { Box, Image, VStack } from '@chakra-ui/react';
 import { memo, useEffect, useRef } from 'react';
 import { canvasStyles } from './canvas-styles';
 import { useCamera } from '@/context/camera-context';
@@ -26,7 +26,14 @@ const Background = memo(({ children }: { children?: React.ReactNode }) => {
   }, [backgroundStream]);
 
   return (
-    <Box {...canvasStyles.background.container}>
+    <Box
+      position="absolute"
+      top={0}
+      left={0}
+      width="100%"
+      height="100%"
+      zIndex={0}
+    >
       {useCameraBackground ? (
         <video
           ref={videoRef}
@@ -34,18 +41,58 @@ const Background = memo(({ children }: { children?: React.ReactNode }) => {
           playsInline
           muted
           style={{
-            ...canvasStyles.background.video,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
             display: isBackgroundStreaming ? 'block' : 'none',
             transform: 'scaleX(-1)',
           }}
         />
       ) : (
-        <Image
-          {...canvasStyles.background.image}
-          src={backgroundUrl}
-          alt="background"
-        />
+        backgroundUrl ? (
+          <Image
+            src={backgroundUrl}
+            alt="background"
+            width="100%"
+            height="100%"
+            objectFit="cover"
+            position="absolute"
+            top={0}
+            left={0}
+          />
+        ) : (
+          <Box
+            width="100%"
+            height="100%"
+            bg="linear-gradient(135deg, rgba(30, 84, 148, 0.1) 0%, rgba(255, 107, 53, 0.05) 100%)"
+            position="absolute"
+            top={0}
+            left={0}
+          />
+        )
       )}
+
+      {/* 左侧虚化遮罩 - 右侧清晰，左侧渐变虚化 */}
+      <Box
+        position="absolute"
+        top={0}
+        left={0}
+        width="45%"
+        height="100%"
+        bg="linear-gradient(to right, rgba(245, 247, 250, 0.95) 0%, rgba(245, 247, 250, 0.7) 50%, rgba(245, 247, 250, 0.2) 100%)"
+        zIndex={1}
+      />
+
+      {/* 右侧保持清晰 */}
+      <Box
+        position="absolute"
+        top={0}
+        right={0}
+        width="55%"
+        height="100%"
+        zIndex={1}
+      />
+
       {children}
     </Box>
   );

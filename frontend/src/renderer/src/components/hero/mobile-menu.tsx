@@ -4,8 +4,9 @@
  */
 
 import { memo } from 'react';
-import { Box, Flex, Button, Text, IconButton } from '@chakra-ui/react';
-import { FiX } from 'react-icons/fi';
+import { Box, Flex, Button, Text, IconButton, HStack } from '@chakra-ui/react';
+import { FiX, FiHome, FiBook, FiClock, FiAward, FiUsers } from 'react-icons/fi';
+import { useInterrupt } from '@/hooks/utils/use-interrupt';
 
 interface NavItem {
   id: string;
@@ -19,7 +20,21 @@ interface MobileMenuProps {
   navigation: NavItem[];
 }
 
-const handleNavClick = (itemId: string, onClose: () => void) => {
+// 图标映射
+const iconMap: Record<string, React.ElementType> = {
+  home: FiHome,
+  intro: FiBook,
+  history: FiClock,
+  achievements: FiAward,
+  'role-models': FiUsers,
+};
+
+const handleNavClick = (itemId: string, onClose: () => void, onInterrupt?: () => void) => {
+  // 切换界面时打断语音播报
+  if (onInterrupt) {
+    onInterrupt();
+  }
+
   onClose();
 
   // Navigate based on item id
@@ -45,6 +60,20 @@ const handleNavClick = (itemId: string, onClose: () => void) => {
 };
 
 const MobileMenu = memo(({ isOpen, onClose, navigation }: MobileMenuProps) => {
+  const { interrupt } = useInterrupt();
+
+  const handleLogin = () => {
+    // 切换界面时打断语音播报
+    interrupt();
+    // 关闭菜单
+    onClose();
+    // 跳转到main界面（工作台模式）
+    setTimeout(() => {
+      window.location.hash = '#/main';
+      window.dispatchEvent(new Event('hashchange'));
+    }, 100);
+  };
+
   return (
     <Box
       position="absolute"
@@ -84,22 +113,27 @@ const MobileMenu = memo(({ isOpen, onClose, navigation }: MobileMenuProps) => {
         transform={isOpen ? 'translateY(0)' : 'translateY(32px)'}
       >
         {/* Navigation Links */}
-        {navigation.map((item) => (
-          <Text
-            key={item.id}
-            fontSize="2xl"
-            fontWeight="medium"
-            color="gray.700"
-            _hover={{ color: '#002FA7' }}
-            cursor="pointer"
-            mb={6}
-            onClick={() => handleNavClick(item.id, onClose)}
-          >
-            {item.label}
-          </Text>
-        ))}
+        {navigation.map((item) => {
+          const Icon = iconMap[item.id] || item.icon;
+          return (
+            <HStack
+              key={item.id}
+              spacing={4}
+              fontSize="2xl"
+              fontWeight="medium"
+              color="gray.700"
+              _hover={{ color: '#002FA7' }}
+              cursor="pointer"
+              mb={6}
+              onClick={() => handleNavClick(item.id, onClose, interrupt)}
+            >
+              <Icon size={28} />
+              <Text>{item.label}</Text>
+            </HStack>
+          );
+        })}
 
-        {/* CTA Button */}
+        {/* CTA Button - 登录按钮 */}
         <Button
           mt={6}
           rounded="full"
@@ -111,18 +145,9 @@ const MobileMenu = memo(({ isOpen, onClose, navigation }: MobileMenuProps) => {
           fontWeight="medium"
           _hover={{ bg: 'blue.800', transform: 'scale(1.05)' }}
           transition="all 0.2s"
-          onClick={() => {
-            onClose();
-            // Focus on input field
-            setTimeout(() => {
-              const textarea = document.querySelector('textarea[placeholder*="问题"]');
-              if (textarea instanceof HTMLTextAreaElement) {
-                textarea.focus();
-              }
-            }, 100);
-          }}
+          onClick={handleLogin}
         >
-          开始咨询
+          登录
         </Button>
       </Flex>
     </Box>

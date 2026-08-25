@@ -16,7 +16,8 @@ import {
   Icon,
   Progress,
   Divider,
-  SimpleGrid
+  SimpleGrid,
+  createToaster
 } from '@chakra-ui/react';
 import {
   FiUpload,
@@ -29,6 +30,12 @@ import {
 } from 'react-icons/fi';
 import { useState, useCallback, useRef } from 'react';
 import { useKnowledgeAdminAPI } from '@/services/knowledge-admin-api';
+
+const toaster = createToaster({
+  placement: 'top-end',
+  overlap: true,
+  max: 3
+});
 
 const swissFont = '"Helvetica Neue", Arial, sans-serif';
 const ink = '#121826';
@@ -156,7 +163,7 @@ export default function KnowledgeUpload() {
 
   const handleFileUpload = useCallback(async () => {
     if (!selectedFiles || selectedFiles.length === 0) {
-      toast({
+      toaster.create({
         title: '请选择文件',
         description: '请先选择要上传的文件',
         status: 'warning',
@@ -202,7 +209,7 @@ export default function KnowledgeUpload() {
           return next;
         });
 
-        toast({
+        toaster.create({
           title: '上传成功',
           description: `${file.name} 上传成功`,
           status: 'success',
@@ -219,7 +226,7 @@ export default function KnowledgeUpload() {
           return next;
         });
 
-        toast({
+        toaster.create({
           title: '上传失败',
           description: `${file.name} 上传失败: ${errorMessage}`,
           status: 'error',
@@ -233,11 +240,11 @@ export default function KnowledgeUpload() {
     if (fileInputRef) {
       fileInputRef.value = '';
     }
-  }, [selectedFiles, fileCategory, uploadDocument, toast, fileInputRef]);
+  }, [selectedFiles, fileCategory, uploadDocument, fileInputRef]);
 
   const handleTextSubmit = useCallback(async () => {
     if (!textContent.trim()) {
-      toast({
+      toaster.create({
         title: '请输入内容',
         description: '请输入要添加的文本内容',
         status: 'warning',
@@ -248,7 +255,7 @@ export default function KnowledgeUpload() {
     }
 
     if (!textTitle.trim()) {
-      toast({
+      toaster.create({
         title: '请输入标题',
         description: '请为该内容输入一个标题',
         status: 'warning',
@@ -290,7 +297,7 @@ export default function KnowledgeUpload() {
         return next;
       });
 
-      toast({
+      toaster.create({
         title: '添加成功',
         description: result.message,
         status: 'success',
@@ -318,7 +325,7 @@ export default function KnowledgeUpload() {
         return next;
       });
 
-      toast({
+      toaster.create({
         title: '添加失败',
         description: errorMessage,
         status: 'error',
@@ -326,7 +333,7 @@ export default function KnowledgeUpload() {
         isClosable: true
       });
     }
-  }, [textContent, textTitle, textCategory, addDocument, toast]);
+  }, [textContent, textTitle, textCategory, addDocument]);
 
   const clearStatus = useCallback((id: string) => {
     setUploadStatuses(prev => prev.filter(s => s.id !== id));

@@ -36,6 +36,8 @@ interface MessageInputProps {
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void
   onCompositionStart: () => void
   onCompositionEnd: () => void
+  micOn?: boolean
+  onMicToggle?: () => void
 }
 
 // Reusable components
@@ -62,16 +64,22 @@ const ActionButtons = memo(({ micOn, onMicToggle, onInterrupt }: ActionButtonsPr
       bg={micOn ? 'green.500' : 'red.500'}
       {...footerStyles.footer.actionButton}
       onClick={onMicToggle}
+      _hover={{ transform: 'scale(1.05)', transition: 'all 0.2s' }}
+      _active={{ scale: 0.95 }}
     >
-      {micOn ? <BsMicFill /> : <BsMicMuteFill />}
+      <Box as="span" display="flex" alignItems="center" justifyContent="center" fontSize="20px">
+        {micOn ? <BsMicFill style={{ fontSize: '20px' }} /> : <BsMicMuteFill style={{ fontSize: '20px' }} />}
+      </Box>
     </IconButton>
     <IconButton
       aria-label="Raise hand"
       bg="yellow.500"
       {...footerStyles.footer.actionButton}
       onClick={onInterrupt}
+      _hover={{ transform: 'scale(1.05)', transition: 'all 0.2s' }}
+      _active={{ scale: 0.95 }}
     >
-      <IoHandRightSharp size="24" />
+      <IoHandRightSharp style={{ fontSize: '20px' }} />
     </IconButton>
   </HStack>
 ));
@@ -84,28 +92,62 @@ const MessageInput = memo(({
   onKeyDown,
   onCompositionStart,
   onCompositionEnd,
+  micOn = false,
+  onMicToggle,
 }: MessageInputProps) => {
   const { t } = useTranslation();
 
   return (
     <InputGroup flex={1}>
-      <Box position="relative" width="100%">
+      <Box position="relative" width="100%" display="flex" alignItems="center" gap="2">
+        {/* Left side - Attachment icon and input */}
+        <Box position="relative" flex={1} display="flex" alignItems="center">
+          <IconButton
+            aria-label="Attach file"
+            variant="ghost"
+            {...footerStyles.footer.attachButton}
+          >
+            <BsPaperclip size={18} />
+          </IconButton>
+          <Textarea
+            value={value}
+            onChange={onChange}
+            onKeyDown={onKeyDown}
+            onCompositionStart={onCompositionStart}
+            onCompositionEnd={onCompositionEnd}
+            placeholder={t('footer.typeYourMessage')}
+            {...footerStyles.footer.input}
+            paddingRight="60px" // 确保右侧有足够空间
+          />
+        </Box>
+
+        {/* Right side - Microphone button - 绝对定位在输入框右侧 */}
         <IconButton
-          aria-label="Attach file"
-          variant="ghost"
-          {...footerStyles.footer.attachButton}
+          aria-label={micOn ? '停止语音识别' : '开始语音识别'}
+          title={micOn ? '停止语音识别' : '开始语音识别'}
+          bg={micOn ? 'green.500' : 'red.500'}
+          width="45px"
+          height="45px"
+          minWidth="45px"
+          minHeight="45px"
+          borderRadius="10px"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          onClick={onMicToggle}
+          _hover={{ transform: 'scale(1.05)', transition: 'all 0.2s' }}
+          _active={{ scale: 0.95 }}
+          color="white"
+          padding={0}
+          position="relative"
+          zIndex={10}
         >
-          <BsPaperclip size="24" />
+          {micOn ? (
+            <BsMicFill style={{ fontSize: '22px', color: 'white' }} />
+          ) : (
+            <BsMicMuteFill style={{ fontSize: '22px', color: 'white' }} />
+          )}
         </IconButton>
-        <Textarea
-          value={value}
-          onChange={onChange}
-          onKeyDown={onKeyDown}
-          onCompositionStart={onCompositionStart}
-          onCompositionEnd={onCompositionEnd}
-          placeholder={t('footer.typeYourMessage')}
-          {...footerStyles.footer.input}
-        />
       </Box>
     </InputGroup>
   );
@@ -150,6 +192,8 @@ function Footer({ isCollapsed = false, onToggle }: FooterProps): JSX.Element {
             onKeyDown={handleKeyPress}
             onCompositionStart={handleCompositionStart}
             onCompositionEnd={handleCompositionEnd}
+            micOn={micOn}
+            onMicToggle={handleMicToggle}
           />
         </HStack>
         <AsrControls {...asr} />

@@ -12,7 +12,8 @@ import {
   HStack,
   Tabs,
   Icon,
-  Spinner
+  Spinner,
+  createToaster
 } from '@chakra-ui/react';
 import {
   FiBookOpen,
@@ -30,6 +31,12 @@ import KnowledgeDashboard from './knowledge-dashboard';
 import KnowledgeList from './knowledge-list';
 import KnowledgeUpload from './knowledge-upload';
 import UnansweredQuestions from './unanswered-questions';
+
+const toaster = createToaster({
+  placement: 'top-end',
+  overlap: true,
+  max: 3
+});
 
 const swissFont = '"Helvetica Neue", Arial, sans-serif';
 const ink = '#121826';
@@ -53,27 +60,23 @@ export default function KnowledgeAdmin({ onClose }: KnowledgeAdminProps) {
     setIsRefreshing(true);
     try {
       await checkHealth();
-      toast({
+      toaster.create({
         title: '刷新成功',
         description: '知识库数据已更新',
-        status: 'success',
-        duration: 2000,
-        isClosable: true
+        status: 'success'
       });
       // Trigger re-render by changing tab state slightly
       setActiveTab(prev => prev);
     } catch (error) {
-      toast({
+      toaster.create({
         title: '刷新失败',
         description: error instanceof Error ? error.message : '无法连接到知识库服务',
-        status: 'error',
-        duration: 3000,
-        isClosable: true
+        status: 'error'
       });
     } finally {
       setIsRefreshing(false);
     }
-  }, [checkHealth, toast]);
+  }, [checkHealth]);
 
   const handleRebuildIndex = useCallback(async () => {
     if (!confirm('确定要重建知识库索引吗？这可能需要一些时间。')) return;
@@ -82,28 +85,24 @@ export default function KnowledgeAdmin({ onClose }: KnowledgeAdminProps) {
     try {
       const result = await rebuildIndex();
       if (result.success) {
-        toast({
+        toaster.create({
           title: '索引重建成功',
           description: result.message,
-          status: 'success',
-          duration: 2000,
-          isClosable: true
+          status: 'success'
         });
       } else {
         throw new Error(result.message);
       }
     } catch (error) {
-      toast({
+      toaster.create({
         title: '索引重建失败',
         description: error instanceof Error ? error.message : '未知错误',
-        status: 'error',
-        duration: 3000,
-        isClosable: true
+        status: 'error'
       });
     } finally {
       setIsRefreshing(false);
     }
-  }, [rebuildIndex, toast]);
+  }, [rebuildIndex]);
 
   const tabs = [
     { id: 0, label: '概览', icon: FiBarChart2 },

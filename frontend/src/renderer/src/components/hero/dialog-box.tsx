@@ -15,15 +15,13 @@ import {
   IconButton,
   Badge,
   Flex,
-  Switch as ChakraSwitch,
-  Alert,
-  AlertIcon,
-  AlertTitle,
   Spinner,
 } from '@chakra-ui/react';
+import { Switch } from '@/components/ui/switch';
 import { BsMicFill, BsMicMuteFill, BsMic } from 'react-icons/bs';
+import { FiInfo, FiArrowRight, FiClock, FiPlus } from 'react-icons/fi';
 import { IoSend } from 'react-icons/io5';
-import { FiArrowRight, FiInfo } from 'react-icons/fi';
+import { Alert } from '@/components/ui/alert';
 import { useTextInput } from '@/hooks/footer/use-text-input';
 import { useWebSocket } from '@/context/websocket-context';
 import { useAiState, AiStateEnum } from '@/context/ai-state-context';
@@ -32,16 +30,50 @@ import { useVAD } from '@/context/vad-context';
 import { useChatHistory } from '@/context/chat-history-context';
 import { useLive2DConfig } from '@/context/live2d-config-context';
 
-// 明亮简洁风格配色
-const lightColors = {
-  bg: '#FAFAFA',
-  primary: '#002FA7',
-  text: '#121826',
-  textSecondary: '#586174',
-  border: '#E5E7EB',
+// Emoji 映射表 - 将 [joy] 等格式转换为真实 emoji
+const emojiMap: Record<string, string> = {
+  '[joy]': '😂',
+  '[smile]': '😊',
+  '[laugh]': '😄',
+  '[love]': '😍',
+  '[wink]': '😉',
+  '[sad]': '😢',
+  '[cry]': '😭',
+  '[angry]': '😠',
+  '[surprised]': '😲',
+  '[confused]': '😕',
+  '[thumbs_up]': '👍',
+  '[thumbs_down]': '👎',
+  '[clap]': '👏',
+  '[wave]': '👋',
+  '[heart]': '❤️',
+  '[fire]': '🔥',
+  '[star]': '⭐',
+  '[check]': '✅',
+  '[x]': '❌',
+};
+
+// 将文本中的 emoji 标记转换为真实 emoji
+function convertEmojis(text: string): string {
+  let result = text;
+  Object.entries(emojiMap).forEach(([marker, emoji]) => {
+    result = result.replace(new RegExp(marker.replace(/[[]]/g, '\\$&'), 'gi'), emoji);
+  });
+  return result;
+}
+
+// 学校配色方案 - 基于石实实验学校的设计
+const schoolColors = {
+  bg: '#F5F7FA',        // 浅灰背景，简洁明了
+  primary: '#1E5494',    // 深蓝色，代表知识和专业
+  secondary: '#FF6B35',  // 暖橙色，代表活力和成长
+  accent: '#E8F0FE',     // 浅蓝色，用于高亮
+  text: '#2D3748',       // 深灰色，主要文字
+  textSecondary: '#718096', // 浅灰色，次要文字
+  border: '#E2E8F0',     // 边框颜色
   white: '#FFFFFF',
-  userBubble: '#002FA7',
-  assistantBubble: '#F3F4F6',
+  userBubble: '#1E5494', // 用户消息气泡
+  assistantBubble: '#F3F4F6', // AI回复气泡
 };
 
 interface DialogBoxProps {
@@ -56,17 +88,35 @@ const DialogBox = memo(({ schoolName, tagline, description }: DialogBoxProps) =>
   const { aiState } = useAiState();
   const { subtitleText } = useSubtitleDisplay();
   const { micOn, startMic, stopMic, autoStopMic, setAutoStopMic } = useVAD();
-  const { messages } = useChatHistory();
+  const { messages, historyList } = useChatHistory();
   const { modelInfo, isLoading: modelLoading } = useLive2DConfig();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [showHistory, setShowHistory] = useState(false);
 
   // 确保麦克风不会自动启动（仅在首次加载时执行）
   useEffect(() => {
-    if (micOn) {
-      console.log('麦克风已自动启动，正在关闭...');
-      stopMic();
-    }
+    const timer = setTimeout(() => {
+      if (micOn) {
+        console.log('麦克风已自动启动，正在关闭...');
+        try {
+          stopMic();
+        } catch (error) {
+          console.error('关闭麦克风时出错:', error);
+        }
+      }
+    }, 100); // 延迟执行，确保 VAD 完全初始化
+
+    return () => clearTimeout(timer);
   }, []); // 只在组件挂载时执行一次
+
+  // 调试：打印 modelInfo 和 WebSocket 状态
+  useEffect(() => {
+    console.log('[DialogBox Debug] wsState:', wsState);
+    console.log('[DialogBox Debug] modelInfo:', modelInfo);
+    if (modelInfo?.url) {
+      console.log('[DialogBox Debug] Model URL:', modelInfo.url);
+    }
+  }, [wsState, modelInfo]);
 
   // 自动滚动到最新消息
   useEffect(() => {
@@ -93,14 +143,14 @@ const DialogBox = memo(({ schoolName, tagline, description }: DialogBoxProps) =>
   };
 
   const getStatusColor = () => {
-    if (wsState !== 'OPEN' && wsState !== 'CONNECTING') return 'red';
-    if (modelLoading) return 'yellow';
-    if (!modelInfo && wsState === 'OPEN') return 'orange';
+    if (wsState !== 'OPEN' && wsState !== 'CONNECTING') return '#E53E3E'; // 红色
+    if (modelLoading) return '#ECC94B'; // 黄色
+    if (!modelInfo && wsState === 'OPEN') return '#DD6B20'; // 橙色
     switch (aiState) {
-      case AiStateEnum.THINKING_SPEAKING: return 'blue';
-      case AiStateEnum.LISTENING: return 'purple';
-      case AiStateEnum.IDLE: return 'green';
-      default: return 'gray';
+      case AiStateEnum.THINKING_SPEAKING: return '#1E5494'; // 深蓝色
+      case AiStateEnum.LISTENING: return '#FF6B35'; // 暖橙色
+      case AiStateEnum.IDLE: return '#48BB78'; // 绿色
+      default: return '#718096'; // 灰色
     }
   };
 
@@ -113,67 +163,59 @@ const DialogBox = memo(({ schoolName, tagline, description }: DialogBoxProps) =>
     >
       {/* Connection Status Alert */}
       {wsState !== 'OPEN' && (
-        <Alert status="warning" mb={4} borderRadius="md">
-          <AlertIcon />
-          <Box flex="1">
-            <AlertTitle fontSize="sm" mb={1}>正在连接服务器...</AlertTitle>
-            <Text fontSize="xs">请确保后端服务器正在运行 (端口12393)</Text>
-          </Box>
-          <Spinner size="sm" />
-        </Alert>
-      )}
-
-      {wsState === 'OPEN' && !modelInfo && (
-        <Alert status="info" mb={4} borderRadius="md">
-          <AlertIcon as={FiInfo} />
-          <Box flex="1">
-            <AlertTitle fontSize="sm" mb={1}>等待模型配置</AlertTitle>
-            <Text fontSize="xs">虚拟人模型配置将在WebSocket连接后自动加载</Text>
-          </Box>
-          <Spinner size="sm" />
+        <Alert status="warning" mb={4} title="正在连接服务器..." endElement={<Spinner size="sm" />}>
+          请确保后端服务器正在运行 (端口12393)
         </Alert>
       )}
 
       <VStack spacing={6} align="stretch" flex={1} overflow="hidden">
-      <VStack spacing={6} align="stretch" flex={1} overflow="hidden">
-        {/* Welcome Badge */}
-        <Box>
-          <HStack spacing={2} mb={4}>
-            <Badge
-              bg="blue.50"
-              color="blue.700"
-              px={3}
-              py={1}
-              rounded="md"
-              fontSize={{ base: 'xs', sm: 'sm' }}
-            >
-              人工智能 · 教育创新
-            </Badge>
-
-            {/* Status Indicator */}
-            <HStack spacing={2}>
-              <Box
-                w={2}
-                h={2}
-                rounded="full"
-                bg={getStatusColor()}
-              />
-              <Text fontSize="sm" color={lightColors.textSecondary}>
-                {getStatusText()}
+        {/* Status Indicator */}
+        <HStack spacing={2} mb={4} justify="space-between">
+          <HStack spacing={2}>
+            <Box
+              w={2}
+              h={2}
+              rounded="full"
+              bg={getStatusColor()}
+            />
+            <Text fontSize="sm" color={schoolColors.textSecondary}>
+              {getStatusText()}
+            </Text>
+            {wsState === 'OPEN' && !modelInfo && (
+              <Text fontSize="xs" color="orange.600" ml={2}>
+                (模型未配置)
               </Text>
-              {wsState === 'OPEN' && !modelInfo && (
-                <Text fontSize="xs" color="orange.600" ml={2}>
-                  (模型未配置)
-                </Text>
-              )}
-            </HStack>
+            )}
           </HStack>
+          <HStack spacing={2}>
+            <IconButton
+              aria-label="新对话"
+              icon={<FiPlus />}
+              size="sm"
+              variant="ghost"
+              color={schoolColors.textSecondary}
+              onClick={() => {
+                // 创建新对话的逻辑
+                console.log('创建新对话');
+              }}
+            />
+            <IconButton
+              aria-label="对话历史"
+              icon={<FiClock />}
+              size="sm"
+              variant="ghost"
+              color={schoolColors.textSecondary}
+              onClick={() => setShowHistory(!showHistory)}
+            />
+          </HStack>
+        </HStack>
 
+        <Box>
           <Text
             fontSize={{ base: '2xl', sm: '4xl', md: '5xl' }}
             fontWeight="bold"
             leadingTight={1.1}
-            color={lightColors.text}
+            color={schoolColors.text}
             mb={3}
             style={{ fontFamily: '"Helvetica Neue", Arial, sans-serif' }}
           >
@@ -183,7 +225,7 @@ const DialogBox = memo(({ schoolName, tagline, description }: DialogBoxProps) =>
           <Text
             fontSize={{ base: 'sm', sm: 'base', md: 'lg' }}
             leading="relaxed"
-            color={lightColors.textSecondary}
+            color={schoolColors.textSecondary}
             maxW={{ base: 'sm', sm: 'lg', md: 'xl' }}
             mb={{ base: 4, sm: 5 }}
           >
@@ -195,59 +237,100 @@ const DialogBox = memo(({ schoolName, tagline, description }: DialogBoxProps) =>
         <Box
           flex={1}
           overflowY="auto"
-          bg={lightColors.white}
+          bg={schoolColors.white}
           rounded="xl"
           p={4}
           border="1px solid"
-          borderColor={lightColors.border}
+          borderColor={schoolColors.border}
           boxShadow="sm"
         >
           <VStack spacing={3} align="stretch">
             {messages.map((msg, index) => (
               <Box
                 key={index}
-                bg={msg.role === 'human' ? lightColors.userBubble : lightColors.assistantBubble}
-                color={msg.role === 'human' ? 'white' : lightColors.text}
+                bg={msg.role === 'human' ? schoolColors.userBubble : schoolColors.assistantBubble}
+                color={msg.role === 'human' ? 'white' : schoolColors.text}
                 p={3}
                 rounded="lg"
                 alignSelf={msg.role === 'human' ? 'flex-end' : 'flex-start'}
                 maxWidth="80%"
                 fontSize="sm"
               >
-                {msg.content}
+                {convertEmojis(msg.content)}
               </Box>
             ))}
 
             {/* Show current AI response */}
             {subtitleText && (
               <Box
-                bg={lightColors.assistantBubble}
-                color={lightColors.text}
+                bg={schoolColors.assistantBubble}
+                color={schoolColors.text}
                 p={3}
                 rounded="lg"
                 alignSelf="flex-start"
                 maxWidth="80%"
                 fontSize="sm"
               >
-                {subtitleText}
+                {convertEmojis(subtitleText)}
               </Box>
             )}
 
             <div ref={messagesEndRef} />
           </VStack>
+
+          {/* 历史记录面板 */}
+          {showHistory && (
+            <Box
+              borderTop="1px solid"
+              borderColor={schoolColors.border}
+              p={3}
+              bg={schoolColors.accent}
+              maxHeight="120px"
+              overflowY="auto"
+            >
+              <Text fontSize="xs" fontWeight="semibold" color={schoolColors.text} mb={2}>
+                对话历史 ({historyList.length}个会话)
+              </Text>
+              {historyList.length === 0 ? (
+                <Text fontSize="xs" color={schoolColors.textSecondary}>
+                  暂无历史记录
+                </Text>
+              ) : (
+                <VStack gap="1" align="stretch">
+                  {historyList.slice(0, 3).map((history) => (
+                    <Box
+                      key={history.uid}
+                      p={2}
+                      bg="white"
+                      rounded="md"
+                      fontSize="xs"
+                      color={schoolColors.text}
+                    >
+                      {history.latest_message?.content || '空对话'}
+                    </Box>
+                  ))}
+                  {historyList.length > 3 && (
+                    <Text fontSize="xs" color={schoolColors.textSecondary} textAlign="center">
+                      ...还有 {historyList.length - 3} 个会话
+                    </Text>
+                  )}
+                </VStack>
+              )}
+            </Box>
+          )}
         </Box>
 
         {/* Input Area */}
-        <HStack spacing={3}>
+        <HStack spacing={3} alignItems="center">
           <Textarea
             value={textInput.inputText}
             onChange={(e) => textInput.setInputText({ target: { value: e.target.value } } as React.ChangeEvent<HTMLInputElement>)}
             onKeyDown={textInput.handleKeyPress}
             placeholder="输入您的问题..."
-            bg={lightColors.white}
-            color={lightColors.text}
+            bg={schoolColors.white}
+            color={schoolColors.text}
             border="1px solid"
-            borderColor={lightColors.border}
+            borderColor={schoolColors.border}
             rounded="lg"
             p={3}
             flex={1}
@@ -257,100 +340,84 @@ const DialogBox = memo(({ schoolName, tagline, description }: DialogBoxProps) =>
             maxHeight="120px"
             _placeholder={{ color: 'gray.400' }}
             _focus={{
-              borderColor: lightColors.primary,
+              borderColor: schoolColors.primary,
               outline: 'none',
               boxShadow: '0 0 0 2px rgba(0, 47, 167, 0.1)'
             }}
           />
 
-          <IconButton
-            aria-label={micOn ? '停止录音' : '开始录音'}
-            icon={micOn ? <BsMicFill size={20} /> : <BsMicMuteFill size={20} />}
-            onClick={micOn ? stopMic : startMic}
-            bg={micOn ? 'green.500' : 'gray.100'}
-            color={micOn ? 'white' : 'gray.600'}
-            _hover={{ bg: micOn ? 'green.600' : 'gray.200' }}
-            rounded="lg"
-            size={12}
-            title={micOn ? '点击停止录音' : '点击开始录音'}
-          />
-
-          <IconButton
-            aria-label="发送消息"
-            icon={<IoSend size={20} />}
-            onClick={handleSendMessage}
-            bg={lightColors.primary}
+          {/* 精美的动画麦克风按钮 */}
+          {/* 麦克风按钮 */}
+          <Box
+            as="button"
+            onClick={async () => {
+              console.log('麦克风点击前状态:', micOn);
+              try {
+                if (micOn) {
+                  stopMic();
+                  console.log('调用 stopMic');
+                } else {
+                  await startMic();
+                  console.log('调用 startMic');
+                }
+              } catch (error) {
+                console.error('麦克风切换失败:', error);
+              }
+            }}
+            width="48px"
+            height="48px"
+            rounded="full"
+            bg={micOn ? schoolColors.secondary : schoolColors.primary}
             color="white"
-            _hover={{ bg: 'blue.800' }}
-            rounded="lg"
-            size={12}
-            isDisabled={!textInput.inputText.trim()}
-          />
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            transition="all 0.3s ease"
+            _hover={{
+              bg: micOn ? '#E55A2D' : '#1A4280',
+              transform: 'scale(1.05)',
+            }}
+            _active={{
+              transform: 'scale(0.95)',
+            }}
+            style={{ cursor: 'pointer' }}
+          >
+            {micOn ? <BsMicFill size={20} /> : <BsMic size={20} />}
+          </Box>
+
+          {/* 发送按钮 */}
+          <Box
+            as="button"
+            onClick={handleSendMessage}
+            width="48px"
+            height="48px"
+            rounded="full"
+            bg={schoolColors.primary}
+            color="white"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            transition="all 0.3s ease"
+            _hover={{
+              bg: '#1A4280',
+              transform: 'scale(1.05)',
+            }}
+            _active={{
+              transform: 'scale(0.95)',
+            }}
+            style={{ cursor: 'pointer' }}
+          >
+            <IoSend size={20} />
+          </Box>
         </HStack>
 
-        {/* Microphone Settings - Always Visible */}
-        <Box
-          bg="blue.50"
-          p={3}
-          rounded="lg"
-          border="1px solid"
-          borderColor="blue.100"
-        >
-          <HStack spacing={4} justify="space-between">
-            <HStack spacing={3}>
-              <BsMic size={16} color="#002FA7" />
-              <Text fontSize="sm" fontWeight="medium" color="#002FA7">
-                麦克风控制
-              </Text>
-            </HStack>
-
-            <HStack spacing={4}>
-              <HStack spacing={2}>
-                <Text fontSize="sm" color="gray.600">
-                  说话后自动关闭
-                </Text>
-                <ChakraSwitch.Root
-                  checked={autoStopMic}
-                  onCheckedChange={(details) => setAutoStopMic(details.checked)}
-                  size="sm"
-                  colorScheme="blue"
-                >
-                  <ChakraSwitch.HiddenInput />
-                  <ChakraSwitch.Control>
-                    <ChakraSwitch.Thumb />
-                  </ChakraSwitch.Control>
-                </ChakraSwitch.Root>
-              </HStack>
-
-              <Text fontSize="xs" color="gray.500" whiteSpace="nowrap">
-                {autoStopMic ? '✓ 已开启' : '✗ 已关闭'}
-              </Text>
-            </HStack>
-          </HStack>
-        </Box>
-
-        {/* Quick Actions */}
-        <HStack spacing={3} display={{ base: 'none', md: 'flex' }}>
-          <Button
-            variant="ghost"
-            color={lightColors.textSecondary}
-            size="sm"
-            leftIcon={<FiArrowRight size={16} />}
-            _hover={{ bg: 'gray.50' }}
-            onClick={() => window.location.hash = '#/campus/intro'}
-          >
-            了解学校简介
-          </Button>
-          <Button
-            variant="ghost"
-            color={lightColors.textSecondary}
-            size="sm"
-            leftIcon={<FiArrowRight size={16} />}
-            _hover={{ bg: 'gray.50' }}
-            onClick={() => window.location.hash = '#/campus/role-models'}
-          >
-            查看学习标兵
-          </Button>
+        {/* 麦克风自动停止设置 */}
+        <HStack spacing={3} fontSize="xs" color={schoolColors.textSecondary}>
+          <Switch
+            checked={autoStopMic}
+            onCheckedChange={(checked) => setAutoStopMic(checked)}
+          />
+          <Text>对话结束后自动停止麦克风</Text>
         </HStack>
       </VStack>
     </Flex>
@@ -360,4 +427,3 @@ const DialogBox = memo(({ schoolName, tagline, description }: DialogBoxProps) =>
 DialogBox.displayName = 'DialogBox';
 
 export default DialogBox;
-

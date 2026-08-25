@@ -45,7 +45,9 @@ export function updateModelConfig(resourcePath: string, modelDirectory: string, 
   ResourcesPath = resourcePath.endsWith('/') ? resourcePath : resourcePath + '/';
 
   // Remove leading slash from modelDirectory if present (for proper path joining)
-  ModelDir = [modelDirectory.startsWith('/') ? modelDirectory.substring(1) : modelDirectory];
+  // This prevents double slashes in the URL
+  const cleanModelDirectory = modelDirectory.startsWith('/') ? modelDirectory.substring(1) : modelDirectory;
+  ModelDir = [cleanModelDirectory];
   ModelFileNames = [modelFileName]; // Store the actual model file name
   if (kScale !== undefined) {
     CurrentKScale = kScale;

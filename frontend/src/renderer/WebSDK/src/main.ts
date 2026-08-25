@@ -17,32 +17,64 @@ import { LAppLive2DManager } from "./lapplive2dmanager";
  */
 export function initializeLive2D(): void {
   console.log(
-    "Initializing Live2D with resourcePath:",
+    "[Live2D] Initializing Live2D with resourcePath:",
     LAppDefine.ResourcesPath
   );
-  console.log("Model directories:", LAppDefine.ModelDir);
+  console.log("[Live2D] Model directories:", LAppDefine.ModelDir);
 
-  // Clean up any existing instances first
-  if (LAppDelegate.getInstance()) {
-    // Release existing model resources
-    LAppLive2DManager.releaseInstance();
+  // Check if canvas element exists in DOM before proceeding
+  const canvasElement = document.getElementById('canvas');
+  if (!canvasElement) {
+    console.error('[Live2D] Canvas element not found in DOM. Make sure the component is mounted.');
+    return;
   }
 
-  if (
-    !LAppGlManager.getInstance() ||
-    !LAppDelegate.getInstance().initialize()
-  ) {
+  // Clean up any existing instances first
+  const hasExistingDelegate = !!LAppDelegate.getInstance();
+  const hasExistingGLManager = !!LAppGlManager.getInstance();
+
+  if (hasExistingDelegate || hasExistingGLManager) {
+    console.log('[Live2D] Releasing existing instances');
+
+    // Release existing model resources first
+    LAppLive2DManager.releaseInstance();
+
+    // Release delegate (this will dispose CubismFramework)
+    if (hasExistingDelegate) {
+      LAppDelegate.releaseInstance();
+    }
+
+    // Release GL manager
+    if (hasExistingGLManager) {
+      LAppGlManager.releaseInstance();
+    }
+
+    // Small delay to ensure cleanup is complete
+    // This is important to avoid conflicts during re-initialization
+  }
+
+  // Initialize GL Manager first (this will get the canvas element)
+  const glManager = LAppGlManager.getInstance();
+  if (!glManager) {
+    console.error('[Live2D] Failed to initialize GL Manager');
+    return;
+  }
+
+  // Create new delegate instance and initialize
+  // This will call initializeCubism() which properly initializes CubismFramework
+  const delegate = LAppDelegate.getInstance();
+  if (!delegate || !delegate.initialize()) {
     console.error("Failed to initialize Live2D");
     return;
   }
 
-  LAppDelegate.getInstance().run();
+  delegate.run();
 
   (window as any).getLive2DManager = () => LAppLive2DManager.getInstance();
 
   // Make sure LAppAdapter is available globally
   if (!(window as any).getLAppAdapter) {
-    console.log('Setting up getLAppAdapter function');
+    console.log('[Live2D] Setting up getLAppAdapter function');
     const { LAppAdapter } = require('./lappadapter');
     (window as any).getLAppAdapter = () => LAppAdapter.getInstance();
   }
