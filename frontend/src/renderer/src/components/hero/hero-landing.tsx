@@ -70,12 +70,8 @@ export default function HeroLanding({
       h="100vh"
       w="full"
       overflow="hidden"
-      bg={schoolColors.bg}
       sx={{
-        // 添加虚化背景效果
-        backgroundImage: 'linear-gradient(135deg, rgba(30, 84, 148, 0.03) 0%, rgba(255, 107, 53, 0.02) 100%), url("data:image/svg+xml,%3Csvg width=\'80\' height=\'80\' viewBox=\'0 0 80 80\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%231E5494\' fill-opacity=\'0.03\'%3E%3Cpath d=\'M40 40c0-21.5-17.5-39-39-39S2 18.5 2 40s17.5 39 39 39 39-17.5 39-39zm-1 0c0-20.4-16.6-37-37-37S3 19.6 3 40s16.6 37 37 37 37-16.6 37-37z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
-        backgroundSize: '100% 100%, 80px 80px',
-        backgroundPosition: 'center, center',
+        // 移除背景样式，由Background组件处理
         fontFamily: "'Helvetica Neue', Arial, sans-serif",
       }}
     >

@@ -26,8 +26,29 @@ const Subtitle = memo((): JSX.Element | null => {
   if (!isLoaded || !subtitleText || !showSubtitle) return null;
 
   return (
-    <Box {...canvasStyles.subtitle.container}>
-      <SubtitleText text={subtitleText} />
+    <Box
+      sx={{
+        textAlign: 'center',
+        padding: '0',
+        borderRadius: '0',
+        minWidth: 'auto',
+        maxWidth: '100%',
+        backgroundColor: 'transparent',
+      }}
+    >
+      <Text
+        sx={{
+          color: '#1E5494',
+          fontSize: { base: 'md', md: 'lg' },
+          textAlign: 'center',
+          lineHeight: '1.6',
+          whiteSpace: 'pre-wrap',
+          fontWeight: 'medium',
+          fontFamily: "'Helvetica Neue', Arial, sans-serif",
+        }}
+      >
+        {subtitleText}
+      </Text>
     </Box>
   );
 });

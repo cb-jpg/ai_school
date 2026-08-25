@@ -80,12 +80,12 @@ const BACKGROUNDS = [
   { id: 'default', name: '默认背景', url: '' },
   { id: 'camera', name: '摄像头背景', url: '' },
   { id: 'upload', name: '上传图片', url: '' },
-  // 学校风格背景图片（需要添加到backgrounds目录）
-  { id: 'school_building', name: '学校建筑', url: '/bg/school-building.jpg' },
-  { id: 'library', name: '图书馆', url: '/bg/library.jpg' },
-  { id: 'classroom', name: '教室', url: '/bg/classroom.jpg' },
-  { id: 'campus_garden', name: '校园花园', url: '/bg/campus-garden.jpg' },
-  { id: 'sports_field', name: '运动场', url: '/bg/sports-field.jpg' },
+  // 学校风格背景图片（使用在线免费图片资源）
+  { id: 'school_building', name: '学校建筑', url: 'https://images.unsplash.com/photo-1562774053-701939374585?w=1920&q=80' },
+  { id: 'library', name: '图书馆', url: 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=1920&q=80' },
+  { id: 'classroom', name: '教室', url: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=1920&q=80' },
+  { id: 'campus_garden', name: '校园花园', url: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920&q=80' },
+  { id: 'sports_field', name: '运动场', url: 'https://images.unsplash.com/photo-1571896349842-6c5c1f7ce626?w=1920&q=80' },
 ];
 
 interface HeroSidebarProps {
@@ -204,9 +204,8 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
           stopBackgroundCamera();
           setUseCameraBackground(false);
         }
-        // 构建完整URL
-        const fullUrl = bg.url ? `${baseUrl}${bg.url}` : '';
-        setBackgroundUrl(fullUrl);
+        // 直接使用URL（已经是完整的URL）
+        setBackgroundUrl(bg.url || '');
       }
     }
   };
@@ -335,7 +334,7 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
           {/* 数字人选择 */}
           <Box>
             <HStack gap="2" mb="3">
-              <FiUser boxSize="4" color={schoolColors.primary} />
+              <FiUser style={{ width: '16px', height: '16px', color: schoolColors.primary }} />
               <Text fontSize="sm" fontWeight="semibold" color={schoolColors.text}>
                 数字人选择
               </Text>
@@ -380,14 +379,14 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
           {/* 播报音量 */}
           <Box>
             <HStack gap="2" mb="3">
-              <FiVolume2 boxSize="4" color={schoolColors.primary} />
+              <FiVolume2 style={{ width: '16px', height: '16px', color: schoolColors.primary }} />
               <Text fontSize="sm" fontWeight="semibold" color={schoolColors.text}>
                 播报音量
               </Text>
             </HStack>
             <Box px="2">
               <Slider
-                defaultValue={[volume]}
+                value={[volume]}
                 min={0}
                 max={100}
                 onValueChange={(details) => handleVolumeChange(details.value[0])}
@@ -402,7 +401,7 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
           {/* 背景图片切换 */}
           <Box>
             <HStack gap="2" mb="3">
-              <FiImage boxSize="4" color={schoolColors.primary} />
+              <FiImage style={{ width: '16px', height: '16px', color: schoolColors.primary }} />
               <Text fontSize="sm" fontWeight="semibold" color={schoolColors.text}>
                 背景图片
               </Text>
@@ -424,10 +423,10 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
                   gap="2"
                 >
                   {bg.id === 'camera' && (
-                    <FiCamera boxSize="4" color={isBackgroundStreaming ? 'green.500' : schoolColors.textSecondary} />
+                    <FiCamera style={{ width: '16px', height: '16px', color: isBackgroundStreaming ? 'green.500' : schoolColors.textSecondary }} />
                   )}
                   {bg.id === 'upload' && (
-                    <FiUpload boxSize="4" color={schoolColors.textSecondary} />
+                    <FiUpload style={{ width: '16px', height: '16px', color: schoolColors.textSecondary }} />
                   )}
                   <Text
                     fontSize="sm"
@@ -453,7 +452,7 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
           <Box>
             <HStack justify="space-between" mb="3">
               <HStack gap="2">
-                <FiClock boxSize="4" color={schoolColors.primary} />
+                <FiClock style={{ width: '16px', height: '16px', color: schoolColors.primary }} />
                 <Text fontSize="sm" fontWeight="semibold" color={schoolColors.text}>
                   历史记录
                 </Text>
@@ -514,18 +513,25 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
                         <Text fontSize="9px" color={schoolColors.textSecondary}>
                           {history.timestamp ? new Date(history.timestamp).toLocaleString() : '无时间'}
                         </Text>
-                        <IconButton
+                        <Box
+                          as="button"
                           aria-label="删除"
-                          icon={<FiTrash2 />}
-                          size="sm"
-                          bg="red.100"
-                          color="red.600"
-                          _hover={{ bg: 'red.200', color: 'red.700' }}
+                          width="20px"
+                          height="20px"
+                          borderRadius="full"
+                          display="flex"
+                          alignItems="center"
+                          justifyContent="center"
+                          color="gray.400"
+                          _hover={{ bg: 'red.100', color: 'red.500' }}
+                          transition="all 0.2s"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteHistory(history.uid);
                           }}
-                        />
+                        >
+                          <FiX size={12} />
+                        </Box>
                       </HStack>
                     </VStack>
                   </Box>

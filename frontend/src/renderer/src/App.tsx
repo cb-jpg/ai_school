@@ -196,6 +196,9 @@ function AppContent(): JSX.Element {
   if (currentRoute === 'hero') {
     return (
       <>
+        {/* Background layer for hero route */}
+        <Background />
+
         {/* Live2D layer for hero route - positioned on the right side */}
         <Box
           position="absolute"
@@ -234,6 +237,29 @@ function AppContent(): JSX.Element {
         {/* WebSocketStatus indicator */}
         <Box position="absolute" top="20px" left="20px" zIndex={10}>
           <WebSocketStatus />
+        </Box>
+
+        {/* Subtitle for hero page - positioned under the character */}
+        <Box
+          position="absolute"
+          bottom={{ base: "8%", md: "12%" }}
+          left={{ base: "50%", md: "25%" }}
+          transform="translateX(-50%)"
+          zIndex={20}
+          width={{ base: "80%", md: "35%" }}
+          textAlign="center"
+          pointerEvents="none"
+        >
+          <Box
+            bg="rgba(255, 255, 255, 0.95)"
+            borderRadius="16px"
+            padding="16px 24px"
+            boxShadow="0 4px 20px rgba(0, 0, 0, 0.1)"
+            backdropFilter="blur(10px)"
+            border="1px solid rgba(255, 255, 255, 0.5)"
+          >
+            <Subtitle />
+          </Box>
         </Box>
 
         {/* Hero UI overlay */}
