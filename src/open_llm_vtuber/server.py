@@ -112,6 +112,11 @@ class WebSocketServer:
         # Include knowledge base management routes
         self.app.include_router(init_knowledge_management_routes())
 
+        # Include admin auth routes (login/user management)
+        from .knowledge.auth import init_auth_routes
+
+        self.app.include_router(init_auth_routes())
+
         # Initialize and include proxy routes if proxy is enabled
         system_config = config.system_config
         if hasattr(system_config, "enable_proxy") and system_config.enable_proxy:

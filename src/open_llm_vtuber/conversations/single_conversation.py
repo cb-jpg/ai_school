@@ -67,14 +67,14 @@ async def process_single_conversation(
         if images:
             logger.info(f"With {len(images)} images")
 
-        # RAG 检索集成：检查是否需要从学校知识库检索相关信息
+        # RAG 检索集成：检查是否需要从学校知识库（data/knowledge）检索相关信息
         try:
-            from school_rag.school_rag_integration import get_rag_integration
-            rag_integration = get_rag_integration()
+            from ..knowledge.rag_service import get_rag_service
+            rag_service = get_rag_service()
 
-            if rag_integration._initialized and rag_integration.needs_rag_retrieval(input_text):
+            if rag_service.needs_rag_retrieval(input_text):
                 logger.info("检测到学校相关问题，执行 RAG 检索...")
-                rag_result = await rag_integration.retrieve_and_enrich_input(
+                rag_result = await rag_service.retrieve_and_enrich_input(
                     query=input_text,
                     top_k=3,
                 )
@@ -83,12 +83,12 @@ async def process_single_conversation(
                     enriched_input_text = rag_result.get("enriched_query", input_text)
                     logger.info(f"RAG 检索成功，检索到 {len(rag_result.get('retrieved_docs', []))} 条相关资料")
 
-                    # 发送 RAG 检索状态到前端
-                    await websocket_send(json.dumps({
-                        "type": "rag-status",
-                        "has_context": True,
-                        "doc_count": len(rag_result.get("retrieved_docs", [])),
-                    }))
+                # 发送 RAG 检索状态到前端（命中与否都发，便于前端收起提示条）
+                await websocket_send(json.dumps({
+                    "type": "rag-status",
+                    "has_context": bool(rag_result.get("has_context")),
+                    "doc_count": len(rag_result.get("retrieved_docs", [])),
+                }))
         except Exception as e:
             logger.warning(f"RAG 检索失败，继续使用原始输入: {e}")
 

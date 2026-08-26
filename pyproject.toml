@@ -5,6 +5,7 @@ description = "Talk to any LLM with hands-free voice interaction, voice interrup
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 dependencies = [
+    "aiohttp>=3.10,<4",
     "anthropic>=0.40.0",
     "azure-cognitiveservices-speech>=1.41.1",
     "chardet>=5.2.0",
@@ -41,6 +42,8 @@ dependencies = [
     "websocket-client>=1.8.0",
     "letta-client>=0.1.100",
     "duckduckgo-mcp-server>=0.1.1",
+    "rank-bm25>=0.2.2",
+    "jieba>=0.42.1",
 ]
 
 [project.optional-dependencies]

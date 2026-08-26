@@ -1,10 +1,28 @@
 import os
+import sys
+import ctypes
 import numpy as np
+import onnxruntime
+
+# Windows fix: an old onnxruntime.dll (e.g. 1.17.1 dropped into System32 by
+# other software) can shadow the venv version during by-name DLL resolution,
+# making sherpa-onnx abort with "requested API version not available".
+# Loading the venv DLL by full path first pins the module name to the
+# correct version for everything loaded afterwards.
+if sys.platform == "win32":
+    try:
+        _ort_dll = os.path.join(
+            os.path.dirname(onnxruntime.__file__), "capi", "onnxruntime.dll"
+        )
+        if os.path.exists(_ort_dll):
+            ctypes.CDLL(_ort_dll)
+    except OSError:
+        pass
+
 import sherpa_onnx
 from loguru import logger
 from .asr_interface import ASRInterface
 from .utils import download_and_extract, check_and_extract_local_file
-import onnxruntime
 
 
 class VoiceRecognition(ASRInterface):

@@ -157,7 +157,11 @@ class EmbeddingCache:
                 with open(self.index_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                 # Don't load all embeddings into memory, just the keys
-                self._cache_keys = set(data.keys())
+                # 兼容历史格式：_save_index 曾存为 dict，现保存为 list
+                if isinstance(data, dict):
+                    self._cache_keys = set(data.keys())
+                else:
+                    self._cache_keys = set(data)
                 logger.info(f"Loaded embedding cache index with {len(self._cache_keys)} entries")
             except Exception as e:
                 logger.error(f"Error loading embedding cache index: {e}")

@@ -3,8 +3,10 @@ FastAPI routes for knowledge base management.
 """
 from typing import List, Optional
 from datetime import datetime
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from loguru import logger
+
+from .auth import require_user
 
 from .models import (
     KnowledgeEntry, KnowledgeStatus, KnowledgeCategory,
@@ -12,7 +14,7 @@ from .models import (
 )
 from .schemas import (
     KnowledgeCreateRequest, KnowledgeUpdateRequest,
-    UrlAddRequest, BulkOperationRequest,
+    UrlAddRequest, BulkOperationRequest, SearchRequest,
     KnowledgeListItem, KnowledgeDetailResponse,
     UploadProgressResponse, KnowledgeStatsResponse,
     UnansweredQuestion, LowConfidenceQuestion
@@ -20,10 +22,13 @@ from .schemas import (
 from .crud import get_knowledge_crud
 from .document_processor import DocumentProcessor
 from .vector_store import get_vector_store
+from .rag_service import get_question_log, get_rag_service
 
 
-# Create router
-router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
+# Create router（全部知识库管理接口要求登录）
+router = APIRouter(
+    prefix="/api/knowledge", tags=["knowledge"], dependencies=[Depends(require_user)]
+)
 
 # Initialize components
 crud = get_knowledge_crud()
@@ -77,25 +82,27 @@ async def get_knowledge_stats():
     try:
         stats = crud.get_statistics()
 
-        # Get unanswered questions (mock data for now)
+        # 未命中 / 低置信问题：来自对话 RAG 的真实记录（data/runtime/question_log.json）
+        question_log = get_question_log()
         unanswered = [
             UnansweredQuestion(
-                id="1",
-                question="学校什么时候建立的？",
-                timestamp=datetime.now(),
-                count=3
+                id=item["id"],
+                question=item["question"],
+                timestamp=datetime.fromisoformat(item["last_asked"]),
+                count=item["count"],
             )
+            for item in question_log.get_unanswered()
         ]
 
-        # Get low confidence questions (mock data)
         low_conf = [
             LowConfidenceQuestion(
-                id="2",
-                question="学校有哪些特色课程？",
-                confidence_score=0.45,
-                timestamp=datetime.now(),
-                retrieval_count=5
+                id=item["id"],
+                question=item["question"],
+                confidence_score=item["score"],
+                timestamp=datetime.fromisoformat(item["last_asked"]),
+                retrieval_count=item["count"],
             )
+            for item in question_log.get_low_confidence()
         ]
 
         return KnowledgeStatsResponse(
@@ -116,29 +123,8 @@ async def get_knowledge_stats():
 
 
 # ============== Knowledge CRUD ==============
-
-@router.get("/{entry_id}", response_model=KnowledgeDetailResponse)
-async def get_knowledge_detail(entry_id: str):
-    """Get detailed information about a knowledge entry"""
-    try:
-        entry = crud.get(entry_id)
-        if not entry:
-            raise HTTPException(status_code=404, detail="Knowledge entry not found")
-
-        # Load chunks
-        chunks = vector_store.load_entry_chunks(entry_id)
-
-        return KnowledgeDetailResponse(
-            **entry.model_dump(),
-            chunks=[chunk.model_dump() for chunk in chunks]
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting knowledge detail: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
+# 注意：GET /{entry_id} 定义在文件末尾——FastAPI 按定义顺序匹配，
+# 若放在 /unanswered、/low-confidence 之前会把它们当作 entry_id 吞掉。
 
 @router.post("/create", response_model=KnowledgeListItem)
 async def create_knowledge(request: KnowledgeCreateRequest):
@@ -428,6 +414,19 @@ async def reindex_entry(entry_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============== Search（与对话 RAG 同一条检索路径） ==============
+
+@router.post("/search")
+async def search_knowledge(request: SearchRequest):
+    """Search published knowledge chunks by semantic similarity"""
+    try:
+        docs = await get_rag_service().search(request.query, top_k=request.top_k)
+        return {"success": True, "query": request.query, "results": docs, "total": len(docs)}
+    except Exception as e:
+        logger.error(f"Error searching knowledge: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============== Unanswered Queries ==============
 
 @router.get("/unanswered", response_model=List[UnansweredQuestion])
@@ -435,21 +434,31 @@ async def get_unanswered_queries(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None
 ):
-    """Get list of unanswered questions (mock implementation)"""
-    # Mock data for now - would be implemented with query logging
+    """Get list of questions the knowledge base failed to answer"""
+    from datetime import datetime as dt
+
+    def _in_range(ts: Optional[str]) -> bool:
+        if not start_date and not end_date:
+            return True
+        try:
+            t = dt.fromisoformat(ts) if ts else None
+        except ValueError:
+            return True
+        if start_date and (t is None or t < dt.fromisoformat(start_date)):
+            return False
+        if end_date and (t is None or t > dt.fromisoformat(end_date)):
+            return False
+        return True
+
     return [
         UnansweredQuestion(
-            id="1",
-            question="学校什么时候建立的？",
-            timestamp=datetime.now(),
-            count=3
-        ),
-        UnansweredQuestion(
-            id="2",
-            question="学校有哪些特色课程？",
-            timestamp=datetime.now(),
-            count=2
+            id=item["id"],
+            question=item["question"],
+            timestamp=dt.fromisoformat(item["last_asked"]),
+            count=item["count"],
         )
+        for item in get_question_log().get_unanswered()
+        if _in_range(item.get("last_asked"))
     ]
 
 
@@ -458,17 +467,61 @@ async def get_low_confidence_queries(
     threshold: float = 0.6,
     start_date: Optional[str] = None
 ):
-    """Get list of low confidence questions (mock implementation)"""
-    # Mock data for now
+    """Get list of questions answered with low retrieval confidence"""
     return [
         LowConfidenceQuestion(
-            id="1",
-            question="学校有哪些特色课程？",
-            confidence_score=0.45,
-            timestamp=datetime.now(),
-            retrieval_count=5
+            id=item["id"],
+            question=item["question"],
+            confidence_score=item["score"],
+            timestamp=datetime.fromisoformat(item["last_asked"]),
+            retrieval_count=item["count"],
         )
+        for item in get_question_log().get_low_confidence()
+        if item["score"] < threshold
     ]
+
+
+@router.delete("/unanswered/{question_id}")
+async def resolve_unanswered_question(question_id: str):
+    """Close an unanswered question after the admin adds knowledge for it"""
+    removed = get_question_log().remove_unanswered(question_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="问题不存在")
+    return {"message": "问题已关闭"}
+
+
+@router.delete("/low-confidence/{question_id}")
+async def resolve_low_confidence_question(question_id: str):
+    """Close a low-confidence question after the admin adds knowledge for it"""
+    removed = get_question_log().remove_low_confidence(question_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="问题不存在")
+    return {"message": "问题已关闭"}
+
+
+# ============== Entry Detail（parametric 路由，必须放在静态路由之后） ==============
+
+@router.get("/{entry_id}", response_model=KnowledgeDetailResponse)
+async def get_knowledge_detail(entry_id: str):
+    """Get detailed information about a knowledge entry"""
+    try:
+        entry = crud.get(entry_id)
+        if not entry:
+            raise HTTPException(status_code=404, detail="Knowledge entry not found")
+
+        # Load chunks
+        chunks = vector_store.load_entry_chunks(entry_id)
+
+        return KnowledgeDetailResponse(
+            **entry.model_dump(),
+            chunks=[chunk.model_dump() for chunk in chunks]
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting knowledge detail: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 def init_knowledge_routes(knowledge_dir: str = "data/knowledge"):

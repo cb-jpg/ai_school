@@ -8,6 +8,7 @@ import asyncio
 from pathlib import Path
 from typing import List, Optional, Tuple
 from datetime import datetime
+from urllib.parse import urlparse
 from loguru import logger
 
 try:
@@ -147,10 +148,24 @@ class DocumentProcessor:
             raise RuntimeError("Web scraping not available. Install aiohttp and beautifulsoup4.")
 
         try:
+            # 仅接受 http/https 链接（在 try 内，保持"失败也返回 ERROR entry"的约定）
+            parsed = urlparse(url)
+            if parsed.scheme not in ("http", "https") or not parsed.netloc:
+                raise ValueError("仅支持 http/https 网页链接")
+
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
                     if response.status != 200:
                         raise ValueError(f"Failed to fetch URL: {response.status}")
+                    # 非 HTML 页面给出明确提示（PDF 等文件应走文件上传）
+                    content_type = response.headers.get("Content-Type", "").split(";")[0].strip().lower()
+                    if content_type and content_type not in ("text/html", "text/plain", "application/xhtml+xml"):
+                        raise ValueError(
+                            f"链接内容类型为 {content_type}，仅支持网页链接；文件请用上传功能"
+                        )
+                    # 防止超大响应拖垮内存
+                    if response.content_length and response.content_length > 5 * 1024 * 1024:
+                        raise ValueError("网页内容超过 5MB 限制")
                     html = await response.text()
 
             # Parse HTML
@@ -189,6 +204,20 @@ class DocumentProcessor:
             logger.info(f"Successfully processed URL: {url}, chunks: {len(chunks)}")
             return entry, chunks
 
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout processing URL {url}")
+            # Return entry with error status
+            return KnowledgeEntry(
+                title=title or url,
+                category=category,
+                tags=tags,
+                source_type=SourceType.URL,
+                source_url=url,
+                status=KnowledgeStatus.ERROR,
+                error_message="抓取超时（30 秒），请确认链接可访问后重试",
+                chunk_count=0,
+                created_by=created_by
+            ), []
         except Exception as e:
             logger.error(f"Error processing URL {url}: {e}")
             # Return entry with error status
