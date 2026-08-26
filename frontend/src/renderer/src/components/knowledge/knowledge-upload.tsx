@@ -10,7 +10,6 @@ import {
   Textarea,
   Select,
   HStack,
-  Progress,
   IconButton
 } from '@chakra-ui/react';
 import { FiUpload, FiLink, FiFileText, FiX } from 'react-icons/fi';
@@ -29,20 +28,20 @@ interface KnowledgeUploadProps {
     category: KnowledgeCategory;
     tags?: string;
     summary?: string;
-  }) => Promise<void>;
+  }) => Promise<unknown>;
   onUrlUpload: (params: {
     url: string;
     title?: string;
     category: KnowledgeCategory;
     tags?: string[];
-  }) => Promise<void>;
+  }) => Promise<unknown>;
   onManualCreate: (params: {
     title: string;
     content: string;
     category: KnowledgeCategory;
     tags?: string[];
     summary?: string;
-  }) => Promise<void>;
+  }) => Promise<unknown>;
 }
 
 export default function KnowledgeUpload({
@@ -155,24 +154,24 @@ export default function KnowledgeUpload({
           size="sm"
           variant={uploadType === 'file' ? 'solid' : 'outline'}
           onClick={() => setUploadType('file')}
-          leftIcon={<FiUpload />}
         >
+          <FiUpload />
           {t('knowledge.upload.file')}
         </Button>
         <Button
           size="sm"
           variant={uploadType === 'url' ? 'solid' : 'outline'}
           onClick={() => setUploadType('url')}
-          leftIcon={<FiLink />}
         >
+          <FiLink />
           {t('knowledge.upload.url')}
         </Button>
         <Button
           size="sm"
           variant={uploadType === 'manual' ? 'solid' : 'outline'}
           onClick={() => setUploadType('manual')}
-          leftIcon={<FiFileText />}
         >
+          <FiFileText />
           {t('knowledge.upload.manual')}
         </Button>
       </HStack>
@@ -196,7 +195,7 @@ export default function KnowledgeUpload({
               onChange={handleFileSelect}
               accept=".txt,.md,.pdf,.doc,.docx,.xls,.xlsx"
             />
-            <FiUpload size={32} color="white" mb={2} />
+            <FiUpload size={32} color="white" style={{ marginBottom: '8px' }} />
             <Text color="white" mb={1}>{t('knowledge.upload.dropFile')}</Text>
             <Text fontSize="sm" color="whiteAlpha.500">
               {t('knowledge.upload.supportedFormats')}
@@ -225,43 +224,47 @@ export default function KnowledgeUpload({
 
       {/* URL upload */}
       {uploadType === 'url' && (
-        <Field label={t('knowledge.upload.url')}>
+        <Field.Root>
+          <Field.Label>{t('knowledge.upload.url')}</Field.Label>
           <Input
             {...knowledgeStyles.form.field.input}
             placeholder="https://..."
             value={url}
             onChange={(e) => setUrl(e.target.value)}
           />
-        </Field>
+        </Field.Root>
       )}
 
       {/* Manual entry */}
       {uploadType === 'manual' && (
-        <Field label={t('knowledge.upload.content')}>
+        <Field.Root>
+          <Field.Label>{t('knowledge.upload.content')}</Field.Label>
           <Textarea
             {...knowledgeStyles.form.field.textarea}
             placeholder={t('knowledge.upload.contentPlaceholder')}
             value={content}
             onChange={(e) => setContent(e.target.value)}
           />
-        </Field>
+        </Field.Root>
       )}
 
       {/* Common fields */}
-      <Field label={t('knowledge.title')}>
+      <Field.Root>
+        <Field.Label>{t('knowledge.title')}</Field.Label>
         <Input
           {...knowledgeStyles.form.field.input}
           placeholder={t('knowledge.titlePlaceholder')}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
-      </Field>
+      </Field.Root>
 
-      <Field label={t('knowledge.category')}>
+      <Field.Root>
+        <Field.Label>{t('knowledge.category')}</Field.Label>
         <Select.Root
           collection={categoryCollection}
           value={[category]}
-          onValueChange={(details) => setCategory(details.value as KnowledgeCategory)}
+          onValueChange={(details) => setCategory(details.value[0] as KnowledgeCategory)}
         >
           <Select.Trigger {...knowledgeStyles.form.field.input}>
             <Select.ValueText placeholder={t('knowledge.selectCategory')} />
@@ -274,31 +277,35 @@ export default function KnowledgeUpload({
             ))}
           </Select.Content>
         </Select.Root>
-      </Field>
+      </Field.Root>
 
-      <Field label={t('knowledge.tags')}>
+      <Field.Root>
+        <Field.Label>{t('knowledge.tags')}</Field.Label>
         <Input
           {...knowledgeStyles.form.field.input}
           placeholder={t('knowledge.tagsPlaceholder')}
           value={tags}
           onChange={(e) => setTags(e.target.value)}
         />
-      </Field>
+      </Field.Root>
 
-      <Field label={t('knowledge.summary')}>
+      <Field.Root>
+        <Field.Label>{t('knowledge.summary')}</Field.Label>
         <Textarea
           {...knowledgeStyles.form.field.textarea}
           placeholder={t('knowledge.summaryPlaceholder')}
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
         />
-      </Field>
+      </Field.Root>
 
       {/* Upload progress */}
       {uploading && (
         <Box {...knowledgeStyles.upload.progress}>
-          <Progress value={uploadProgress} />
-          <Text mt={2} textAlign="center" color="whiteAlpha.700">
+          <Box width="100%" height="8px" borderRadius="4px" overflow="hidden" bg="rgba(255,255,255,0.15)">
+            <Box width={`${uploadProgress}%`} height="100%" bg="#3182ce" transition="width 0.3s ease" />
+          </Box>
+          <Text mt={2} textAlign="center" color="rgba(255,255,255,0.7)">
             {uploadProgress}%
           </Text>
         </Box>

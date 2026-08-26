@@ -3,7 +3,7 @@
  * Live2D 数字人容器 - 右侧人物展示区域
  */
 
-import { memo, useRef, useEffect } from 'react';
+import { memo, useRef } from 'react';
 import { Box, Text, Flex, Spinner } from '@chakra-ui/react';
 import { Live2D } from '../canvas/live2d';
 import { useLive2DConfig } from '@/context/live2d-config-context';
@@ -41,7 +41,7 @@ const Live2DContainer = memo(({ showSidebar = false }: Live2DContainerProps) => 
           bg="rgba(255, 255, 255, 0.9)"
           zIndex={10}
         >
-          <Spinner size="xl" color="#002FA7" thickness="4px" />
+          <Spinner size="xl" color="#002FA7" borderWidth="4px" />
           <Text fontSize="sm" color="gray.600">加载虚拟形象中...</Text>
         </Flex>
       )}

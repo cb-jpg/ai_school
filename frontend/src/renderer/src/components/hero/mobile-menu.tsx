@@ -98,7 +98,6 @@ const MobileMenu = memo(({ isOpen, onClose, navigation }: MobileMenuProps) => {
         bg="transparent"
         color="gray.700"
         _hover={{ bg: 'gray.100' }}
-        size={10}
       >
         <FiX size={24} />
       </IconButton>
@@ -118,7 +117,7 @@ const MobileMenu = memo(({ isOpen, onClose, navigation }: MobileMenuProps) => {
           return (
             <HStack
               key={item.id}
-              spacing={4}
+              gap={4}
               fontSize="2xl"
               fontWeight="medium"
               color="gray.700"

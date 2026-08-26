@@ -5,7 +5,6 @@
 
 import {
   Button,
-  Flex,
   Icon,
   Text,
   HStack
@@ -43,8 +42,8 @@ export default function AdminEntry({ showLabel = true, variant = 'menuItem' }: A
         }}
         fontFamily={swissFont}
         fontWeight="600"
-        leftIcon={<FiSettings size="14px" />}
       >
+        <FiSettings size="14px" />
         {showLabel && '知识库管理'}
       </Button>
     );
@@ -102,8 +101,8 @@ export function CompactAdminEntry() {
       justifyContent="flex-start"
       width="100%"
       fontFamily={swissFont}
-      leftIcon={<FiSettings size="14px" />}
     >
+      <FiSettings size="14px" />
       知识库管理后台
     </Button>
   );

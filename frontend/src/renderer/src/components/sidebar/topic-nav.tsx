@@ -17,7 +17,6 @@ import {
   FiAward,
   FiUsers
 } from 'react-icons/fi';
-import { useNavigate } from 'react-router-dom';
 import { useInterrupt } from '@/hooks/utils/use-interrupt';
 
 const swissFont = '"Helvetica Neue", Arial, sans-serif';
@@ -123,7 +122,7 @@ export default function TopicNav({ onNavigate }: TopicNavProps) {
                   bg={`${topic.color}10`}
                   color={topic.color}
                 >
-                  <Icon boxSize="4" />
+                  <Icon size="4" />
                 </Box>
                 <Box flex="1" textAlign="left">
                   <Text

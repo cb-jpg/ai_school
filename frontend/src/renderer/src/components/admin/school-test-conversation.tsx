@@ -22,7 +22,6 @@ import {
   FiVolume2,
   FiVolumeX,
   FiSettings,
-  FiRefreshCw,
   FiClock,
 } from 'react-icons/fi';
 import { Live2D } from '../canvas/live2d';
@@ -44,14 +43,6 @@ const colors = {
   gray600: '#475569',
   gray800: '#1e293b',
 };
-
-// 消息类型
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-}
 
 // 主测试对话组件
 export const SchoolTestConversation: FC = () => {
@@ -176,17 +167,17 @@ export const SchoolTestConversation: FC = () => {
         >
           <IconButton
             aria-label="设置"
-            icon={<FiSettings />}
             size="sm"
             variant="ghost"
             color={colors.gray600}
             bg="white"
             rounded="full"
             shadow="sm"
-          />
+          >
+            <FiSettings />
+          </IconButton>
           <IconButton
             aria-label="静音"
-            icon={isMuted ? <FiVolumeX /> : <FiVolume2 />}
             size="sm"
             variant="ghost"
             color={colors.gray600}
@@ -194,7 +185,9 @@ export const SchoolTestConversation: FC = () => {
             rounded="full"
             shadow="sm"
             onClick={handleToggleMute}
-          />
+          >
+            {isMuted ? <FiVolumeX /> : <FiVolume2 />}
+          </IconButton>
         </Box>
       </Box>
 
@@ -224,7 +217,7 @@ export const SchoolTestConversation: FC = () => {
                 color="white"
                 name="小石"
               />
-              <VStack align="start" spacing="0">
+              <VStack align="start" gap="0">
                 <Text fontSize="sm" fontWeight="semibold" color={colors.gray800}>
                   小石 - 测试对话
                 </Text>
@@ -235,12 +228,13 @@ export const SchoolTestConversation: FC = () => {
             </HStack>
             <IconButton
               aria-label="对话历史"
-              icon={<FiClock />}
               size="sm"
               variant="ghost"
               color={colors.gray600}
               onClick={() => setShowHistory(!showHistory)}
-            />
+            >
+              <FiClock />
+            </IconButton>
           </HStack>
         </Box>
 
@@ -274,9 +268,9 @@ export const SchoolTestConversation: FC = () => {
                 <HStack
                   key={message.id}
                   gap="3"
-                  justify={message.role === 'user' ? 'flex-end' : 'flex-start'}
+                  justify={message.role === 'human' ? 'flex-end' : 'flex-start'}
                 >
-                  {message.role === 'assistant' && (
+                  {message.role === 'ai' && (
                     <Avatar
                       size="xs"
                       bg={colors.primary}
@@ -289,19 +283,19 @@ export const SchoolTestConversation: FC = () => {
                     p="3"
                     rounded="lg"
                     bg={
-                      message.role === 'user'
+                      message.role === 'human'
                         ? colors.primary
                         : colors.gray100
                     }
                     color={
-                      message.role === 'user'
+                      message.role === 'human'
                         ? 'white'
                         : colors.gray800
                     }
                   >
                     <Text fontSize="sm">{message.content}</Text>
                   </Box>
-                  {message.role === 'user' && (
+                  {message.role === 'human' && (
                     <Avatar
                       size="xs"
                       bg={colors.gray600}
@@ -400,14 +394,15 @@ export const SchoolTestConversation: FC = () => {
               </Text>
               <IconButton
                 aria-label="麦克风"
-                icon={micOn ? <FiMic /> : <FiMicOff />}
                 size="sm"
                 variant={micOn ? 'solid' : 'ghost'}
                 bg={micOn ? colors.secondary : 'transparent'}
                 color={micOn ? 'white' : colors.gray600}
                 _hover={{ bg: micOn ? colors.secondary : colors.gray100 }}
                 onClick={handleToggleMic}
-              />
+              >
+                {micOn ? <FiMic /> : <FiMicOff />}
+              </IconButton>
             </HStack>
 
             {/* 麦克风状态提示 */}

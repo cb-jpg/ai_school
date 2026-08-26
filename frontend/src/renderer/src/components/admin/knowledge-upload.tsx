@@ -14,8 +14,6 @@ import {
   VStack,
   Spinner,
   Icon,
-  Progress,
-  Divider,
   SimpleGrid,
   createToaster
 } from '@chakra-ui/react';
@@ -25,10 +23,9 @@ import {
   FiLink,
   FiPlus,
   FiCheck,
-  FiX,
-  FiAlertCircle
+  FiX
 } from 'react-icons/fi';
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { useKnowledgeAdminAPI } from '@/services/knowledge-admin-api';
 
 const toaster = createToaster({
@@ -84,7 +81,7 @@ function UploadStatusItem({ status }: { status: UploadStatus }) {
     error: { bg: redWash, color: red }
   };
 
-  const { bg, color } = statusColors[status.status];
+  const { color } = statusColors[status.status];
 
   return (
     <Box
@@ -96,24 +93,26 @@ function UploadStatusItem({ status }: { status: UploadStatus }) {
     >
       <Flex align="center" justify="space-between" mb="6px">
         <HStack gap="8px">
-          <Icon as={FiFileText} color={color} size="14px" />
-          <Text color={ink} fontSize="12px" fontWeight="600" noOfLines={1} maxWidth="200px">
+          <Icon as={FiFileText} color={color} width="14px" height="14px" />
+          <Text color={ink} fontSize="12px" fontWeight="600" maxWidth="200px">
             {status.name}
           </Text>
         </HStack>
         {status.status === 'pending' && <Spinner size="xs" />}
         {status.status === 'uploading' && <Spinner size="xs" color={blue} />}
-        {status.status === 'success' && <Icon as={FiCheck} color={green} size="14px" />}
-        {status.status === 'error' && <Icon as={FiX} color={red} size="14px" />}
+        {status.status === 'success' && <Icon as={FiCheck} color={green} width="14px" height="14px" />}
+        {status.status === 'error' && <Icon as={FiX} color={red} width="14px" height="14px" />}
       </Flex>
 
       {status.status === 'uploading' && (
-        <Progress
-          value={status.progress}
-          size="xs"
-          colorPalette="blue"
-          borderRadius="2px"
-        />
+        <Box width="100%" height="4px" background={surface} borderRadius="2px" overflow="hidden">
+          <Box
+            width={`${status.progress}%`}
+            height="100%"
+            background={blue}
+            transition="width 0.3s ease"
+          />
+        </Box>
       )}
 
       {status.message && (
@@ -155,7 +154,14 @@ export default function KnowledgeUpload() {
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
   const [fileCategory, setFileCategory] = useState('');
 
-  const { uploadDocument, addDocument } = useKnowledgeAdminAPI();
+  // URL form state
+  const [urlUrl, setUrlUrl] = useState('');
+  const [urlTitle, setUrlTitle] = useState('');
+  const [urlCategory, setUrlCategory] = useState('');
+  const [urlTags, setUrlTags] = useState('');
+  const [urlSubmitting, setUrlSubmitting] = useState(false);
+
+  const { uploadDocument, addDocument, addUrlDocument } = useKnowledgeAdminAPI();
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedFiles(e.target.files);
@@ -166,9 +172,9 @@ export default function KnowledgeUpload() {
       toaster.create({
         title: '请选择文件',
         description: '请先选择要上传的文件',
-        status: 'warning',
+        type: 'warning',
         duration: 2000,
-        isClosable: true
+        closable: true
       });
       return;
     }
@@ -212,9 +218,9 @@ export default function KnowledgeUpload() {
         toaster.create({
           title: '上传成功',
           description: `${file.name} 上传成功`,
-          status: 'success',
+          type: 'success',
           duration: 2000,
-          isClosable: true
+          closable: true
         });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : '上传失败';
@@ -229,9 +235,9 @@ export default function KnowledgeUpload() {
         toaster.create({
           title: '上传失败',
           description: `${file.name} 上传失败: ${errorMessage}`,
-          status: 'error',
+          type: 'error',
           duration: 3000,
-          isClosable: true
+          closable: true
         });
       }
     }
@@ -247,9 +253,9 @@ export default function KnowledgeUpload() {
       toaster.create({
         title: '请输入内容',
         description: '请输入要添加的文本内容',
-        status: 'warning',
+        type: 'warning',
         duration: 2000,
-        isClosable: true
+        closable: true
       });
       return;
     }
@@ -258,9 +264,9 @@ export default function KnowledgeUpload() {
       toaster.create({
         title: '请输入标题',
         description: '请为该内容输入一个标题',
-        status: 'warning',
+        type: 'warning',
         duration: 2000,
-        isClosable: true
+        closable: true
       });
       return;
     }
@@ -300,9 +306,9 @@ export default function KnowledgeUpload() {
       toaster.create({
         title: '添加成功',
         description: result.message,
-        status: 'success',
+        type: 'success',
         duration: 2000,
-        isClosable: true
+        closable: true
       });
 
       // Reset form
@@ -328,9 +334,9 @@ export default function KnowledgeUpload() {
       toaster.create({
         title: '添加失败',
         description: errorMessage,
-        status: 'error',
+        type: 'error',
         duration: 3000,
-        isClosable: true
+        closable: true
       });
     }
   }, [textContent, textTitle, textCategory, addDocument]);
@@ -342,6 +348,57 @@ export default function KnowledgeUpload() {
   const clearAllStatuses = useCallback(() => {
     setUploadStatuses([]);
   }, []);
+
+  // 网页抓取提交：失败（非 HTML / 超时 / 不可达）在状态区与提示中展示
+  const handleUrlSubmit = useCallback(async () => {
+    const url = urlUrl.trim();
+    if (!url || !urlCategory.trim()) return;
+
+    const statusId = crypto.randomUUID();
+    setUploadStatuses(prev => [
+      { id: statusId, name: url, status: 'uploading', progress: 30 },
+      ...prev,
+    ]);
+    setUrlSubmitting(true);
+
+    try {
+      const result = await addUrlDocument({
+        url,
+        title: urlTitle || undefined,
+        category: urlCategory,
+        tags: urlTags.split(',').map(t => t.trim()).filter(Boolean),
+      });
+
+      setUploadStatuses(prev => prev.map(s =>
+        s.id === statusId ? { ...s, status: 'success', progress: 100, message: result.message } : s
+      ));
+      toaster.create({
+        title: '抓取成功',
+        description: `${url} 已加入知识库`,
+        type: 'success',
+        duration: 2000,
+        closable: true
+      });
+      setUrlUrl('');
+      setUrlTitle('');
+      setUrlTags('');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '抓取失败';
+
+      setUploadStatuses(prev => prev.map(s =>
+        s.id === statusId ? { ...s, status: 'error', message: errorMessage } : s
+      ));
+      toaster.create({
+        title: '抓取失败',
+        description: errorMessage,
+        type: 'error',
+        duration: 4000,
+        closable: true
+      });
+    } finally {
+      setUrlSubmitting(false);
+    }
+  }, [urlUrl, urlTitle, urlCategory, urlTags, addUrlDocument]);
 
   return (
     <VStack gap="20px" py="20px" align="stretch" height="100%">
@@ -394,8 +451,6 @@ export default function KnowledgeUpload() {
           borderBottomColor={blue}
           fontFamily={swissFont}
           _hover={{ background: activeTab === 'url' ? blue : blueWash }}
-          opacity="0.5"
-          cursor="not-allowed"
         >
           <Icon as={FiLink} mr="6px" />
           网页抓取
@@ -471,7 +526,7 @@ export default function KnowledgeUpload() {
                   </Text>
                   <VStack align="stretch" gap="4px">
                     {Array.from(selectedFiles).map(file => (
-                      <Text key={file.name} color={muted} fontSize="11px" noOfLines={1}>
+                      <Text key={file.name} color={muted} fontSize="11px">
                         • {file.name} ({(file.size / 1024).toFixed(1)} KB)
                       </Text>
                     ))}
@@ -482,7 +537,7 @@ export default function KnowledgeUpload() {
               <Button
                 width="100%"
                 onClick={handleFileUpload}
-                isDisabled={!selectedFiles || selectedFiles.length === 0}
+                disabled={!selectedFiles || selectedFiles.length === 0}
                 height="38px"
                 borderRadius="2px"
                 background={blue}
@@ -564,7 +619,7 @@ export default function KnowledgeUpload() {
               <Button
                 width="100%"
                 onClick={handleTextSubmit}
-                isDisabled={!textContent.trim() || !textTitle.trim()}
+                disabled={!textContent.trim() || !textTitle.trim()}
                 height="38px"
                 borderRadius="2px"
                 background={blue}
@@ -581,12 +636,104 @@ export default function KnowledgeUpload() {
           )}
 
           {activeTab === 'url' && (
-            <Box py="40px" textAlign="center">
-              <Icon as={FiAlertCircle} color={muted} size="32px" mb="12px" />
-              <Text color={muted} fontSize="13px">
-                网页抓取功能开发中
-              </Text>
-            </Box>
+            <VStack gap="16px" align="stretch">
+              <Box>
+                <Text color={ink} fontSize="13px" fontWeight="700" mb="8px">
+                  网页链接 *
+                </Text>
+                <Input
+                  placeholder="https:// 学校官网或公开网页地址"
+                  value={urlUrl}
+                  onChange={(e) => setUrlUrl(e.target.value)}
+                  height="36px"
+                  borderRadius="2px"
+                  border="1px solid"
+                  borderColor={hairline}
+                  fontFamily={swissFont}
+                  _focus={{ borderColor: blue }}
+                />
+                <Text mt="4px" color={muted} fontSize="10px">
+                  仅支持 http/https 网页链接；PDF 等文件请用「文件上传」
+                </Text>
+              </Box>
+
+              <Box>
+                <Text color={ink} fontSize="13px" fontWeight="700" mb="8px">
+                  标题（可选，默认取网页标题）
+                </Text>
+                <Input
+                  placeholder="留空则自动使用网页标题"
+                  value={urlTitle}
+                  onChange={(e) => setUrlTitle(e.target.value)}
+                  height="36px"
+                  borderRadius="2px"
+                  border="1px solid"
+                  borderColor={hairline}
+                  fontFamily={swissFont}
+                  _focus={{ borderColor: blue }}
+                />
+              </Box>
+
+              <Box display="flex" gap="12px">
+                <Box flex="1">
+                  <Text color={ink} fontSize="13px" fontWeight="700" mb="8px">
+                    分类 *
+                  </Text>
+                  <Input
+                    placeholder="选择或输入分类"
+                    list="categories"
+                    value={urlCategory}
+                    onChange={(e) => setUrlCategory(e.target.value)}
+                    height="36px"
+                    borderRadius="2px"
+                    border="1px solid"
+                    borderColor={hairline}
+                    fontFamily={swissFont}
+                    _focus={{ borderColor: blue }}
+                  />
+                  <datalist id="categories">
+                    {CATEGORIES.map(cat => (
+                      <option key={cat} value={cat} />
+                    ))}
+                  </datalist>
+                </Box>
+                <Box flex="1">
+                  <Text color={ink} fontSize="13px" fontWeight="700" mb="8px">
+                    标签（可选）
+                  </Text>
+                  <Input
+                    placeholder="逗号分隔，如：官网,简介"
+                    value={urlTags}
+                    onChange={(e) => setUrlTags(e.target.value)}
+                    height="36px"
+                    borderRadius="2px"
+                    border="1px solid"
+                    borderColor={hairline}
+                    fontFamily={swissFont}
+                    _focus={{ borderColor: blue }}
+                  />
+                </Box>
+              </Box>
+
+              <Button
+                width="100%"
+                onClick={handleUrlSubmit}
+                disabled={!urlUrl.trim() || !urlCategory.trim()}
+                loading={urlSubmitting}
+                loadingText="抓取中（最长 30 秒）..."
+                height="38px"
+                borderRadius="2px"
+                background={blue}
+                color={paper}
+                fontWeight="600"
+                fontFamily={swissFont}
+                _hover={{ background: ink }}
+                _disabled={{ opacity: 0.5, cursor: 'not-allowed' }}
+              >
+                <FiPlus />
+                抓取并添加到知识库
+              </Button>
+            </VStack>
           )}
         </Box>
 

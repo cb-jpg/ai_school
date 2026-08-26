@@ -3,10 +3,10 @@
  * 学校主题风格的管理后台布局
  */
 
-import { FC, useState, useRef } from 'react';
+import { FC, useState } from 'react';
 import { Box, HStack, VStack, Text, Button, Badge } from '@chakra-ui/react';
 import { Avatar } from '@/components/ui/avatar';
-import { useAdmin } from '@/context/admin-context';
+import { useAuth } from '@/context/auth-context';
 import {
   FiGrid,
   FiMessageSquare,
@@ -58,6 +58,7 @@ interface MenuItemConfig {
   onClick: () => void;
   description?: string;
   disabled?: boolean;
+  adminOnly?: boolean;
 }
 
 // 菜单分组配置
@@ -126,8 +127,7 @@ const menuGroups: MenuGroupConfig[] = [
         label: '待补充问题库',
         icon: FiMessageSquare,
         onClick: () => {},
-        description: '无',
-        disabled: true,
+        description: '未命中与低置信问题',
       },
       {
         id: 'document-knowledge',
@@ -178,12 +178,12 @@ const menuGroups: MenuGroupConfig[] = [
         disabled: true,
       },
       {
-        id: 'user-permissions',
-        label: '用户权限',
+        id: 'user-management',
+        label: '用户管理',
         icon: FiUsers,
         onClick: () => {},
-        description: '无',
-        disabled: true,
+        description: '管理员账号管理',
+        adminOnly: true,
       },
       {
         id: 'model-settings',
@@ -232,7 +232,7 @@ const MenuGroupItem: FC<{
         className="school-menu-group"
       >
         <HStack gap="3">
-          <GroupIcon boxSize="4" color={schoolColors.primary} />
+          <GroupIcon size="4" color={schoolColors.primary} />
           {!isCollapsed && (
             <Text fontSize="sm" fontWeight="semibold" color={schoolColors.gray800}>
               {group.title}
@@ -244,7 +244,7 @@ const MenuGroupItem: FC<{
             transition="transform 0.2s"
             transform={isOpen ? 'rotate(0deg)' : 'rotate(-90deg)'}
           >
-            <FiChevronDown boxSize="4" color={schoolColors.gray600} />
+            <FiChevronDown size="4" color={schoolColors.gray600} />
           </Box>
         )}
       </Button>
@@ -274,7 +274,7 @@ const MenuGroupItem: FC<{
               >
                 <HStack gap="3" width="full">
                   <ItemIcon
-                    boxSize="4"
+                    size="4"
                     color={isActive ? schoolColors.primary : schoolColors.gray600}
                   />
                   {!isCollapsed && (
@@ -315,12 +315,17 @@ const MenuGroupItem: FC<{
 export const SchoolAdminLayout: FC<{
   children: React.ReactNode;
 }> = ({ children }) => {
-  const { openAdmin } = useAdmin();
+  const { user, logout } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [activeItem, setActiveItem] = useState<string | null>('dashboard');
   const [openGroups, setOpenGroups] = useState<Set<string>>(
     new Set(menuGroups.filter(g => g.defaultOpen).map(g => g.id))
   );
+
+  const visibleMenuGroups = menuGroups.map(group => ({
+    ...group,
+    items: group.items.filter(item => !item.adminOnly || user?.role === 'admin'),
+  }));
 
   const toggleGroup = (groupId: string) => {
     const newOpenGroups = new Set(openGroups);
@@ -342,6 +347,7 @@ export const SchoolAdminLayout: FC<{
       'test-conversation': '#/main/test-conversation',
       'knowledge-admin': '#/main/knowledge-admin',
       'unanswered-questions': '#/main/unanswered-questions',
+      'user-management': '#/main/user-management',
     };
 
     if (routeMap[itemId]) {
@@ -407,7 +413,7 @@ export const SchoolAdminLayout: FC<{
               </Text>
             </Box>
             {!isCollapsed && (
-              <VStack align="start" spacing="0">
+              <VStack align="start" gap="0">
                 <Text
                   fontSize="sm"
                   fontWeight="bold"
@@ -444,7 +450,7 @@ export const SchoolAdminLayout: FC<{
           }}
         >
           <VStack gap="1" align="stretch">
-            {menuGroups.map((group) => (
+            {visibleMenuGroups.map((group) => (
               <MenuGroupItem
                 key={group.id}
                 group={group}
@@ -474,14 +480,14 @@ export const SchoolAdminLayout: FC<{
                     size="sm"
                     bg={schoolColors.primary}
                     color="white"
-                    name="管理员"
+                    name={user?.username || '未登录'}
                   />
-                  <VStack align="start" spacing="0" flex="1">
+                  <VStack align="start" gap="0" flex="1">
                     <Text fontSize="sm" fontWeight="medium" color={schoolColors.gray800}>
-                      管理员
+                      {user?.username || '未登录'}
                     </Text>
                     <Text fontSize="10px" color={schoolColors.gray600}>
-                      系统管理员
+                      {user?.role === 'admin' ? '系统管理员' : '知识管理员'}
                     </Text>
                   </VStack>
                 </>
@@ -491,17 +497,30 @@ export const SchoolAdminLayout: FC<{
             {/* 操作按钮 */}
             <VStack gap="1" width="full">
               {!isCollapsed && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  width="full"
-                  justifyContent="flex-start"
-                  onClick={() => { window.location.hash = '#/hero'; }}
-                  gap="2"
-                >
-                  <FiLogOut boxSize="4" color={schoolColors.gray600} />
-                  <Text fontSize="xs" color={schoolColors.gray600}>返回Hero页面</Text>
-                </Button>
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    width="full"
+                    justifyContent="flex-start"
+                    onClick={() => { window.location.hash = '#/hero'; }}
+                    gap="2"
+                  >
+                    <FiLogOut size="4" color={schoolColors.gray600} />
+                    <Text fontSize="xs" color={schoolColors.gray600}>返回Hero页面</Text>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    width="full"
+                    justifyContent="flex-start"
+                    onClick={logout}
+                    gap="2"
+                  >
+                    <FiLogOut size="4" color={schoolColors.secondary} />
+                    <Text fontSize="xs" color={schoolColors.secondary}>退出登录</Text>
+                  </Button>
+                </>
               )}
               {/* 折叠按钮 */}
               <Button
@@ -513,11 +532,11 @@ export const SchoolAdminLayout: FC<{
               >
                 <HStack justify="center" gap="2">
                   {isCollapsed ? (
-                    <FiChevronRight boxSize="4" />
+                    <FiChevronRight size="4" />
                   ) : (
                     <>
                       <Text fontSize="xs">收起</Text>
-                      <FiChevronLeft boxSize="4" />
+                      <FiChevronLeft size="4" />
                     </>
                   )}
                 </HStack>
@@ -574,10 +593,10 @@ export const SchoolAdminLayout: FC<{
               size="sm"
               bg={schoolColors.primary}
               color="white"
-              name="管理员"
+              name={user?.username || '未登录'}
             />
             <Text fontSize="sm" color={schoolColors.gray600} fontWeight="medium">
-              管理员
+              {user?.username || '未登录'}
             </Text>
           </HStack>
         </Box>

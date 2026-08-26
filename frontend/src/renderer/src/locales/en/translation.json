@@ -112,6 +112,8 @@
     "failedStartBackgroundCamera": "Failed to start background camera",
     "failedStartScreenCapture": "Failed to start screen capture",
     "failedStartVAD": "Failed to start VAD",
+    "vadMicPermissionDenied": "Microphone permission denied: click the lock/microphone icon in the address bar, set the microphone to 'Allow', then reload the page",
+    "vadNoMicDevice": "No microphone device detected. Check that a microphone is connected and enabled in system settings",
     "llmCantHear": "The LLM can't hear you.",
     "audioPlayback": "Audio playback error",
     "enterValidUuid": "Please enter a valid UUID",

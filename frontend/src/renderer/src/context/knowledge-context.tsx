@@ -1,7 +1,7 @@
 /**
  * Knowledge base context for state management
  */
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, ReactNode, Dispatch, SetStateAction } from 'react';
 import { KnowledgeEntry, KnowledgeFilters, KnowledgeStatsResponse } from '@/types/knowledge';
 
 interface KnowledgeContextType {
@@ -31,7 +31,7 @@ interface KnowledgeContextType {
 
   // Upload progress
   uploadProgress: number;
-  setUploadProgress: (progress: number) => void;
+  setUploadProgress: Dispatch<SetStateAction<number>>;
 
   // Toggle selection
   toggleSelection: (id: string) => void;

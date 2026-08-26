@@ -145,6 +145,16 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
           setSubtitleText(message.text);
         }
         break;
+      case 'rag-status':
+        // 学校知识库检索状态：命中时提示本次回答参考的资料条数
+        if (message.has_context) {
+          toaster.create({
+            title: `已检索到 ${message.doc_count} 条相关学校资料`,
+            type: 'info',
+            duration: 2500,
+          });
+        }
+        break;
       case 'config-files':
         if (message.configs) {
           setConfigFiles(message.configs);

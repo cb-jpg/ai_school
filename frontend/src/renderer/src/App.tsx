@@ -1,6 +1,18 @@
 /* eslint-disable no-shadow */
 // import { StrictMode } from 'react';
-import { Box, ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { Box, ChakraProvider, createSystem, defaultConfig, defineTokens } from "@chakra-ui/react";
+
+// v2→v3 迁移兼容：项目大量组件直接用 px 字面量（如 fontSize="14px"、size="20px"），
+// v3 类型只认 token。这里把常用 px 值注册为 token，类型合法且运行时值不变。
+const tokens = defineTokens({
+  fontSizes: Object.fromEntries(
+    [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 22, 24, 26, 28, 32, 36].map((px) => [
+      `${px}px`,
+      { value: `${px}px` },
+    ]),
+  ),
+});
+const system = createSystem(defaultConfig, { theme: { tokens } });
 import { useState, useEffect, useRef } from "react";
 // 导入工作台字体
 import "@/styles/admin-fonts.css";
@@ -27,6 +39,7 @@ import { GroupProvider } from "./context/group-context";
 import { BrowserProvider } from "./context/browser-context";
 import { KnowledgeProvider } from "./context/knowledge-context";
 import { AdminProvider, useAdmin } from "./context/admin-context";
+import { AuthProvider, useAuth } from "./context/auth-context";
 // eslint-disable-next-line import/no-extraneous-dependencies, import/newline-after-import
 import "@chatscope/chat-ui-kit-styles/dist/default/styles.min.css";
 import Background from "./components/canvas/background";
@@ -42,6 +55,9 @@ import { SchoolAdminLayout } from "./components/admin/school-admin-layout";
 import { SchoolDashboard } from "./components/admin/school-dashboard";
 import { SchoolTestConversation } from "./components/admin/school-test-conversation";
 import { ModernMainWorkspace } from "./components/admin/modern-workspace";
+import LoginPage from "./components/admin/login-page";
+import UnansweredQuestions from "./components/admin/unanswered-questions";
+import UserManagement from "./components/admin/user-management";
 
 // 定义路由类型
 type AppRoute = 'hero' | 'main' | 'campus' | 'main-admin';
@@ -88,6 +104,7 @@ function AppContent(): JSX.Element {
   const [currentRoute, setCurrentRoute] = useState<AppRoute>(() => getCurrentRoute());
   const [currentMainRoute, setCurrentMainRoute] = useState<MainRoute>(() => getCurrentMainRoute());
   const { mode } = useMode();
+  const { user: authUser } = useAuth();
   const isElectron = window.api !== undefined;
   const live2dContainerRef = useRef<HTMLDivElement>(null);
   const currentLayoutRef = useRef({ showSidebar, isFooterCollapsed });
@@ -246,6 +263,11 @@ function AppContent(): JSX.Element {
 
   // Admin workspace page - school themed management dashboard
   if (currentRoute === 'main-admin') {
+    // 登录守卫：管理后台所有页面要求先登录
+    if (!authUser) {
+      return <LoginPage />;
+    }
+
     let content;
     switch (currentMainRoute) {
       case 'dashboard':
@@ -256,6 +278,12 @@ function AppContent(): JSX.Element {
         break;
       case 'workspace':
         content = <ModernMainWorkspace />;
+        break;
+      case 'unanswered-questions':
+        content = <UnansweredQuestions />;
+        break;
+      case 'user-management':
+        content = <UserManagement />;
         break;
       case 'knowledge-admin':
         return <KnowledgeAdmin />;
@@ -361,7 +389,7 @@ function AppContent(): JSX.Element {
 
 function App(): JSX.Element {
   return (
-    <ChakraProvider value={defaultSystem}>
+    <ChakraProvider value={system}>
       {/* ModeProvider needs to wrap AppContent to provide mode to getGlobalStyles */}
       <ModeProvider>
         <AppWithGlobalStyles />
@@ -383,6 +411,7 @@ function AdminPanelWrapper(): JSX.Element | null {
 function AppWithGlobalStyles(): JSX.Element {
   return (
     <>
+      <AuthProvider>
       <CameraProvider>
         <ScreenCaptureProvider>
           <CharacterConfigProvider>
@@ -418,6 +447,7 @@ function AppWithGlobalStyles(): JSX.Element {
           </CharacterConfigProvider>
         </ScreenCaptureProvider>
       </CameraProvider>
+      </AuthProvider>
     </>
   );
 }

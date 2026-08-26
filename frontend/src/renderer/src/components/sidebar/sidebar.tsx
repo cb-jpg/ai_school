@@ -1,10 +1,10 @@
 /* eslint-disable react/require-default-props */
-import { Box, Button, HStack, VStack, Text, Badge } from '@chakra-ui/react';
+import { Box, Button, HStack, VStack, Text } from '@chakra-ui/react';
 import {
   FiSettings, FiClock, FiPlus, FiChevronLeft, FiUsers, FiLayers, FiBook,
   FiGrid, FiDatabase, FiUpload, FiBarChart2, FiTrendingUp, FiActivity
 } from 'react-icons/fi';
-import { memo, useState, useEffect, useRef } from 'react';
+import { memo } from 'react';
 import { sidebarStyles } from './sidebar-styles';
 import SettingUI from './setting/setting-ui';
 import ChatHistoryPanel from './chat-history-panel';
@@ -45,14 +45,14 @@ const WorkspaceStats = memo(() => {
   return (
     <Box px="4" py="3" bg="whiteAlpha.50" borderRadius="lg" mb="2">
       <Text fontSize="sm" fontWeight="semibold" color="white" mb="3" display="flex" alignItems="center" gap="2">
-        <FiTrendingUp boxSize="4" />
+        <FiTrendingUp size="4" />
         工作台概览
       </Text>
       <VStack gap="2" align="stretch">
         {statItems.map((stat, index) => (
           <HStack key={index} justify="space-between" fontSize="xs">
             <HStack gap="2" color="whiteAlpha.800">
-              <stat.icon boxSize="3" />
+              <stat.icon size="3" />
               <Text>{stat.label}</Text>
             </HStack>
             <HStack gap="1">
@@ -71,7 +71,6 @@ WorkspaceStats.displayName = 'WorkspaceStats';
 // 快速操作按钮组件
 const QuickActions = memo(() => {
   const { openAdmin } = useAdmin();
-  const knowledgeDrawerRef = useRef<{ open: () => void } | null>(null);
 
   const handleUploadDocument = () => {
     // 打开知识库上传抽屉
@@ -135,7 +134,7 @@ const QuickActions = memo(() => {
             }}
             onClick={action.onClick}
           >
-            <action.icon boxSize="3" color={action.color} />
+            <action.icon size="3" color={action.color} />
             {action.label}
           </Button>
         ))}

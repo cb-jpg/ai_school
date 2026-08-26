@@ -280,7 +280,7 @@ const Sidebar: FC<SidebarProps> = ({ isCollapsed, onToggle, activeItem, onItemCl
 };
 
 // 顶部导航栏组件
-const Header: FC<HeaderProps> = ({ sidebarCollapsed, userName = '管理员' }) => {
+const Header: FC<HeaderProps> = ({ userName = '管理员' }) => {
   const [notifications] = useState([
     { id: 1, message: '知识库更新完成', time: '5分钟前' },
     { id: 2, message: '新的文档上传', time: '1小时前' },
@@ -324,7 +324,7 @@ const Header: FC<HeaderProps> = ({ sidebarCollapsed, userName = '管理员' }) =
             {userName.charAt(0)}
           </div>
           <button
-            onClick={() => toaster.create({ title: '已退出登录', status: 'info' })}
+            onClick={() => toaster.create({ title: '已退出登录', type: 'info' })}
             className="p-2 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
             title="退出登录"
           >

@@ -9,7 +9,6 @@ import {
   Flex,
   Text,
   VStack,
-  Icon,
   HStack
 } from '@chakra-ui/react';
 import { useColorModeValue } from '@/components/ui/color-mode';
@@ -17,8 +16,7 @@ import {
   FiMessageCircle,
   FiMic,
   FiBook,
-  FiHelpCircle,
-  FiArrowRight
+  FiHelpCircle
 } from 'react-icons/fi';
 
 const swissFont = '"Helvetica Neue", Arial, sans-serif';
@@ -66,7 +64,7 @@ function FeatureItem({ feature }: { feature: FeatureItem }) {
         color="#002FA7"
         flexShrink={0}
       >
-        <Icon boxSize="4" />
+        <Icon size="4" />
       </Box>
       <Box>
         <Text
@@ -143,8 +141,8 @@ export default function WelcomeCard({ onStartChat, onOpenHelp }: WelcomeCardProp
           _hover={{ bg: '#001F7A' }}
           fontFamily={swissFont}
           fontWeight="600"
-          leftIcon={<FiMessageCircle size="14px" />}
         >
+          <FiMessageCircle size="14px" />
           开始对话
         </Button>
         <Button
@@ -154,8 +152,8 @@ export default function WelcomeCard({ onStartChat, onOpenHelp }: WelcomeCardProp
           onClick={onOpenHelp}
           fontFamily={swissFont}
           fontWeight="600"
-          leftIcon={<FiHelpCircle size="14px" />}
         >
+          <FiHelpCircle size="14px" />
           使用帮助
         </Button>
       </HStack>

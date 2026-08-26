@@ -76,6 +76,8 @@ export interface MessageEvent {
   is_owner?: boolean;
   client_uid?: string;
   forwarded?: boolean;
+  has_context?: boolean;
+  doc_count?: number;
   display_text?: DisplayText;
   live2d_model?: string;
   browser_view?: {

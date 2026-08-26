@@ -6,15 +6,14 @@
  */
 
 import { useState } from 'react';
-import { Box, Flex, Button, Text, Badge, IconButton } from '@chakra-ui/react';
-import { FiMenu, FiSettings } from 'react-icons/fi';
+import { Box, Flex, IconButton } from '@chakra-ui/react';
+import { FiSettings } from 'react-icons/fi';
 import { FiHome, FiBook, FiClock, FiAward, FiUsers } from 'react-icons/fi';
 import Navbar from './navbar';
 import MobileMenu from './mobile-menu';
 import DialogBox from './dialog-box';
 import HeroSidebar from './hero-sidebar';
 import { CampusTopicId } from '@/data/campus-knowledge';
-import { useInterrupt } from '@/hooks/utils/use-interrupt';
 
 // 学校配色方案 - 基于石实实验学校的设计
 const schoolColors = {
@@ -71,7 +70,7 @@ export default function HeroLanding({
       w="full"
       overflow="hidden"
       bg={schoolColors.bg}
-      sx={{
+      css={{
         // 添加虚化背景效果
         backgroundImage: 'linear-gradient(135deg, rgba(30, 84, 148, 0.03) 0%, rgba(255, 107, 53, 0.02) 100%), url("data:image/svg+xml,%3Csvg width=\'80\' height=\'80\' viewBox=\'0 0 80 80\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%231E5494\' fill-opacity=\'0.03\'%3E%3Cpath d=\'M40 40c0-21.5-17.5-39-39-39S2 18.5 2 40s17.5 39 39 39 39-17.5 39-39zm-1 0c0-20.4-16.6-37-37-37S3 19.6 3 40s16.6 37 37 37 37-16.6 37-37z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
         backgroundSize: '100% 100%, 80px 80px',
@@ -96,9 +95,7 @@ export default function HeroLanding({
       >
         <IconButton
           aria-label="设置"
-          icon={<FiSettings />}
           size="lg"
-          colorScheme="blue"
           rounded="full"
           shadow="md"
           onClick={toggleSidebar}
@@ -108,7 +105,9 @@ export default function HeroLanding({
             bg: schoolColors.primary,
             color: 'white',
           }}
-        />
+        >
+          <FiSettings />
+        </IconButton>
       </Box>
 
       {/* Mobile Menu */}
@@ -132,7 +131,6 @@ export default function HeroLanding({
         {!activeCampusTopic && (
           <Box
             flex="1"
-            maxWidth={{ base: '100%', md: '50%', lg: '45%' }}
             maxWidth="600px"
             zIndex={10}
           >

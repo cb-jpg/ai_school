@@ -9,7 +9,6 @@ import {
   FiDatabase,
   FiUpload,
   FiSearch,
-  FiTrendingUp,
   FiUsers,
   FiClock,
   FiCheckCircle,
@@ -18,7 +17,7 @@ import {
   FiArrowRight,
   FiFileText,
   FiBook,
-  FiBarChart3,
+  FiBarChart2,
 } from 'react-icons/fi';
 import {
   DashboardLayout,
@@ -115,7 +114,7 @@ const quickActions = [
   { id: 1, label: '上传文档', icon: FiUpload, color: 'bg-blue-500' },
   { id: 2, label: '添加知识', icon: FiFileText, color: 'bg-green-500' },
   { id: 3, label: '管理分类', icon: FiBook, color: 'bg-purple-500' },
-  { id: 4, label: '查看统计', icon: FiBarChart3, color: 'bg-orange-500' },
+  { id: 4, label: '查看统计', icon: FiBarChart2, color: 'bg-orange-500' },
 ];
 
 // 知识库搜索趋势数据（模拟图表）
@@ -220,7 +219,7 @@ export const AdminHomepage: FC = () => {
         toaster.create({
           title: `执行${action.label}`,
           description: '功能开发中，敬请期待',
-          status: 'info'
+          type: 'info'
         });
       }, 500);
     }
@@ -379,7 +378,7 @@ export const AdminHomepage: FC = () => {
             </p>
           </div>
           <button
-            onClick={() => toaster.create({ title: '查看失败文档', status: 'info' })}
+            onClick={() => toaster.create({ title: '查看失败文档', type: 'info' })}
             className="text-sm text-amber-900 font-medium hover:underline"
           >
             立即处理

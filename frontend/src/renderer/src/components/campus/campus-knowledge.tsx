@@ -13,7 +13,6 @@ import {
   FiAward,
   FiBookOpen,
   FiClock,
-  FiExternalLink,
   FiMic,
   FiPlay,
   FiUsers,
@@ -46,17 +45,6 @@ const topicIcons: Record<CampusTopicId, IconType> = {
   history: FiClock,
   achievements: FiAward,
   'role-models': FiUsers,
-};
-
-// 使用与首页一致的明亮风格配色
-const lightColors = {
-  bg: '#FAFAFA',
-  primary: '#002FA7',
-  text: '#121826',
-  textSecondary: '#586174',
-  border: '#E5E7EB',
-  white: '#FFFFFF',
-  accent: '#E8EEFF',
 };
 
 const swissFont = '"Helvetica Neue", Arial, sans-serif';
@@ -203,7 +191,7 @@ export default function CampusKnowledge({
   const { aiState, setAiState } = useAiState();
   const { setSubtitleText } = useSubtitle();
   const { interrupt } = useInterrupt();
-  const [narrationError, setNarrationError] = useState('');
+  const [, setNarrationError] = useState('');
   const activeTopic = activeTopicId ? campusTopicMap[activeTopicId] : null;
   const isSpeaking = aiState === 'thinking-speaking';
   const isHeroMode = mode === 'hero';
@@ -360,7 +348,7 @@ export default function CampusKnowledge({
           <Box
             height="100%"
             overflowY="auto"
-            CSS={{
+            css={{
               '&::-webkit-scrollbar': {
               width: '6px',
               },
@@ -421,7 +409,7 @@ export default function CampusKnowledge({
 
               {/* Stats */}
               <SimpleGrid columns={{ base: 2, md: 3 }} gap="6" mb="8" pb="8" borderBottom="1px solid" borderColor={hairline}>
-                {activeTopic.stats.map((stat, index) => (
+                {activeTopic.stats.map((stat) => (
                   <Box key={stat.label}>
                     <Text
                       color={blue}

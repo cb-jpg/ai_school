@@ -8,7 +8,6 @@ import {
   Button,
   Flex,
   Text,
-  VStack,
   HStack,
   Tabs,
   Icon,
@@ -54,7 +53,7 @@ interface KnowledgeAdminProps {
 export default function KnowledgeAdmin({ onClose }: KnowledgeAdminProps) {
   const [activeTab, setActiveTab] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { checkHealth, getStatistics, rebuildIndex } = useKnowledgeAdminAPI();
+  const { checkHealth, rebuildIndex } = useKnowledgeAdminAPI();
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -63,7 +62,7 @@ export default function KnowledgeAdmin({ onClose }: KnowledgeAdminProps) {
       toaster.create({
         title: '刷新成功',
         description: '知识库数据已更新',
-        status: 'success'
+        type: 'success'
       });
       // Trigger re-render by changing tab state slightly
       setActiveTab(prev => prev);
@@ -71,7 +70,7 @@ export default function KnowledgeAdmin({ onClose }: KnowledgeAdminProps) {
       toaster.create({
         title: '刷新失败',
         description: error instanceof Error ? error.message : '无法连接到知识库服务',
-        status: 'error'
+        type: 'error'
       });
     } finally {
       setIsRefreshing(false);
@@ -88,7 +87,7 @@ export default function KnowledgeAdmin({ onClose }: KnowledgeAdminProps) {
         toaster.create({
           title: '索引重建成功',
           description: result.message,
-          status: 'success'
+          type: 'success'
         });
       } else {
         throw new Error(result.message);
@@ -97,7 +96,7 @@ export default function KnowledgeAdmin({ onClose }: KnowledgeAdminProps) {
       toaster.create({
         title: '索引重建失败',
         description: error instanceof Error ? error.message : '未知错误',
-        status: 'error'
+        type: 'error'
       });
     } finally {
       setIsRefreshing(false);
@@ -105,10 +104,10 @@ export default function KnowledgeAdmin({ onClose }: KnowledgeAdminProps) {
   }, [rebuildIndex]);
 
   const tabs = [
-    { id: 0, label: '概览', icon: FiBarChart2 },
-    { id: 1, label: '知识库', icon: FiList },
-    { id: 2, label: '上传', icon: FiUpload },
-    { id: 3, label: '未回答问题', icon: FiHelpCircle },
+    { id: '0', label: '概览', icon: FiBarChart2 },
+    { id: '1', label: '知识库', icon: FiList },
+    { id: '2', label: '上传', icon: FiUpload },
+    { id: '3', label: '未回答问题', icon: FiHelpCircle },
   ];
 
   return (
@@ -137,7 +136,7 @@ export default function KnowledgeAdmin({ onClose }: KnowledgeAdminProps) {
         <Flex align="center" justify="space-between" gap="16px" flexWrap="wrap">
           <Flex align="center" gap="12px">
             <Box width="32px" height="32px" background={blue} color={paper} display="grid" placeItems="center" borderRadius="2px">
-              <Icon as={FiBookOpen} size="16px" />
+              <Icon as={FiBookOpen} width="16px" height="16px" />
             </Box>
             <Box>
               <Text color={ink} fontSize="16px" fontWeight="700" lineHeight="1.1">
@@ -232,7 +231,7 @@ export default function KnowledgeAdmin({ onClose }: KnowledgeAdminProps) {
                 _hover={{ color: blue }}
               >
                 <HStack gap="6px">
-                  <Icon as={tab.icon} size="14px" />
+                  <Icon as={tab.icon} width="14px" height="14px" />
                   <Text>{tab.label}</Text>
                 </HStack>
               </Tabs.Trigger>

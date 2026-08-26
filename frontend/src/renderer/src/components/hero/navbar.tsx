@@ -61,7 +61,6 @@ const Navbar = memo(({
   schoolName,
   navigation,
   onMobileMenuToggle,
-  mobileMenuOpen
 }: NavbarProps) => {
   const { interrupt } = useInterrupt();
 
@@ -90,11 +89,11 @@ const Navbar = memo(({
       boxShadow="sm"
     >
       {/* Left Side: Logo */}
-      <HStack spacing={4}>
+      <HStack gap={4}>
         <Text
           fontSize={{ base: 'lg', sm: 'xl' }}
           fontWeight="bold"
-          tracking="tight"
+          letterSpacing="tight"
           color="#1E5494"
           cursor="pointer"
           onClick={() => handleNavClick('home', interrupt)}
@@ -105,16 +104,15 @@ const Navbar = memo(({
 
       {/* Center: Desktop Navigation */}
       <HStack
-        spacing={8}
         display={{ base: 'none', md: 'flex' }}
-        gap={{ md: 6, lg: 8 }}
+        gap={{ base: 8, md: 6, lg: 8 }}
       >
         {navigation.map((item) => {
           const Icon = iconMap[item.id] || item.icon;
           return (
             <HStack
               key={item.id}
-              spacing={2}
+              gap={2}
               fontSize="sm"
               color="gray.600"
               _hover={{ color: '#1E5494' }}
@@ -131,7 +129,7 @@ const Navbar = memo(({
       </HStack>
 
       {/* Right Side: CTA Button (Desktop) */}
-      <HStack spacing={4}>
+      <HStack gap={4}>
         <Button
           display={{ base: 'none', md: 'inline-flex' }}
           bg="#1E5494"
@@ -157,7 +155,6 @@ const Navbar = memo(({
           color="gray.700"
           _hover={{ bg: 'gray.100' }}
           _active={{ scale: 0.9 }}
-          size={10}
           zIndex={50}
         >
           <FiMenu size={20} />

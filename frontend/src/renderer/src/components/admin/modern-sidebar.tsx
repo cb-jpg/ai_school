@@ -6,7 +6,6 @@
 import { FC, useState, useEffect } from 'react';
 import { Box, Button, HStack, VStack, Text } from '@chakra-ui/react';
 import {
-  FiHome,
   FiSettings,
   FiChevronLeft,
   FiChevronRight,
@@ -16,10 +15,6 @@ import {
   FiBookOpen,
   FiUsers,
   FiBarChart2,
-  FiUpload,
-  FiFileText,
-  FiSearch,
-  FiBell,
   FiClock,
   FiPlus,
   FiLayers,
@@ -61,7 +56,7 @@ export const ModernSidebar: FC<{
   const { getStatistics } = useKnowledgeAdminAPI();
   const [stats, setStats] = useState<any>(null);
   const [currentMode, setCurrentMode] = useState<ModeType>('window');
-  const [isElectron, setIsElectron] = useState(false);
+  const [, setIsElectron] = useState(false);
 
   // 获取真实统计数据
   useEffect(() => {
@@ -102,7 +97,7 @@ export const ModernSidebar: FC<{
       icon: FiPlus,
       onClick: () => {
         createNewHistory();
-        toaster.create({ title: '已创建新对话', status: 'success' });
+        toaster.create({ title: '已创建新对话', type: 'success' });
       },
       description: '开始新的对话'
     },
@@ -117,7 +112,7 @@ export const ModernSidebar: FC<{
         <HistoryDrawer>
           <Button variant="ghost" width="full" justifyContent="flex-start">
             <HStack gap="3">
-              <FiClock boxSize="5" />
+              <FiClock size="5" />
               {!isCollapsed && <Text fontSize="sm">对话历史</Text>}
             </HStack>
           </Button>
@@ -135,7 +130,7 @@ export const ModernSidebar: FC<{
         <GroupDrawer>
           <Button variant="ghost" width="full" justifyContent="flex-start">
             <HStack gap="3">
-              <FiUsers boxSize="5" />
+              <FiUsers size="5" />
               {!isCollapsed && <Text fontSize="sm">群组管理</Text>}
             </HStack>
           </Button>
@@ -154,7 +149,7 @@ export const ModernSidebar: FC<{
         <KnowledgeDrawer>
           <Button variant="ghost" width="full" justifyContent="flex-start">
             <HStack gap="3">
-              <FiDatabase boxSize="5" />
+              <FiDatabase size="5" />
               {!isCollapsed && (
                 <>
                   <Text fontSize="sm">知识库</Text>
@@ -188,7 +183,7 @@ export const ModernSidebar: FC<{
         setMode(newMode);
         toaster.create({
           title: `已切换到${newMode === 'window' ? '窗口' : '宠物'}模式`,
-          status: 'info'
+          type: 'info'
         });
       },
       description: currentMode === 'window' ? '切换到宠物模式' : '切换到窗口模式'
@@ -290,14 +285,13 @@ export const ModernSidebar: FC<{
                   px="3"
                   position="relative"
                 >
-                  <HStack gap="3" spacing={isCollapsed ? '0' : '3'}>
+                  <HStack gap={isCollapsed ? '0' : '3'}>
                     <item.icon
-                      boxSize="5"
+                      size="5"
                       color={activeItem === item.id ? '#6366F1' : 'currentColor'}
-                      flexShrink={0}
                     />
                     {!isCollapsed && (
-                      <VStack align="start" spacing="0" flex="1">
+                      <VStack align="start" gap="0" flex="1">
                         <Text fontSize="sm" fontWeight="medium">
                           {item.label}
                         </Text>
@@ -333,11 +327,11 @@ export const ModernSidebar: FC<{
                 size="sm"
                 justifyContent="flex-start"
                 onClick={() => {
-                  toaster.create({ title: '设置功能开发中', status: 'info' });
+                  toaster.create({ title: '设置功能开发中', type: 'info' });
                 }}
               >
                 <HStack gap="3">
-                  <FiSettings boxSize="4" />
+                  <FiSettings size="4" />
                   <Text fontSize="sm">系统设置</Text>
                 </HStack>
               </Button>
@@ -347,11 +341,11 @@ export const ModernSidebar: FC<{
                 justifyContent="flex-start"
                 onClick={() => {
                   openAdmin();
-                  toaster.create({ title: '打开管理后台', status: 'info' });
+                  toaster.create({ title: '打开管理后台', type: 'info' });
                 }}
               >
                 <HStack gap="3">
-                  <FiBarChart2 boxSize="4" />
+                  <FiBarChart2 size="4" />
                   <Text fontSize="sm">管理后台</Text>
                 </HStack>
               </Button>
@@ -361,11 +355,11 @@ export const ModernSidebar: FC<{
                 justifyContent="flex-start"
                 onClick={() => {
                   window.location.hash = '#/hero';
-                  toaster.create({ title: '切换到Hero页面', status: 'info' });
+                  toaster.create({ title: '切换到Hero页面', type: 'info' });
                 }}
               >
                 <HStack gap="3">
-                  <FiBookOpen boxSize="4" />
+                  <FiBookOpen size="4" />
                   <Text fontSize="sm">校园内容</Text>
                 </HStack>
               </Button>
@@ -385,7 +379,7 @@ export const ModernSidebar: FC<{
           width="full"
           justifyContent="space-between"
           onClick={() => {
-            toaster.create({ title: '已退出工作台', status: 'info' });
+            toaster.create({ title: '已退出工作台', type: 'info' });
           }}
         >
           <HStack gap="3">
@@ -405,7 +399,7 @@ export const ModernSidebar: FC<{
                 >
                   {userName.charAt(0)}
                 </Box>
-                <VStack align="start" spacing="0" flex="1">
+                <VStack align="start" gap="0" flex="1">
                   <Text fontSize="sm" fontWeight="medium" color="gray.900">
                     {userName}
                   </Text>
@@ -415,7 +409,7 @@ export const ModernSidebar: FC<{
                 </VStack>
               </>
             )}
-            <FiLogOut boxSize="4" color="gray.400" />
+            <FiLogOut size="4" color="gray.400" />
           </HStack>
         </Button>
 
@@ -430,11 +424,11 @@ export const ModernSidebar: FC<{
         >
           <HStack justify="center" gap="2">
             {isCollapsed ? (
-              <FiChevronRight boxSize="4" />
+              <FiChevronRight size="4" />
             ) : (
               <>
                 <Text fontSize="xs">收起</Text>
-                <FiChevronLeft boxSize="4" />
+                <FiChevronLeft size="4" />
               </>
             )}
           </HStack>

@@ -13,8 +13,6 @@ import {
   VStack,
   Spinner,
   Checkbox,
-  IconButton,
-  SimpleGrid,
   Badge,
   createToaster
 } from '@chakra-ui/react';
@@ -33,7 +31,7 @@ import {
   FiDownload,
   FiFilter
 } from 'react-icons/fi';
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useKnowledgeAdminAPI, type SearchResult, type Document } from '@/services/knowledge-admin-api';
 
 const toaster = createToaster({
@@ -81,12 +79,15 @@ function DocumentItem({ doc, isSelected, onToggleSelect, onView, onDelete }: Doc
       transition="border-color 160ms ease, background 160ms ease"
     >
       <Flex align="flex-start" gap="12px">
-        <Checkbox
-          isChecked={isSelected}
-          onChange={() => onToggleSelect(docId)}
+        <Checkbox.Root
+          checked={isSelected}
+          onCheckedChange={() => onToggleSelect(docId)}
           colorPalette="blue"
           mt="2px"
-        />
+        >
+          <Checkbox.HiddenInput />
+          <Checkbox.Control />
+        </Checkbox.Root>
 
         <Box flex="1" minWidth="0">
           <Flex align="center" gap="8px" mb="4px" flexWrap="wrap">
@@ -97,7 +98,6 @@ function DocumentItem({ doc, isSelected, onToggleSelect, onView, onDelete }: Doc
               lineHeight="1.3"
               flex="1"
               minWidth="0"
-              noOfLines={1}
             >
               {title}
             </Text>
@@ -127,7 +127,7 @@ function DocumentItem({ doc, isSelected, onToggleSelect, onView, onDelete }: Doc
             )}
           </Flex>
 
-          <Text color={muted} fontSize="11px" lineHeight="1.5" mb="8px" noOfLines={2}>
+          <Text color={muted} fontSize="11px" lineHeight="1.5" mb="8px">
             {preview}
           </Text>
 
@@ -299,7 +299,6 @@ export default function KnowledgeList() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   const { searchDocuments, deleteDocument } = useKnowledgeAdminAPI();
-  const cancelRef = useRef<HTMLButtonElement>(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
@@ -323,9 +322,9 @@ export default function KnowledgeList() {
       toaster.create({
         title: '搜索失败',
         description: error instanceof Error ? error.message : '未知错误',
-        status: 'error',
+        type: 'error',
         duration: 3000,
-        isClosable: true
+        closable: true
       });
     } finally {
       setLoading(false);
@@ -378,7 +377,7 @@ export default function KnowledgeList() {
         toaster.create({
           title: '删除成功',
           description: `已删除 ${response.deleted_count} 个文档`,
-          status: 'success',
+          type: 'success',
           duration: 2000
         });
         // Reload documents
@@ -393,7 +392,7 @@ export default function KnowledgeList() {
       toaster.create({
         title: '删除失败',
         description: error instanceof Error ? error.message : '未知错误',
-        status: 'error',
+        type: 'error',
         duration: 3000
       });
     } finally {
@@ -416,7 +415,7 @@ export default function KnowledgeList() {
       toaster.create({
         title: '批量删除完成',
         description: `已删除 ${totalDeleted} 个文档`,
-        status: 'success',
+        type: 'success',
         duration: 2000
       });
 
@@ -426,7 +425,7 @@ export default function KnowledgeList() {
       toaster.create({
         title: '批量删除失败',
         description: error instanceof Error ? error.message : '未知错误',
-        status: 'error',
+        type: 'error',
         duration: 3000
       });
     }
@@ -498,16 +497,19 @@ export default function KnowledgeList() {
       {hasDocuments && (
         <Flex align="center" justify="space-between" py="8px" borderBottom="1px solid" borderColor={hairline}>
           <HStack gap="12px">
-            <Checkbox
-              isChecked={allSelected}
-              isIndeterminate={someSelected}
-              onChange={handleToggleSelectAll}
+            <Checkbox.Root
+              checked={someSelected && !allSelected ? 'indeterminate' : allSelected}
+              onCheckedChange={handleToggleSelectAll}
               colorPalette="blue"
             >
-              <Text color={muted} fontSize="12px">
-                全选
-              </Text>
-            </Checkbox>
+              <Checkbox.HiddenInput />
+              <Checkbox.Control />
+              <Checkbox.Label>
+                <Text color={muted} fontSize="12px">
+                  全选
+                </Text>
+              </Checkbox.Label>
+            </Checkbox.Root>
             <Text color={muted} fontSize="12px">
               共 {documents.length} 条结果
             </Text>

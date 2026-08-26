@@ -27,7 +27,7 @@ import {
 } from 'react-icons/fi';
 import { Slider } from '@/components/ui/slider';
 import { useChatHistory } from '@/context/chat-history-context';
-import { useLive2DConfig } from '@/context/live2d-config-context';
+import { useConfig } from '@/context/character-config-context';
 import { useWebSocket } from '@/context/websocket-context';
 import { useBgUrl } from '@/context/bgurl-context';
 import { useCamera } from '@/context/camera-context';
@@ -46,6 +46,7 @@ const schoolColors = {
   textSecondary: '#718096',
   border: '#E2E8F0',
   white: '#FFFFFF',
+  gray50: '#F7FAFC',
 };
 
 // 数字人角色列表（从配置中获取）
@@ -65,9 +66,9 @@ const getAvatarCharacters = (configs: any[] | undefined) => {
 
   // 添加配置的角色
   const configCharacters = configs.map((conf: any, index: number) => ({
-    id: conf.conf_uid || `character-${index}`,
-    name: conf.conf_name || `角色 ${index + 1}`,
-    description: conf.persona_prompt?.substring(0, 50) || '数字人角色',
+    id: conf.filename || `character-${index}`,
+    name: conf.name || `角色 ${index + 1}`,
+    description: '数字人角色',
     filename: conf.filename,
     preview: ['👨‍🏫', '👩‍🏫', '📚', '🎨'][index % 4],
   }));
@@ -95,13 +96,12 @@ interface HeroSidebarProps {
 
 export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
   const { historyList, currentHistoryUid, setMessages, setCurrentHistoryUid, setHistoryList } = useChatHistory();
-  const { modelInfo, setModelInfo } = useLive2DConfig();
   const { sendMessage, baseUrl } = useWebSocket();
-  const { backgroundUrl, setBackgroundUrl, backgroundFiles, addBackgroundFile, useCameraBackground, setUseCameraBackground } = useBgUrl();
+  const { setBackgroundUrl, addBackgroundFile, setUseCameraBackground } = useBgUrl();
   const { startBackgroundCamera, stopBackgroundCamera, isBackgroundStreaming } = useCamera();
   const { switchCharacter } = useSwitchCharacter();
   const { volume, setVolume } = useVolume();
-  const { configs } = useLive2DConfig();
+  const { configFiles: configs } = useConfig();
 
   const [selectedAvatar, setSelectedAvatar] = useState('');
   const [selectedBg, setSelectedBg] = useState('default');
@@ -303,13 +303,14 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
           </Text>
           <IconButton
             aria-label="关闭"
-            icon={<FiX />}
             size="sm"
             variant="ghost"
             color="white"
             _hover={{ bg: 'rgba(255, 255, 255, 0.1)' }}
             onClick={onClose}
-          />
+          >
+            <FiX />
+          </IconButton>
         </HStack>
       </Box>
 
@@ -335,7 +336,7 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
           {/* 数字人选择 */}
           <Box>
             <HStack gap="2" mb="3">
-              <FiUser boxSize="4" color={schoolColors.primary} />
+              <FiUser size="4" color={schoolColors.primary} />
               <Text fontSize="sm" fontWeight="semibold" color={schoolColors.text}>
                 数字人选择
               </Text>
@@ -356,7 +357,7 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
                 >
                   <HStack gap="3">
                     <Text fontSize="2xl">{avatar.preview}</Text>
-                    <VStack align="start" spacing="0" flex="1">
+                    <VStack align="start" gap="0" flex="1">
                       <Text fontSize="sm" fontWeight="medium" color={schoolColors.text}>
                         {avatar.name}
                       </Text>
@@ -380,7 +381,7 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
           {/* 播报音量 */}
           <Box>
             <HStack gap="2" mb="3">
-              <FiVolume2 boxSize="4" color={schoolColors.primary} />
+              <FiVolume2 size="4" color={schoolColors.primary} />
               <Text fontSize="sm" fontWeight="semibold" color={schoolColors.text}>
                 播报音量
               </Text>
@@ -402,7 +403,7 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
           {/* 背景图片切换 */}
           <Box>
             <HStack gap="2" mb="3">
-              <FiImage boxSize="4" color={schoolColors.primary} />
+              <FiImage size="4" color={schoolColors.primary} />
               <Text fontSize="sm" fontWeight="semibold" color={schoolColors.text}>
                 背景图片
               </Text>
@@ -424,10 +425,10 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
                   gap="2"
                 >
                   {bg.id === 'camera' && (
-                    <FiCamera boxSize="4" color={isBackgroundStreaming ? 'green.500' : schoolColors.textSecondary} />
+                    <FiCamera size="4" color={isBackgroundStreaming ? 'green.500' : schoolColors.textSecondary} />
                   )}
                   {bg.id === 'upload' && (
-                    <FiUpload boxSize="4" color={schoolColors.textSecondary} />
+                    <FiUpload size="4" color={schoolColors.textSecondary} />
                   )}
                   <Text
                     fontSize="sm"
@@ -453,7 +454,7 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
           <Box>
             <HStack justify="space-between" mb="3">
               <HStack gap="2">
-                <FiClock boxSize="4" color={schoolColors.primary} />
+                <FiClock size="4" color={schoolColors.primary} />
                 <Text fontSize="sm" fontWeight="semibold" color={schoolColors.text}>
                   历史记录
                 </Text>
@@ -465,13 +466,13 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
             <VStack gap="2">
               {/* 创建新对话按钮 */}
               <Button
-                leftIcon={<FiPlus />}
                 size="sm"
                 colorScheme="blue"
                 variant="outline"
                 width="full"
                 onClick={handleNewConversation}
               >
+                <FiPlus />
                 开启新对话
               </Button>
 
@@ -501,12 +502,11 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
                     _hover={{ borderColor: schoolColors.primary }}
                     transition="all 0.2s"
                   >
-                    <VStack align="start" spacing="1">
+                    <VStack align="start" gap="1">
                       <Text
                         fontSize="xs"
                         color={schoolColors.text}
                         fontWeight="medium"
-                        noOfLines={1}
                       >
                         {history.latest_message?.content || '空对话'}
                       </Text>
@@ -516,7 +516,6 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
                         </Text>
                         <IconButton
                           aria-label="删除"
-                          icon={<FiTrash2 />}
                           size="sm"
                           bg="red.100"
                           color="red.600"
@@ -525,7 +524,9 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
                             e.stopPropagation();
                             handleDeleteHistory(history.uid);
                           }}
-                        />
+                        >
+                          <FiTrash2 />
+                        </IconButton>
                       </HStack>
                     </VStack>
                   </Box>

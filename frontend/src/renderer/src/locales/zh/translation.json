@@ -109,6 +109,8 @@
     "failedStartBackgroundCamera": "启动背景摄像头失败",
     "failedStartScreenCapture": "启动屏幕捕获失败",
     "failedStartVAD": "启动语音活动检测失败",
+    "vadMicPermissionDenied": "浏览器拒绝了麦克风权限：请点击地址栏左侧的锁形/麦克风图标，把麦克风设为「允许」后刷新重试",
+    "vadNoMicDevice": "未检测到麦克风设备，请检查麦克风是否已连接并在系统设置中启用",
     "llmCantHear": "AI无法听到您的声音",
     "audioPlayback": "音频播放错误",
     "enterValidUuid": "请输入有效的UUID",

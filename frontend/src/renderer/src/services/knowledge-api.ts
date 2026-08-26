@@ -4,6 +4,7 @@
 import { useWebSocket } from '@/context/websocket-context';
 import {
   KnowledgeEntry,
+  KnowledgeDetailResponse,
   KnowledgeFilters,
   KnowledgeStatsResponse,
   KnowledgeCreateRequest,
@@ -44,7 +45,7 @@ export async function fetchKnowledgeStats(): Promise<KnowledgeStatsResponse> {
 /**
  * Fetch knowledge detail
  */
-export async function fetchKnowledgeDetail(entryId: string): Promise<KnowledgeEntry> {
+export async function fetchKnowledgeDetail(entryId: string): Promise<KnowledgeDetailResponse> {
   const response = await fetch(`${API_BASE}/${entryId}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch knowledge detail: ${response.statusText}`);
@@ -179,6 +180,9 @@ export function useKnowledgeAPI() {
 
     // Delete via HTTP
     delete: deleteKnowledge,
+
+    // Fetch detail via HTTP
+    fetchDetail: fetchKnowledgeDetail,
 
     // Bulk operation
     bulkOperation,

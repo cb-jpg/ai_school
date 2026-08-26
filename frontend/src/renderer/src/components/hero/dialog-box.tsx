@@ -11,15 +11,13 @@ import {
   HStack,
   Text,
   Textarea,
-  Button,
   IconButton,
-  Badge,
   Flex,
   Spinner,
 } from '@chakra-ui/react';
 import { Switch } from '@/components/ui/switch';
-import { BsMicFill, BsMicMuteFill, BsMic } from 'react-icons/bs';
-import { FiInfo, FiArrowRight, FiClock, FiPlus } from 'react-icons/fi';
+import { BsMicFill, BsMic } from 'react-icons/bs';
+import { FiClock, FiPlus } from 'react-icons/fi';
 import { IoSend } from 'react-icons/io5';
 import { Alert } from '@/components/ui/alert';
 import { useTextInput } from '@/hooks/footer/use-text-input';
@@ -82,7 +80,7 @@ interface DialogBoxProps {
   description: string;
 }
 
-const DialogBox = memo(({ schoolName, tagline, description }: DialogBoxProps) => {
+const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
   const textInput = useTextInput();
   const { wsState } = useWebSocket();
   const { aiState } = useAiState();
@@ -168,10 +166,10 @@ const DialogBox = memo(({ schoolName, tagline, description }: DialogBoxProps) =>
         </Alert>
       )}
 
-      <VStack spacing={6} align="stretch" flex={1} overflow="hidden">
+      <VStack gap={6} align="stretch" flex={1} overflow="hidden">
         {/* Status Indicator */}
-        <HStack spacing={2} mb={4} justify="space-between">
-          <HStack spacing={2}>
+        <HStack gap={2} mb={4} justify="space-between">
+          <HStack gap={2}>
             <Box
               w={2}
               h={2}
@@ -187,10 +185,9 @@ const DialogBox = memo(({ schoolName, tagline, description }: DialogBoxProps) =>
               </Text>
             )}
           </HStack>
-          <HStack spacing={2}>
+          <HStack gap={2}>
             <IconButton
               aria-label="新对话"
-              icon={<FiPlus />}
               size="sm"
               variant="ghost"
               color={schoolColors.textSecondary}
@@ -198,15 +195,18 @@ const DialogBox = memo(({ schoolName, tagline, description }: DialogBoxProps) =>
                 // 创建新对话的逻辑
                 console.log('创建新对话');
               }}
-            />
+            >
+              <FiPlus />
+            </IconButton>
             <IconButton
               aria-label="对话历史"
-              icon={<FiClock />}
               size="sm"
               variant="ghost"
               color={schoolColors.textSecondary}
               onClick={() => setShowHistory(!showHistory)}
-            />
+            >
+              <FiClock />
+            </IconButton>
           </HStack>
         </HStack>
 
@@ -214,7 +214,6 @@ const DialogBox = memo(({ schoolName, tagline, description }: DialogBoxProps) =>
           <Text
             fontSize={{ base: '2xl', sm: '4xl', md: '5xl' }}
             fontWeight="bold"
-            leadingTight={1.1}
             color={schoolColors.text}
             mb={3}
             style={{ fontFamily: '"Helvetica Neue", Arial, sans-serif' }}
@@ -224,7 +223,6 @@ const DialogBox = memo(({ schoolName, tagline, description }: DialogBoxProps) =>
 
           <Text
             fontSize={{ base: 'sm', sm: 'base', md: 'lg' }}
-            leading="relaxed"
             color={schoolColors.textSecondary}
             maxW={{ base: 'sm', sm: 'lg', md: 'xl' }}
             mb={{ base: 4, sm: 5 }}
@@ -244,7 +242,7 @@ const DialogBox = memo(({ schoolName, tagline, description }: DialogBoxProps) =>
           borderColor={schoolColors.border}
           boxShadow="sm"
         >
-          <VStack spacing={3} align="stretch">
+          <VStack gap={3} align="stretch">
             {messages.map((msg, index) => (
               <Box
                 key={index}
@@ -321,11 +319,11 @@ const DialogBox = memo(({ schoolName, tagline, description }: DialogBoxProps) =>
         </Box>
 
         {/* Input Area */}
-        <HStack spacing={3} alignItems="center">
+        <HStack gap={3} alignItems="center">
           <Textarea
             value={textInput.inputText}
             onChange={(e) => textInput.setInputText({ target: { value: e.target.value } } as React.ChangeEvent<HTMLInputElement>)}
-            onKeyDown={textInput.handleKeyPress}
+            onKeyDown={(e) => textInput.handleKeyPress(e as unknown as React.KeyboardEvent<HTMLInputElement>)}
             placeholder="输入您的问题..."
             bg={schoolColors.white}
             color={schoolColors.text}
@@ -412,10 +410,10 @@ const DialogBox = memo(({ schoolName, tagline, description }: DialogBoxProps) =>
         </HStack>
 
         {/* 麦克风自动停止设置 */}
-        <HStack spacing={3} fontSize="xs" color={schoolColors.textSecondary}>
+        <HStack gap={3} fontSize="xs" color={schoolColors.textSecondary}>
           <Switch
             checked={autoStopMic}
-            onCheckedChange={(checked) => setAutoStopMic(checked)}
+            onCheckedChange={(e) => setAutoStopMic(e.checked)}
           />
           <Text>对话结束后自动停止麦克风</Text>
         </HStack>

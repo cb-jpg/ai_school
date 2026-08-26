@@ -30,20 +30,19 @@ import { useKnowledgeList } from '@/hooks/knowledge/use-knowledge-list';
 import { useKnowledgeUpload } from '@/hooks/knowledge/use-knowledge-upload';
 import { useKnowledgeStats } from '@/hooks/knowledge/use-knowledge-stats';
 import { useKnowledgeDrawer as useDrawerState } from '@/hooks/knowledge/use-knowledge-drawer';
-import { KnowledgeEntry, KnowledgeCategory } from '@/types/knowledge';
+import { KnowledgeEntry } from '@/types/knowledge';
 
 interface KnowledgeDrawerProps {
-  trigger: React.ReactNode;
+  children?: React.ReactNode;
 }
 
-function KnowledgeDrawer({ trigger }: KnowledgeDrawerProps) {
+function KnowledgeDrawer({ children }: KnowledgeDrawerProps) {
   const { t } = useTranslation();
   const { open, setOpen, activeTab, setActiveTab, handleClose } = useDrawerState();
 
   // List management
   const {
     knowledgeList,
-    filters,
     loading,
     selectedItems,
     fetchKnowledgeList,
@@ -103,13 +102,13 @@ function KnowledgeDrawer({ trigger }: KnowledgeDrawerProps) {
     await archiveEntry(entryId);
   }, [archiveEntry]);
 
-  const handleUploadSuccess = useCallback(() => {
-    setActiveTab('list');
-    fetchKnowledgeList();
-  }, [setActiveTab, fetchKnowledgeList]);
-
   return (
     <>
+      {children && (
+        <Box as="span" display="inline-flex" onClick={() => setOpen(true)}>
+          {children}
+        </Box>
+      )}
       <DrawerRoot open={open} onOpenChange={(details) => !details.open && handleClose()}>
         <DrawerBackdrop />
         <DrawerContent style={knowledgeStyles.drawer.content}>
@@ -173,9 +172,9 @@ function KnowledgeDrawer({ trigger }: KnowledgeDrawerProps) {
                     <Button
                       size="sm"
                       variant={showFilters ? 'solid' : 'outline'}
-                      leftIcon={<FiFilter />}
                       onClick={() => setShowFilters(!showFilters)}
                     >
+                      <FiFilter />
                       {t('knowledge.filters')}
                     </Button>
 
@@ -208,9 +207,9 @@ function KnowledgeDrawer({ trigger }: KnowledgeDrawerProps) {
                     </Button>
                     <Button
                       size="sm"
-                      leftIcon={<FiPlus />}
                       onClick={() => setActiveTab('upload')}
                     >
+                      <FiPlus />
                       {t('knowledge.add')}
                     </Button>
                   </HStack>

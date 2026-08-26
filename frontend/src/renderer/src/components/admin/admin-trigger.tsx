@@ -10,6 +10,7 @@ import { useAdmin } from '@/context/admin-context';
 const blue = '#002FA7';
 const paper = '#FFFFFF';
 const hairline = '#D9DEE8';
+const ink = '#121826';
 
 interface AdminTriggerProps {
   position?: 'sidebar' | 'floating';
@@ -40,7 +41,7 @@ export default function AdminTrigger({ position = 'sidebar' }: AdminTriggerProps
         transition="all 0.2s ease"
         aria-label="打开知识库管理后台"
       >
-        <Icon as={FiSettings} size="20px" />
+        <Icon as={FiSettings} width="20px" height="20px" />
       </Button>
     );
   }
@@ -64,7 +65,7 @@ export default function AdminTrigger({ position = 'sidebar' }: AdminTriggerProps
       aria-label="打开知识库管理后台"
     >
       <Flex align="center" gap="8px">
-        <Icon as={FiSettings} size="16px" />
+        <Icon as={FiSettings} width="16px" height="16px" />
         <span>知识库管理</span>
       </Flex>
     </Button>

@@ -14,7 +14,6 @@ import {
   FiTrendingUp,
   FiTrendingDown,
   FiPlus,
-  FiArrowRight,
 } from 'react-icons/fi';
 import { createToaster } from '@chakra-ui/react';
 import { useAdmin } from '@/context/admin-context';
@@ -80,14 +79,14 @@ const StatCard: FC<{
           bg="gray.100"
           color="gray.600"
         >
-          <Icon boxSize="5" />
+          <Icon size="5" />
         </Box>
         {trend && (
-          <HStack gap="1" spacing="0">
+          <HStack gap="0">
             {trend === 'up' ? (
-              <FiTrendingUp boxSize="4" color="green.500" />
+              <FiTrendingUp size="4" color="green.500" />
             ) : trend === 'down' ? (
-              <FiTrendingDown boxSize="4" color="red.500" />
+              <FiTrendingDown size="4" color="red.500" />
             ) : null}
             <Text
               fontSize="xs"
@@ -100,7 +99,7 @@ const StatCard: FC<{
         )}
       </HStack>
 
-      <VStack align="start" spacing="1">
+      <VStack align="start" gap="1">
         <Text fontSize="2xl" fontWeight="semibold" color="gray.900" fontFamily="Instrument Serif, serif">
           {value}
         </Text>
@@ -111,7 +110,7 @@ const StatCard: FC<{
 
       {/* 数据来源说明 */}
       <Box mt="3" pt="3" borderTop="1px solid" borderColor="gray.100">
-        <Text fontSize="9px" color="gray.400" noOfLines={1}>
+        <Text fontSize="9px" color="gray.400">
           📊 {dataSource.description}
           {dataSource.logic && ` | ${dataSource.logic}`}
         </Text>
@@ -151,7 +150,7 @@ const ActionCard: FC<{
     cursor={available ? 'pointer' : 'not-allowed'}
     width="full"
   >
-    <VStack gap="3" spacing="3">
+    <VStack gap="3">
       <Box
         width="12"
         height="12"
@@ -161,9 +160,9 @@ const ActionCard: FC<{
         alignItems="center"
         justifyContent="center"
       >
-        <Icon boxSize="6" color="white" />
+        <Icon size="6" color="white" />
       </Box>
-      <VStack align="start" spacing="1" flex="1" width="full">
+      <VStack align="start" gap="1" flex="1" width="full">
         <Text
           fontSize="sm"
           fontWeight="semibold"
@@ -178,7 +177,6 @@ const ActionCard: FC<{
           color="gray.400"
           textAlign="left"
           width="full"
-          noOfLines={2}
         >
           {description}
         </Text>
@@ -225,7 +223,7 @@ export const ModernMainWorkspace: FC = () => {
       trend: 'up' as const,
       icon: FiDatabase,
       dataSource: {
-        source: stats?.total_entries ? 'api' : 'mock',
+        source: stats?.total_entries ? ('api' as const) : ('mock' as const),
         description: stats?.total_entries
           ? '来自知识库API实际数据'
           : '模拟数据 - 等待知识库API连接',
@@ -241,7 +239,7 @@ export const ModernMainWorkspace: FC = () => {
       trend: 'up' as const,
       icon: FiUpload,
       dataSource: {
-        source: stats?.published_entries ? 'api' : 'mock',
+        source: stats?.published_entries ? ('api' as const) : ('mock' as const),
         description: stats?.published_entries
           ? '来自知识库API实际数据'
           : '模拟数据 - 等待知识库API连接',
@@ -257,7 +255,7 @@ export const ModernMainWorkspace: FC = () => {
       trend: undefined,
       icon: FiSearch,
       dataSource: {
-        source: 'mock',
+        source: 'mock' as const,
         description: '功能未实现 - 需要搜索日志统计功能',
         logic: '需要在后端添加搜索日志记录和统计接口',
       },
@@ -269,7 +267,7 @@ export const ModernMainWorkspace: FC = () => {
       trend: undefined,
       icon: FiUsers,
       dataSource: {
-        source: 'mock',
+        source: 'mock' as const,
         description: '功能未实现 - 需要用户活动和会话管理',
         logic: '需要实现用户登录、会话管理和活跃度统计',
       },
@@ -289,7 +287,7 @@ export const ModernMainWorkspace: FC = () => {
           toaster.create({
             title: '请使用管理后台上传功能',
             description: '在管理后台中选择"上传管理"进行文件上传',
-            status: 'info',
+            type: 'info',
           });
         }, 300);
       },
@@ -306,7 +304,7 @@ export const ModernMainWorkspace: FC = () => {
           toaster.create({
             title: '请使用管理后台创建功能',
             description: '在管理后台中选择"知识列表"然后点击"新建知识"',
-            status: 'info',
+            type: 'info',
           });
         }, 300);
       },
@@ -323,7 +321,7 @@ export const ModernMainWorkspace: FC = () => {
           toaster.create({
             title: '请使用管理后台统计功能',
             description: '在管理后台中可以查看详细的数据统计',
-            status: 'info',
+            type: 'info',
           });
         }, 300);
       },
@@ -339,7 +337,7 @@ export const ModernMainWorkspace: FC = () => {
         toaster.create({
           title: '切换到Hero页面',
           description: '在Hero页面中可以查看和管理校园内容',
-          status: 'info',
+          type: 'info',
         });
       },
       available: true,
@@ -355,7 +353,7 @@ export const ModernMainWorkspace: FC = () => {
     >
       {/* 顶部欢迎区域 */}
       <Box bg="white" borderBottom="1px solid" borderColor="gray.200" py="8" px="8">
-        <VStack align="start" spacing="2" maxW="6xl">
+        <VStack align="start" gap="2" maxW="6xl">
           <Text
             fontSize="3xl"
             fontWeight="semibold"
@@ -517,7 +515,7 @@ export const ModernMainWorkspace: FC = () => {
             rounded="xl"
             p="4"
           >
-            <VStack align="start" spacing="2">
+            <VStack align="start" gap="2">
               <HStack gap="2">
                 <Badge bg="blue.100" color="blue.700" fontSize="9px" px="2" py="0.5" rounded="md">
                   💡

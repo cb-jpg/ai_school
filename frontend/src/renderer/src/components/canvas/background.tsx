@@ -1,6 +1,5 @@
-import { Box, Image, VStack } from '@chakra-ui/react';
+import { Box, Image } from '@chakra-ui/react';
 import { memo, useEffect, useRef } from 'react';
-import { canvasStyles } from './canvas-styles';
 import { useCamera } from '@/context/camera-context';
 import { useBgUrl } from '@/context/bgurl-context';
 

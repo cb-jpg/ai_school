@@ -8,14 +8,12 @@ import {
   Dialog,
   VStack,
   HStack,
-  Progress,
   Badge,
   Spinner
 } from '@chakra-ui/react';
-import { FiClock, FiTag, FiFileText, FiArchive, FiCheckCircle } from 'react-icons/fi';
+import { FiClock, FiTag, FiFileText } from 'react-icons/fi';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { knowledgeStyles } from './knowledge-styles';
 import { KnowledgeEntry, Chunk, CATEGORY_LABELS, STATUS_LABELS } from '@/types/knowledge';
 import { useKnowledgeAPI } from '@/services/knowledge-api';
 
@@ -75,10 +73,10 @@ function KnowledgeDetailDialog({
   if (!entryId) return null;
 
   return (
-    <DialogRoot open={open} onOpenChange={(details) => !details.open && onClose()}>
-      <DialogBackdrop />
-      <DialogContent>
-        <DialogCloseTrigger />
+    <Dialog.Root open={open} onOpenChange={(details) => !details.open && onClose()}>
+      <Dialog.Backdrop />
+      <Dialog.Content>
+        <Dialog.CloseTrigger />
 
         {loading ? (
           <Box p={8} textAlign="center">
@@ -87,9 +85,9 @@ function KnowledgeDetailDialog({
         ) : entry ? (
           <VStack gap={4} align="stretch">
             {/* Header */}
-            <DialogHeader>
-              <DialogTitle>{entry.title}</DialogTitle>
-            </DialogHeader>
+            <Dialog.Header>
+              <Dialog.Title>{entry.title}</Dialog.Title>
+            </Dialog.Header>
 
             {/* Metadata */}
             <VStack gap={3} align="stretch">
@@ -180,17 +178,19 @@ function KnowledgeDetailDialog({
                   </Text>
                 </HStack>
                 {entry.chunk_count > 0 && (
-                  <Progress
-                    value={entry.status === 'error' ? 0 : 100}
-                    colorPalette={entry.status === 'published' ? 'green' : 'blue'}
-                    size="sm"
-                  />
+                  <Box width="100%" height="6px" borderRadius="3px" overflow="hidden" bg="gray.200">
+                    <Box
+                      width={entry.status === 'error' ? '0%' : '100%'}
+                      height="100%"
+                      bg={entry.status === 'published' ? 'green.500' : 'blue.500'}
+                    />
+                  </Box>
                 )}
               </Box>
 
               {/* Error message */}
               {entry.status === 'error' && entry.error_message && (
-                <Box p={3} bg="red.500" bgOpacity={0.1} borderRadius="md">
+                <Box p={3} bg="red.500/10" borderRadius="md">
                   <Text color="red.300" fontSize="sm">
                     {entry.error_message}
                   </Text>
@@ -217,7 +217,7 @@ function KnowledgeDetailDialog({
                       <Text color="whiteAlpha.500" fontSize="xs" mb={1}>
                         {t('knowledge.chunk', { number: index + 1 })}
                       </Text>
-                      <Text color="whiteAlpha.700" fontSize="sm" noOfLines={2}>
+                      <Text color="whiteAlpha.700" fontSize="sm">
                         {chunk.content}
                       </Text>
                     </Box>
@@ -232,23 +232,23 @@ function KnowledgeDetailDialog({
             )}
 
             {/* Actions */}
-            <DialogFooter>
+            <Dialog.Footer>
               <Button variant="ghost" onClick={onClose}>
                 {t('common.close')}
               </Button>
               {entry.status !== 'error' && (
                 <Button
-                  leftIcon={<FiFileText />}
                   onClick={handleReindex}
                 >
+                  <FiFileText />
                   {t('knowledge.reindex')}
                 </Button>
               )}
-            </DialogFooter>
+            </Dialog.Footer>
           </VStack>
         ) : null}
-      </DialogContent>
-    </DialogRoot>
+      </Dialog.Content>
+    </Dialog.Root>
   );
 }
 

@@ -3,8 +3,8 @@
  * 集成现有系统Context和API的后台管理界面
  */
 
-import { FC, useState, useEffect } from 'react';
-import { Box, Button, HStack, VStack, Text } from '@chakra-ui/react';
+import { FC, useState } from 'react';
+import { Box, Button, HStack, VStack, Text, Input } from '@chakra-ui/react';
 import {
   FiDatabase,
   FiSettings,
@@ -185,7 +185,7 @@ const AdminSidebar: FC<{
                     px="3"
                   >
                     <HStack gap="3">
-                      <item.icon boxSize="5" flexShrink="0" />
+                      <item.icon size="5" />
                       {!isCollapsed && (
                         <Text fontSize="sm" fontWeight="medium">
                           {item.label}
@@ -201,7 +201,7 @@ const AdminSidebar: FC<{
                             : 'rotate(0deg)'
                         }
                       >
-                        <FiChevronRight boxSize="4" />
+                        <FiChevronRight size="4" />
                       </Box>
                     )}
                   </Button>
@@ -212,8 +212,6 @@ const AdminSidebar: FC<{
                       gap="1"
                       align="stretch"
                       ml="8"
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
                     >
                       {item.children.map((child) => (
                         <Button
@@ -228,7 +226,7 @@ const AdminSidebar: FC<{
                           justifyContent="flex-start"
                         >
                           <HStack gap="2">
-                            {child.icon && <child.icon boxSize="4" />}
+                            {child.icon && <child.icon size="4" />}
                             {child.label}
                           </HStack>
                         </Button>
@@ -255,7 +253,7 @@ const AdminSidebar: FC<{
                   px="3"
                 >
                   <HStack gap="3">
-                    <item.icon boxSize="5" flexShrink="0" />
+                    <item.icon size="5" />
                     {!isCollapsed && (
                       <Text fontSize="sm" fontWeight="medium">
                         {item.label}
@@ -300,10 +298,10 @@ const AdminSidebar: FC<{
         >
           <HStack gap="2">
             {isCollapsed ? (
-              <FiChevronRight boxSize="5" />
+              <FiChevronRight size="5" />
             ) : (
               <>
-                <FiChevronLeft boxSize="5" />
+                <FiChevronLeft size="5" />
                 <Text fontSize="sm">收起侧边栏</Text>
               </>
             )}
@@ -316,7 +314,6 @@ const AdminSidebar: FC<{
 
 // 顶部导航栏组件
 const AdminHeader: FC<{ sidebarCollapsed: boolean; userName?: string }> = ({
-  sidebarCollapsed,
   userName = '管理员',
 }) => {
   const [notifications] = useState([
@@ -342,26 +339,20 @@ const AdminHeader: FC<{ sidebarCollapsed: boolean; userName?: string }> = ({
       <HStack gap="4">
         <Box position="relative" width="80">
           <FiSearch
-            position="absolute"
-            left="3"
-            top="50%"
             transform="translateY(-50%)"
-            boxSize="4"
             color="gray.400"
           />
-          <Box
-            as="input"
-            type="text"
+          <Input
             placeholder="搜索知识库、文档..."
             width="full"
-            pl="10"
-            pr="4"
-            py="2"
+            paddingLeft="10"
+            paddingRight="4"
+            paddingY="2"
             backgroundColor="gray.100"
             borderRadius="lg"
             fontSize="sm"
             border="0"
-            _focus={{ outline: 'none', ring: '2px', ringColor: 'indigo.500/20' }}
+            _focus={{ outline: 'none', boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.2)' }}
             fontFamily="Inter, sans-serif"
           />
           <Box
@@ -396,7 +387,7 @@ const AdminHeader: FC<{ sidebarCollapsed: boolean; userName?: string }> = ({
             color: 'gray.900',
           }}
         >
-          <FiBell boxSize="5" />
+          <FiBell size="5" />
           {notifications.length > 0 && (
             <Box
               position="absolute"
@@ -449,12 +440,12 @@ const AdminHeader: FC<{ sidebarCollapsed: boolean; userName?: string }> = ({
               color: 'gray.900',
             }}
             onClick={() => {
-              toaster.create({ title: '已退出登录', status: 'info' });
+              toaster.create({ title: '已退出登录', type: 'info' });
               window.location.hash = '#/main';
             }}
             title="退出工作台"
           >
-            <FiLogOut boxSize="4" />
+            <FiLogOut size="4" />
           </Button>
         </HStack>
       </HStack>
@@ -592,7 +583,7 @@ const WorkspaceDashboard: FC = () => {
                 onClick={() =>
                   toaster.create({
                     title: `${action.label}功能开发中`,
-                    status: 'info',
+                    type: 'info',
                   })
                 }
               >
@@ -605,7 +596,7 @@ const WorkspaceDashboard: FC = () => {
                   alignItems="center"
                   justifyContent="center"
                 >
-                  <action.icon boxSize="6" color="white" />
+                  <action.icon size="6" color="white" />
                 </Box>
                 <Text fontSize="sm" fontWeight="medium" color="gray.900">
                   {action.label}
@@ -683,7 +674,7 @@ const StatCard: FC<{
       </Box>
       {Icon && (
         <Box p="3" rounded="lg" backgroundColor="gray.100">
-          <Icon boxSize="5" color="indigo.500" />
+          <Icon size="5" color="indigo.500" />
         </Box>
       )}
     </HStack>
@@ -732,7 +723,7 @@ const KnowledgeListContent: FC = () => (
     </Box>
     <ContentCard title="知识库列表">
       <Box textAlign="center" py="12">
-        <FiDatabase boxSize="16" color="gray.300" mx="auto" mb="4" />
+        <FiDatabase size="16" color="gray.300" />
         <Text color="gray.500">知识库列表功能开发中...</Text>
       </Box>
     </ContentCard>
@@ -758,7 +749,7 @@ const KnowledgeUploadContent: FC = () => (
     </Box>
     <ContentCard title="文件上传">
       <Box textAlign="center" py="12">
-        <FiUpload boxSize="16" color="gray.300" mx="auto" mb="4" />
+        <FiUpload size="16" color="gray.300" />
         <Text color="gray.500">文件上传功能开发中...</Text>
       </Box>
     </ContentCard>
@@ -784,7 +775,7 @@ const KnowledgeStatsContent: FC = () => (
     </Box>
     <ContentCard title="数据统计">
       <Box textAlign="center" py="12">
-        <FiBarChart2 boxSize="16" color="gray.300" mx="auto" mb="4" />
+        <FiBarChart2 size="16" color="gray.300" />
         <Text color="gray.500">统计分析功能开发中...</Text>
       </Box>
     </ContentCard>

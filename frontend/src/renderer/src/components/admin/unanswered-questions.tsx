@@ -23,11 +23,11 @@ import {
   FiPlus,
   FiAlertTriangle,
   FiCheck,
-  FiSearch
 } from 'react-icons/fi';
 import { BiBulb } from 'react-icons/bi';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useKnowledgeAdminAPI } from '@/services/knowledge-admin-api';
+import { authFetch } from '@/services/auth';
 
 const toaster = createToaster({
   placement: 'top-end',
@@ -53,6 +53,7 @@ interface UnansweredQuestion {
   question: string;
   timestamp: string;
   count: number;
+  score?: number;
 }
 
 interface AnswerFormData {
@@ -87,7 +88,7 @@ function QuestionItem({
       transition="border-color 160ms ease, background 160ms ease"
     >
       <Flex align="flex-start" gap="12px">
-        <Icon as={FiHelpCircle} color={blue} size="16px" mt="2px" flexShrink={0} />
+        <Icon as={FiHelpCircle} color={blue} width="16px" height="16px" mt="2px" flexShrink={0} />
 
         <Box flex="1" minWidth="0">
           <Flex align="center" gap="8px" mb="4px" flexWrap="wrap">
@@ -111,6 +112,20 @@ function QuestionItem({
                 color={amber}
               >
                 {question.count} 次
+              </Badge>
+            )}
+
+            {question.score !== undefined && (
+              <Badge
+                px="6px"
+                py="2px"
+                fontSize="10px"
+                fontWeight="600"
+                borderRadius="2px"
+                background={blueWash}
+                color={blue}
+              >
+                置信度 {question.score.toFixed(2)}
               </Badge>
             )}
           </Flex>
@@ -193,7 +208,7 @@ function AnswerForm({
       borderRadius="4px"
     >
       <Flex align="center" gap="8px" mb="12px">
-        <Icon as={BiBulb} color={blue} size="16px" />
+        <Icon as={BiBulb} color={blue} width="16px" height="16px" />
         <Text color={ink} fontSize="13px" fontWeight="700">
           补充知识库
         </Text>
@@ -313,7 +328,7 @@ function AnswerForm({
           <Button
             size="sm"
             onClick={onSubmit}
-            isDisabled={!formData.answer.trim() || !formData.title.trim()}
+            disabled={!formData.answer.trim() || !formData.title.trim()}
             height="32px"
             px="12px"
             borderRadius="2px"
@@ -333,34 +348,6 @@ function AnswerForm({
   );
 }
 
-// Demo unanswered questions (in production, this would come from the API)
-const DEMO_QUESTIONS: UnansweredQuestion[] = [
-  {
-    id: '1',
-    question: '学校的具体地址在哪里？',
-    timestamp: '2026-08-23T10:30:00',
-    count: 5
-  },
-  {
-    id: '2',
-    question: '学费是多少？有没有奖学金？',
-    timestamp: '2026-08-23T09:15:00',
-    count: 3
-  },
-  {
-    id: '3',
-    question: '学校有哪些社团活动？',
-    timestamp: '2026-08-22T16:45:00',
-    count: 2
-  },
-  {
-    id: '4',
-    question: '如何联系学校招生办？',
-    timestamp: '2026-08-22T14:20:00',
-    count: 1
-  }
-];
-
 function getTimeAgo(timestamp: string): string {
   const now = new Date();
   const time = new Date(timestamp);
@@ -376,7 +363,10 @@ function getTimeAgo(timestamp: string): string {
 }
 
 export default function UnansweredQuestions() {
-  const [questions, setQuestions] = useState<UnansweredQuestion[]>(DEMO_QUESTIONS);
+  const [questions, setQuestions] = useState<UnansweredQuestion[]>([]);
+  const [lowConfQuestions, setLowConfQuestions] = useState<UnansweredQuestion[]>([]);
+  const [activeTab, setActiveTab] = useState<'unanswered' | 'low-confidence'>('unanswered');
+  const [listError, setListError] = useState('');
   const [addingAnswerFor, setAddingAnswerFor] = useState<string | null>(null);
   const [answerForm, setAnswerForm] = useState<AnswerFormData>({
     questionId: '',
@@ -387,7 +377,56 @@ export default function UnansweredQuestions() {
     tags: ''
   });
 
-  const { addDocument, searchDocuments } = useKnowledgeAdminAPI();
+  const { addDocument } = useKnowledgeAdminAPI();
+
+  // 从后端拉取未命中 / 低置信问题（对话 RAG 的真实记录）
+  const loadQuestions = useCallback(async () => {
+    setListError('');
+    try {
+      const [unansweredRes, lowConfRes] = await Promise.all([
+        authFetch('/api/knowledge/unanswered'),
+        authFetch('/api/knowledge/low-confidence'),
+      ]);
+      if (unansweredRes.ok) {
+        const data = await unansweredRes.json();
+        setQuestions((data || []).map((q: UnansweredQuestion) => ({ ...q, timestamp: String(q.timestamp) })));
+      }
+      if (lowConfRes.ok) {
+        const data = await lowConfRes.json();
+        setLowConfQuestions(
+          (data || []).map((q: { id: string; question: string; timestamp: string; retrieval_count: number; confidence_score: number }) => ({
+            id: q.id,
+            question: q.question,
+            timestamp: String(q.timestamp),
+            count: q.retrieval_count,
+            score: q.confidence_score,
+          })),
+        );
+      }
+    } catch (error) {
+      setListError(error instanceof Error ? error.message : '加载问题列表失败');
+    }
+  }, []);
+
+  useEffect(() => {
+    loadQuestions();
+  }, [loadQuestions]);
+
+  // 关闭问题（补充答案后调用，或手动忽略）：删除后端记录
+  const closeQuestion = useCallback(async (id: string) => {
+    const endpoint = activeTab === 'unanswered' ? 'unanswered' : 'low-confidence';
+    try {
+      const response = await authFetch(`/api/knowledge/${endpoint}/${id}`, { method: 'DELETE' });
+      if (!response.ok) return;
+    } catch {
+      return;
+    }
+    if (activeTab === 'unanswered') {
+      setQuestions(prev => prev.filter(q => q.id !== id));
+    } else {
+      setLowConfQuestions(prev => prev.filter(q => q.id !== id));
+    }
+  }, [activeTab]);
 
   const handleAddAnswer = (question: UnansweredQuestion) => {
     setAddingAnswerFor(question.id);
@@ -418,9 +457,9 @@ export default function UnansweredQuestions() {
       toaster.create({
         title: '请填写完整',
         description: '请填写标题和答案内容',
-        status: 'warning',
+        type: 'warning',
         duration: 2000,
-        isClosable: true
+        closable: true
       });
       return;
     }
@@ -444,13 +483,20 @@ export default function UnansweredQuestions() {
         toaster.create({
           title: '添加成功',
           description: `已添加 ${result.document_ids.length} 个知识块到知识库`,
-          status: 'success',
+          type: 'success',
           duration: 2000,
-          isClosable: true
+          closable: true
         });
 
-        // Remove the question from the list
+        // 补充答案后在后端关闭该问题（未命中/低置信列表都可能命中同一问题）
+        try {
+          await authFetch(`/api/knowledge/unanswered/${answerForm.questionId}`, { method: 'DELETE' });
+          await authFetch(`/api/knowledge/low-confidence/${answerForm.questionId}`, { method: 'DELETE' });
+        } catch {
+          // 关闭失败不影响添加结果
+        }
         setQuestions(prev => prev.filter(q => q.id !== answerForm.questionId));
+        setLowConfQuestions(prev => prev.filter(q => q.id !== answerForm.questionId));
 
         // Reset form
         handleCancelAnswer();
@@ -459,43 +505,22 @@ export default function UnansweredQuestions() {
       toaster.create({
         title: '添加失败',
         description: error instanceof Error ? error.message : '未知错误',
-        status: 'error',
+        type: 'error',
         duration: 3000,
-        isClosable: true
+        closable: true
       });
     }
   };
 
   const handleDismiss = (id: string) => {
-    setQuestions(prev => prev.filter(q => q.id !== id));
-  };
-
-  const handleSearch = async () => {
-    // Search for similar questions in the knowledge base
-    if (answerForm.question) {
-      try {
-        const result = await searchDocuments({
-          query: answerForm.question,
-          top_k: 3
-        });
-
-        if (result.success && result.results.length > 0) {
-          toaster.create({
-            title: '找到相关知识',
-            description: `知识库中有 ${result.results.length} 条相关内容`,
-            status: 'info',
-            duration: 3000,
-            isClosable: true
-          });
-        }
-      } catch (error) {
-        // Ignore search errors
-      }
-    }
+    closeQuestion(id);
   };
 
   const totalQuestions = questions.length;
   const highFrequencyQuestions = questions.filter(q => q.count >= 3).length;
+  const displayList = (activeTab === 'unanswered' ? questions : lowConfQuestions)
+    .slice()
+    .sort((a, b) => b.count - a.count);
 
   return (
     <VStack gap="16px" py="20px" align="stretch" height="100%">
@@ -551,16 +576,44 @@ export default function UnansweredQuestions() {
           border="1px solid"
           borderColor={hairline}
           borderRadius="4px"
-          colSpan={{ base: 2, sm: 2 }}
         >
           <Flex align="center" gap="8px">
-            <Icon as={FiAlertTriangle} color={amber} size="14px" />
+            <Icon as={FiAlertTriangle} color={amber} width="14px" height="14px" />
             <Text color={muted} fontSize="10px" fontWeight="600">
               优先处理高频问题,提升用户体验
             </Text>
           </Flex>
         </Box>
       </SimpleGrid>
+
+      {/* Tab 切换：未命中 / 低置信 */}
+      <HStack gap="8px">
+        <Button
+          size="sm"
+          height="28px"
+          px="12px"
+          borderRadius="2px"
+          variant={activeTab === 'unanswered' ? 'solid' : 'outline'}
+          colorScheme={activeTab === 'unanswered' ? 'blue' : 'gray'}
+          onClick={() => setActiveTab('unanswered')}
+        >
+          未命中问题（{questions.length}）
+        </Button>
+        <Button
+          size="sm"
+          height="28px"
+          px="12px"
+          borderRadius="2px"
+          variant={activeTab === 'low-confidence' ? 'solid' : 'outline'}
+          colorScheme={activeTab === 'low-confidence' ? 'blue' : 'gray'}
+          onClick={() => setActiveTab('low-confidence')}
+        >
+          低置信问题（{lowConfQuestions.length}）
+        </Button>
+        {listError && (
+          <Text color={amber} fontSize="11px" ml="8px">{listError}</Text>
+        )}
+      </HStack>
 
       {/* Questions List */}
       <Box flex="1" overflowY="auto">
@@ -575,10 +628,9 @@ export default function UnansweredQuestions() {
           </Box>
         ) : (
           <>
-            {questions.length > 0 ? (
+            {displayList.length > 0 ? (
               <VStack align="stretch" gap="0">
-                {questions
-                  .sort((a, b) => b.count - a.count)
+                {displayList
                   .map(question => (
                     <QuestionItem
                       key={question.id}
@@ -590,12 +642,12 @@ export default function UnansweredQuestions() {
               </VStack>
             ) : (
               <Box py="48px" textAlign="center">
-                <Icon as={FiCheck} color={green} size="32px" mb="12px" />
+                <Icon as={FiCheck} color={green} width="32px" height="32px" mb="12px" />
                 <Text color={ink} fontSize="13px" fontWeight="600" mb="4px">
                   太棒了！
                 </Text>
                 <Text color={muted} fontSize="12px">
-                  目前没有未回答的问题
+                  {activeTab === 'unanswered' ? '目前没有未命中的问题' : '目前没有低置信问题'}
                 </Text>
               </Box>
             )}
@@ -612,7 +664,7 @@ export default function UnansweredQuestions() {
         borderRadius="4px"
       >
         <Flex align="flex-start" gap="10px">
-          <Icon as={BiBulb} color={green} size="16px" flexShrink={0} />
+          <Icon as={BiBulb} color={green} width="16px" height="16px" flexShrink={0} />
           <Box flex="1">
             <Text color={ink} fontSize="11px" fontWeight="600" mb="4px">
               优化建议

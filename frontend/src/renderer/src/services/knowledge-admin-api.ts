@@ -1,9 +1,11 @@
 /**
  * Knowledge base admin API service
- * Connects to the school_admin backend at port 8001
+ * 适配层：保持 useKnowledgeAdminAPI 的旧接口签名，内部全部走
+ * 主服务的新知识库接口（/api/knowledge/*，经 vite 代理到 :12393），
+ * 由 authFetch 注入登录 token。
  */
 
-const API_BASE = 'http://localhost:8001';
+import { authFetch } from '@/services/auth';
 
 // ============== Type Definitions ==============
 
@@ -38,41 +40,92 @@ export interface CategoryInfo {
   count: number;
 }
 
-// ============== API Functions ==============
+// ============== Helpers ==============
 
-/**
- * Check API health
- */
-export async function checkHealth(): Promise<{ status: string; timestamp: string; service: string }> {
-  const response = await fetch(`${API_BASE}/health`);
+// 中文分类（表单 datalist 用的值）→ 新后端 KnowledgeCategory 枚举
+const CATEGORY_MAP: Record<string, string> = {
+  '学校简介': 'school_intro',
+  '校史': 'history',
+  '校训': 'motto',
+  '办学理念': 'philosophy',
+  '校园文化': 'culture',
+  '规章制度': 'rules',
+  '招生简章': 'admissions',
+  '课程介绍': 'courses',
+  '校园活动': 'activities',
+  '常见问题': 'faq',
+  '学校荣誉': 'honors',
+  '教师资料': 'teachers',
+  '学习标兵': 'students',
+  '其他': 'other',
+};
+
+const VALID_CATEGORIES = new Set(Object.values(CATEGORY_MAP));
+
+function normalizeCategory(category?: string): string {
+  if (!category) return 'other';
+  if (VALID_CATEGORIES.has(category)) return category;
+  return CATEGORY_MAP[category] || 'other';
+}
+
+async function request(path: string, init: RequestInit = {}): Promise<any> {
+  const response = await authFetch(path, init);
   if (!response.ok) {
-    throw new Error(`Health check failed: ${response.statusText}`);
+    const detail = await response
+      .json()
+      .then((data) => data?.detail)
+      .catch(() => null);
+    throw new Error(detail || `请求失败（${response.status}）`);
   }
   return response.json();
 }
 
+// ============== API Functions ==============
+
 /**
- * Add text document to knowledge base
+ * Check API health（主服务 /health，无需登录）
  */
-export async function addDocument(request: {
+export async function checkHealth(): Promise<{ status: string; timestamp: string; service: string }> {
+  const response = await fetch('/health');
+  if (!response.ok) {
+    throw new Error(`Health check failed: ${response.statusText}`);
+  }
+  return {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    service: 'open-llm-vtuber-knowledge',
+  };
+}
+
+/**
+ * Add text document to knowledge base → POST /api/knowledge/create
+ */
+export async function addDocument(requestBody: {
   text: string;
   category?: string;
   title?: string;
   metadata?: Record<string, unknown>;
 }): Promise<{ success: boolean; document_ids: string[]; message: string }> {
-  const response = await fetch(`${API_BASE}/api/documents`, {
+  const tags = (requestBody.metadata?.tags as string[] | undefined) || [];
+  const entry = await request('/api/knowledge/create', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request)
+    body: JSON.stringify({
+      title: requestBody.title?.trim() || '(未命名)',
+      content: requestBody.text,
+      category: normalizeCategory(requestBody.category),
+      tags,
+    }),
   });
-  if (!response.ok) {
-    throw new Error(`Failed to add document: ${response.statusText}`);
-  }
-  return response.json();
+  return {
+    success: true,
+    document_ids: [entry.id],
+    message: '已添加到知识库',
+  };
 }
 
 /**
- * Upload file to knowledge base
+ * Upload file to knowledge base → POST /api/knowledge/upload
  */
 export async function uploadDocument(
   file: File,
@@ -81,158 +134,169 @@ export async function uploadDocument(
 ): Promise<{ success: boolean; document_ids: string[]; message: string; chunks_count: number }> {
   const formData = new FormData();
   formData.append('file', file);
-  if (category) formData.append('category', category);
-  if (title) formData.append('title', title);
+  formData.append('title', title?.trim() || file.name);
+  formData.append('category', normalizeCategory(category));
+  formData.append('tags', '');
 
-  const response = await fetch(`${API_BASE}/api/documents/upload`, {
+  const result = await request('/api/knowledge/upload', {
     method: 'POST',
-    body: formData
+    body: formData,
   });
-  if (!response.ok) {
-    throw new Error(`Failed to upload document: ${response.statusText}`);
+
+  if (result.status !== 'completed') {
+    throw new Error(result.message || '文件处理失败');
   }
-  return response.json();
+  return {
+    success: true,
+    document_ids: result.entry_id ? [result.entry_id] : [],
+    message: result.message || '上传成功',
+    chunks_count: 0,
+  };
 }
 
 /**
- * Update document
+ * Delete document（按 entry id）→ DELETE /api/knowledge/{id}
  */
-export async function updateDocument(
-  docId: string,
-  request: {
-    text?: string;
-    metadata?: Record<string, unknown>;
-  }
-): Promise<{ success: boolean; message: string }> {
-  const response = await fetch(`${API_BASE}/api/documents`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ doc_id: docId, ...request })
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to update document: ${response.statusText}`);
-  }
-  return response.json();
-}
-
-/**
- * Delete document
- */
-export async function deleteDocument(request: {
+export async function deleteDocument(requestBody: {
   doc_id?: string;
   category?: string;
   title?: string;
 }): Promise<{ success: boolean; deleted_count: number; message: string }> {
-  const response = await fetch(`${API_BASE}/api/documents`, {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request)
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to delete document: ${response.statusText}`);
+  if (!requestBody.doc_id) {
+    throw new Error('仅支持按文档 ID 删除');
   }
-  return response.json();
+  await request(`/api/knowledge/${requestBody.doc_id}`, { method: 'DELETE' });
+  return { success: true, deleted_count: 1, message: '已删除' };
 }
 
 /**
- * Search documents
+ * Add knowledge from a web URL → POST /api/knowledge/add-url
  */
-export async function searchDocuments(request: {
+export async function addUrlDocument(requestBody: {
+  url: string;
+  title?: string;
+  category?: string;
+  tags?: string[];
+}): Promise<{ success: boolean; document_ids: string[]; message: string }> {
+  const result = await request('/api/knowledge/add-url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      url: requestBody.url.trim(),
+      title: requestBody.title?.trim() || null,
+      category: normalizeCategory(requestBody.category),
+      tags: requestBody.tags || [],
+    }),
+  });
+
+  if (result.status !== 'completed') {
+    throw new Error(result.message || '网页抓取失败');
+  }
+  return {
+    success: true,
+    document_ids: result.entry_id ? [result.entry_id] : [],
+    message: result.message || '网页抓取成功',
+  };
+}
+
+/**
+ * Search documents → POST /api/knowledge/search
+ * 结果按知识条目去重（每条目保留最高分块），id 为条目 ID（可直接用于删除）。
+ */
+export async function searchDocuments(requestBody: {
   query: string;
   top_k?: number;
   category?: string;
 }): Promise<{ success: boolean; query: string; results: SearchResult[]; total: number }> {
-  const response = await fetch(`${API_BASE}/api/search`, {
+  const data = await request('/api/knowledge/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request)
+    body: JSON.stringify({ query: requestBody.query, top_k: requestBody.top_k ?? 10 }),
   });
-  if (!response.ok) {
-    throw new Error(`Failed to search documents: ${response.statusText}`);
+
+  const byEntry = new Map<string, SearchResult>();
+  for (const doc of data.results || []) {
+    if (requestBody.category) {
+      const expected = normalizeCategory(requestBody.category);
+      if (doc.category !== expected) continue;
+    }
+    const existing = byEntry.get(doc.entry_id);
+    if (!existing || (doc.score ?? 0) > (existing.score ?? 0)) {
+      byEntry.set(doc.entry_id, {
+        id: doc.entry_id,
+        content: doc.content,
+        metadata: {
+          entry_id: doc.entry_id,
+          title: doc.title,
+          score: doc.score,
+        },
+        score: doc.score,
+        category: doc.category,
+        title: doc.title,
+      });
+    }
   }
-  return response.json();
+
+  const results = Array.from(byEntry.values());
+  return { success: true, query: requestBody.query, results, total: results.length };
 }
 
 /**
- * RAG query
- */
-export async function ragQuery(request: {
-  query: string;
-  conversation_history?: Array<{ role: string; content: string }>;
-}): Promise<{
-  success: boolean;
-  query: string;
-  context?: string;
-  has_results?: boolean;
-  detected_category?: string;
-  results?: SearchResult[];
-}> {
-  const response = await fetch(`${API_BASE}/api/rag`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request)
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to perform RAG query: ${response.statusText}`);
-  }
-  return response.json();
-}
-
-/**
- * Get all categories
+ * Get all categories（静态：与后端 KnowledgeCategory 枚举一致）
  */
 export async function getCategories(): Promise<{ success: boolean; categories: string[] }> {
-  const response = await fetch(`${API_BASE}/api/categories`);
-  if (!response.ok) {
-    throw new Error(`Failed to get categories: ${response.statusText}`);
-  }
-  return response.json();
+  return { success: true, categories: Object.keys(CATEGORY_MAP) };
 }
 
 /**
- * Get statistics
+ * Get statistics → GET /api/knowledge/stats
  */
 export async function getStatistics(): Promise<{ success: boolean; statistics: Statistics }> {
-  const response = await fetch(`${API_BASE}/api/statistics`);
-  if (!response.ok) {
-    throw new Error(`Failed to get statistics: ${response.statusText}`);
-  }
-  return response.json();
+  const stats = await request('/api/knowledge/stats');
+  return {
+    success: true,
+    statistics: {
+      total_documents: stats.total_entries,
+      total_chunks: stats.total_chunks,
+      categories: stats.category_counts || {},
+    },
+  };
 }
 
 /**
- * Get document by ID
+ * Get document by ID → GET /api/knowledge/{id}（chunks 拼接为 content）
  */
 export async function getDocument(docId: string): Promise<{ success: boolean; document: Document }> {
-  const response = await fetch(`${API_BASE}/api/documents/${docId}`);
-  if (!response.ok) {
-    throw new Error(`Failed to get document: ${response.statusText}`);
-  }
-  return response.json();
+  const detail = await request(`/api/knowledge/${docId}`);
+  return {
+    success: true,
+    document: {
+      id: detail.id,
+      title: detail.title,
+      content: (detail.chunks || []).map((c: { content: string }) => c.content).join('\n\n'),
+      category: detail.category,
+      metadata: { status: detail.status, tags: detail.tags, source_type: detail.source_type },
+      created_at: detail.created_at,
+      updated_at: detail.updated_at,
+    },
+  };
 }
 
 /**
- * Rebuild index
+ * Rebuild index → 对全部条目批量重建索引
  */
 export async function rebuildIndex(): Promise<{ success: boolean; message: string }> {
-  const response = await fetch(`${API_BASE}/api/documents/rebuild`, {
-    method: 'POST'
+  const entries = await request('/api/knowledge/list?include_archived=false');
+  const ids = (entries || []).map((e: { id: string }) => e.id);
+  if (ids.length === 0) {
+    return { success: true, message: '知识库为空，无需重建' };
+  }
+  await request('/api/knowledge/bulk-operation', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ entry_ids: ids, operation: 'reindex' }),
   });
-  if (!response.ok) {
-    throw new Error(`Failed to rebuild index: ${response.statusText}`);
-  }
-  return response.json();
-}
-
-/**
- * Export metadata
- */
-export async function exportMetadata(): Promise<{ success: boolean; message: string }> {
-  const response = await fetch(`${API_BASE}/api/export/metadata`);
-  if (!response.ok) {
-    throw new Error(`Failed to export metadata: ${response.statusText}`);
-  }
-  return response.json();
+  return { success: true, message: `已对 ${ids.length} 个条目重建索引` };
 }
 
 /**
@@ -243,14 +307,12 @@ export function useKnowledgeAdminAPI() {
     checkHealth,
     addDocument,
     uploadDocument,
-    updateDocument,
+    addUrlDocument,
     deleteDocument,
     searchDocuments,
-    ragQuery,
     getCategories,
     getStatistics,
     getDocument,
     rebuildIndex,
-    exportMetadata
   };
 }

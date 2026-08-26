@@ -543,7 +543,7 @@ function convertAPIToTopic(topicId: CampusTopicId, data: any): CampusTopic {
       const sections: CampusKnowledgeSection[] = (data.students || []).map((student: any) => {
         // 将方法对象转换为描述文本
         const methodDescriptions = Object.entries(student.methods || {})
-          .filter(([_, methods]) => methods && methods.length > 0)
+          .filter(([_, methods]: [string, any]) => methods && methods.length > 0)
           .map(([category, methods]: [string, any]) => {
             const methodList = Array.isArray(methods) ? methods.join('、') : methods;
             return `${category}：${methodList}`;

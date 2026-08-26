@@ -8,7 +8,7 @@ import { useInterrupt } from '@/components/canvas/live2d';
 import { audioTaskQueue } from '@/utils/task-queue';
 import { useSendAudio } from '@/hooks/utils/use-send-audio';
 import { SubtitleContext } from './subtitle-context';
-import { AiStateContext } from './ai-state-context';
+import { AiStateContext, type AiState } from './ai-state-context';
 import { useLocalStorage } from '@/hooks/utils/use-local-storage';
 import { toaster } from '@/components/ui/toaster';
 
@@ -108,7 +108,7 @@ export function VADProvider({ children }: { children: React.ReactNode }) {
   // Refs for VAD instance and state
   const vadRef = useRef<MicVAD | null>(null);
   const previousTriggeredProbabilityRef = useRef(0);
-  const previousAiStateRef = useRef<string>('idle');
+  const previousAiStateRef = useRef<AiState>('idle');
 
   // Persistent state management
   const [micOn, setMicOn] = useLocalStorage('micOn', DEFAULT_VAD_STATE.micOn);
@@ -144,7 +144,7 @@ export function VADProvider({ children }: { children: React.ReactNode }) {
   // Refs for callback stability
   const interruptRef = useRef(interrupt);
   const sendAudioPartitionRef = useRef(sendAudioPartition);
-  const aiStateRef = useRef<string>(aiState);
+  const aiStateRef = useRef<AiState>(aiState);
   const setSubtitleTextRef = useRef(setSubtitleText);
   const setAiStateRef = useRef(setAiState);
 
@@ -305,10 +305,18 @@ export function VADProvider({ children }: { children: React.ReactNode }) {
       setMicOn(true);
     } catch (error) {
       console.error('Failed to start VAD:', error);
+      const errName = (error as { name?: string })?.name ?? '';
+      let hintKey = '';
+      if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
+        hintKey = 'error.vadMicPermissionDenied';
+      } else if (errName === 'NotFoundError' || errName === 'DevicesNotFoundError') {
+        hintKey = 'error.vadNoMicDevice';
+      }
+      const hint = hintKey ? `（${t(hintKey)}）` : '';
       toaster.create({
-        title: `${t('error.failedStartVAD')}: ${error}`,
+        title: `${t('error.failedStartVAD')}: ${error}${hint}`,
         type: 'error',
-        duration: 2000,
+        duration: 8000,
       });
     }
   }, [t]);

@@ -13,9 +13,14 @@
     }
   },
   "include": [
-    "src/renderer/**/*.ts",
-    "src/renderer/**/*.tsx",
-    "src/renderer/**/*.d.ts",
-    "src/renderer/WebSDK/src/**/*"
+    "src/renderer/src/**/*",
+    "src/renderer/*.ts",
+    "src/renderer/*.tsx",
+    "src/renderer/**/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "src/renderer/WebSDK",
+    "src/renderer/MotionSync"
   ]
 }

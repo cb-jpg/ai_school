@@ -46,7 +46,7 @@ export function useKnowledgeUpload() {
         params.file,
         params.title,
         params.category,
-        params.tags?.join(',') || '',
+        params.tags || '',
         params.summary
       );
 
@@ -147,7 +147,7 @@ export function useKnowledgeUpload() {
     try {
       setUploadProgress(50);
 
-      const result = await createManual(params);
+      const result = await createManual({ ...params, tags: params.tags ?? [] });
 
       setUploadProgress(100);
 

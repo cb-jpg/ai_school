@@ -2,8 +2,6 @@ import {
   createContext, useMemo, useContext, useState, useCallback,
 } from 'react';
 import { useLocalStorage } from '@/hooks/utils/use-local-storage';
-import { useWebSocket } from './websocket-context';
-
 /**
  * Background file interface
  * @interface BackgroundFile
@@ -41,7 +39,6 @@ const BgUrlContext = createContext<BgUrlContextState | null>(null);
  * @param {React.ReactNode} props.children - Child components
  */
 export function BgUrlProvider({ children }: { children: React.ReactNode }) {
-  const { baseUrl } = useWebSocket();
   const DEFAULT_BACKGROUND = ''; // 空字符串表示使用默认背景色
 
   // Local storage for persistent background URL

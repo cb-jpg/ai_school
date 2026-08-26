@@ -37,7 +37,7 @@ export const SchoolDashboard: FC = () => {
         borderColor={colors.gray200}
       >
         <HStack justify="space-between" align="center">
-          <VStack align="start" spacing="1">
+          <VStack align="start" gap="1">
             <Text fontSize="2xl" fontWeight="bold" color={colors.gray800}>
               欢迎回来，管理员
             </Text>
@@ -73,30 +73,30 @@ export const SchoolDashboard: FC = () => {
 
         <HStack gap="4" flexWrap="wrap">
           <Button
-            leftIcon={<FiBook />}
             colorScheme="blue"
             size="md"
             rounded="lg"
             onClick={() => { window.location.hash = '#/main/knowledge-admin'; }}
           >
+            <FiBook />
             管理知识库
           </Button>
           <Button
-            leftIcon={<FiMessageSquare />}
             colorScheme="purple"
             size="md"
             rounded="lg"
             onClick={() => { window.location.hash = '#/main/test-conversation'; }}
           >
+            <FiMessageSquare />
             测试对话
           </Button>
           <Button
-            leftIcon={<FiSettings />}
             colorScheme="gray"
             size="md"
             rounded="lg"
             onClick={() => { window.location.hash = '#/main/workspace'; }}
           >
+            <FiSettings />
             系统设置
           </Button>
         </HStack>

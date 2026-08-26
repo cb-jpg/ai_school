@@ -1,7 +1,7 @@
 /**
  * Knowledge statistics component
  */
-import { Box, Text, Progress, VStack, HStack } from '@chakra-ui/react';
+import { Box, Text, VStack, HStack } from '@chakra-ui/react';
 import { FiDatabase, FiFileText, FiAlertCircle, FiTrendingUp } from 'react-icons/fi';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -96,11 +96,13 @@ function KnowledgeStats({ statistics, loading }: KnowledgeStatsProps) {
                 <Text color="white" fontSize="sm">{t(`knowledge.category.${cat}`)}</Text>
                 <Text color="whiteAlpha.600" fontSize="sm">{count}</Text>
               </HStack>
-              <Progress
-                value={(count / statistics.total_entries) * 100}
-                colorPalette="blue"
-                size="sm"
-              />
+              <Box width="100%" height="6px" borderRadius="3px" overflow="hidden" bg="rgba(255,255,255,0.15)">
+                <Box
+                  width={`${Math.round((count / statistics.total_entries) * 100)}%`}
+                  height="100%"
+                  bg="#3182ce"
+                />
+              </Box>
             </Box>
           ))}
         </VStack>

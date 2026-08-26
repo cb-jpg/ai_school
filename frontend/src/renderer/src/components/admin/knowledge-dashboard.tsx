@@ -29,11 +29,11 @@ const toaster = createToaster({
   max: 3
 });
 
-const swissFont = '"Helvetica Neue", Arial, sans-serif';
 const ink = '#121826';
 const muted = '#586174';
 const hairline = '#D9DEE8';
 const paper = '#FFFFFF';
+const surface = '#F7F7F8';
 const blue = '#002FA7';
 const blueWash = '#E8EEFF';
 const green = '#047857';
@@ -147,9 +147,9 @@ export default function KnowledgeDashboard() {
         toaster.create({
           title: '加载失败',
           description: errorMessage,
-          status: 'error',
+          type: 'error',
           duration: 3000,
-          isClosable: true
+          closable: true
         });
       } finally {
         setLoading(false);
