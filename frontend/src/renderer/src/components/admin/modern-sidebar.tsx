@@ -117,7 +117,7 @@ export const ModernSidebar: FC<{
         <HistoryDrawer>
           <Button variant="ghost" width="full" justifyContent="flex-start">
             <HStack gap="3">
-              <FiClock boxSize="5" />
+              <FiClock style={{ width: '20px', height: '20px' }} />
               {!isCollapsed && <Text fontSize="sm">对话历史</Text>}
             </HStack>
           </Button>
@@ -135,7 +135,7 @@ export const ModernSidebar: FC<{
         <GroupDrawer>
           <Button variant="ghost" width="full" justifyContent="flex-start">
             <HStack gap="3">
-              <FiUsers boxSize="5" />
+              <FiUsers style={{ width: '20px', height: '20px' }} />
               {!isCollapsed && <Text fontSize="sm">群组管理</Text>}
             </HStack>
           </Button>
@@ -154,7 +154,7 @@ export const ModernSidebar: FC<{
         <KnowledgeDrawer>
           <Button variant="ghost" width="full" justifyContent="flex-start">
             <HStack gap="3">
-              <FiDatabase boxSize="5" />
+              <FiDatabase style={{ width: '20px', height: '20px' }} />
               {!isCollapsed && (
                 <>
                   <Text fontSize="sm">知识库</Text>
@@ -292,7 +292,7 @@ export const ModernSidebar: FC<{
                 >
                   <HStack gap="3" spacing={isCollapsed ? '0' : '3'}>
                     <item.icon
-                      boxSize="5"
+                      style={{ width: '20px', height: '20px' }}
                       color={activeItem === item.id ? '#6366F1' : 'currentColor'}
                       flexShrink={0}
                     />
@@ -333,12 +333,13 @@ export const ModernSidebar: FC<{
                 size="sm"
                 justifyContent="flex-start"
                 onClick={() => {
-                  toaster.create({ title: '设置功能开发中', status: 'info' });
+                  window.location.hash = '#/main/character-config';
+                  toaster.create({ title: '打开角色配置', status: 'info' });
                 }}
               >
                 <HStack gap="3">
-                  <FiSettings boxSize="4" />
-                  <Text fontSize="sm">系统设置</Text>
+                  <FiSettings style={{ width: '16px', height: '16px' }} />
+                  <Text fontSize="sm">角色配置</Text>
                 </HStack>
               </Button>
               <Button
@@ -351,7 +352,7 @@ export const ModernSidebar: FC<{
                 }}
               >
                 <HStack gap="3">
-                  <FiBarChart2 boxSize="4" />
+                  <FiBarChart2 style={{ width: '16px', height: '16px' }} />
                   <Text fontSize="sm">管理后台</Text>
                 </HStack>
               </Button>
@@ -365,7 +366,7 @@ export const ModernSidebar: FC<{
                 }}
               >
                 <HStack gap="3">
-                  <FiBookOpen boxSize="4" />
+                  <FiBookOpen style={{ width: '16px', height: '16px' }} />
                   <Text fontSize="sm">校园内容</Text>
                 </HStack>
               </Button>
@@ -415,7 +416,7 @@ export const ModernSidebar: FC<{
                 </VStack>
               </>
             )}
-            <FiLogOut boxSize="4" color="gray.400" />
+            <FiLogOut style={{ width: '16px', height: '16px', color: 'gray.400' }} />
           </HStack>
         </Button>
 
@@ -430,11 +431,11 @@ export const ModernSidebar: FC<{
         >
           <HStack justify="center" gap="2">
             {isCollapsed ? (
-              <FiChevronRight boxSize="4" />
+              <FiChevronRight style={{ width: '16px', height: '16px' }} />
             ) : (
               <>
                 <Text fontSize="xs">收起</Text>
-                <FiChevronLeft boxSize="4" />
+                <FiChevronLeft style={{ width: '16px', height: '16px' }} />
               </>
             )}
           </HStack>

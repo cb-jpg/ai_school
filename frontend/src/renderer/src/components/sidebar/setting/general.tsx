@@ -165,6 +165,41 @@ function General({ onSave, onCancel }: GeneralProps): JSX.Element {
           }
         }}
       />
+
+      {/* 角色配置部分 */}
+      <Box height="1px" bg="gray.200" my="4" />
+
+      <Text fontSize="sm" fontWeight="semibold" color="gray.700" mb="3">
+        数字人角色配置
+      </Text>
+
+      <InputField
+        label="角色名称"
+        value={characterSettings.name}
+        onChange={(value) => setCharacterSettings({ ...characterSettings, name: value as string })}
+        placeholder="请输入角色名称"
+      />
+
+      <InputField
+        label="角色描述"
+        value={characterSettings.description}
+        onChange={(value) => setCharacterSettings({ ...characterSettings, description: value as string })}
+        placeholder="请输入角色描述"
+      />
+
+      <InputField
+        label="用户名称"
+        value={userSettings.name}
+        onChange={(value) => setUserSettings({ ...userSettings, name: value as string })}
+        placeholder="请输入您的名称"
+      />
+
+      <InputField
+        label="用户身份"
+        value={userSettings.title}
+        onChange={(value) => setUserSettings({ ...userSettings, title: value as string })}
+        placeholder="如：学生、教师、管理员"
+      />
     </Stack>
   );
 }

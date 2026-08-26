@@ -65,6 +65,11 @@ const createConfig = async (outDir: string) => ({
         target: 'http://localhost:12393',
         changeOrigin: true,
       },
+      // Proxy Live2D model files to backend
+      '/live2d-models': {
+        target: 'http://localhost:12393',
+        changeOrigin: true,
+      },
     },
   },
   build: {

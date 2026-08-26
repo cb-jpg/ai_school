@@ -561,6 +561,52 @@ class ServiceContext:
             )
             raise e
 
+    async def handle_live2d_model_switch(
+        self, websocket: WebSocket, model_name: str
+    ):
+        """Handle switching Live2D model"""
+        try:
+            # Import Live2D model handler
+            from open_llm_vtuber.live2d_model import Live2dModel
+
+            # Create a Live2D model instance to get model info
+            live2d_model = Live2dModel(model_name)
+
+            # Get model info and send to frontend
+            model_info = live2d_model.model_info
+
+            await websocket.send_text(
+                json.dumps(
+                    {
+                        "type": "model-info",
+                        "model_info": {
+                            "name": model_name,
+                            "url": model_info.get("url", ""),
+                            "kScale": model_info.get("kScale", 0.5),
+                            "initialXshift": model_info.get("initialXshift", 0),
+                            "initialYshift": model_info.get("initialYshift", 0),
+                            "kXOffset": model_info.get("kXOffset", 1150),
+                            "idleMotionGroupName": model_info.get("idleMotionGroupName", "Idle"),
+                            "emotionMap": model_info.get("emotionMap", {}),
+                            "tapMotions": model_info.get("tapMotions", {}),
+                        },
+                    }
+                )
+            )
+
+            logger.info(f"Live2D model switched to {model_name}")
+
+        except Exception as e:
+            logger.error(f"Error switching Live2D model: {e}")
+            await websocket.send_text(
+                json.dumps(
+                    {
+                        "type": "error",
+                        "message": f"Error switching Live2D model: {str(e)}",
+                    }
+                )
+            )
+
 
 def deep_merge(dict1, dict2):
     """

@@ -48,31 +48,35 @@ const schoolColors = {
   white: '#FFFFFF',
 };
 
-// 数字人角色列表（从配置中获取）
-const getAvatarCharacters = (configs: any[] | undefined) => {
-  // 始终包含默认角色"小石"
-  const defaultCharacter = {
-    id: 'default',
-    name: '小石',
-    description: '石实实验学校AI数字人',
-    filename: '',  // 空字符串表示使用当前配置
-    preview: '🎓',
-  };
-
-  if (!configs || configs.length === 0) {
-    return [defaultCharacter];
-  }
-
-  // 添加配置的角色
-  const configCharacters = configs.map((conf: any, index: number) => ({
-    id: conf.conf_uid || `character-${index}`,
-    name: conf.conf_name || `角色 ${index + 1}`,
-    description: conf.persona_prompt?.substring(0, 50) || '数字人角色',
-    filename: conf.filename,
-    preview: ['👨‍🏫', '👩‍🏫', '📚', '🎨'][index % 4],
-  }));
-
-  return [defaultCharacter, ...configCharacters];
+// 数字人角色列表（从Live2D模型中获取）
+const getLive2DCharacters = () => {
+  // 直接返回Live2D模型列表
+  return [
+    {
+      id: 'mao_pro',
+      name: 'Mao Pro',
+      description: '猫咪角色',
+      modelName: 'mao_pro',
+      modelFileName: 'mao_pro',
+      preview: '🐱',
+    },
+    {
+      id: 'shizuku',
+      name: 'Shizuku',
+      description: '栀子',
+      modelName: 'shizuku',
+      modelFileName: 'shizuku',
+      preview: '🌸',
+    },
+    {
+      id: 'hiyori_pro',
+      name: 'Hiyori Pro',
+      description: '日葵 (专业版)',
+      modelName: 'hiyori_pro',
+      modelFileName: 'hiyori_pro_t11', // 修正实际的模型文件名
+      preview: '👩‍🏫',
+    },
+  ];
 };
 
 // 背景图片列表
@@ -101,14 +105,13 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
   const { startBackgroundCamera, stopBackgroundCamera, isBackgroundStreaming } = useCamera();
   const { switchCharacter } = useSwitchCharacter();
   const { volume, setVolume } = useVolume();
-  const { configs } = useLive2DConfig();
 
   const [selectedAvatar, setSelectedAvatar] = useState('');
   const [selectedBg, setSelectedBg] = useState('default');
   const sidebarRef = useRef<HTMLDivElement>(null);
 
-  // 获取数字人列表
-  const avatarCharacters = getAvatarCharacters(configs);
+  // 获取Live2D角色列表
+  const live2dCharacters = getLive2DCharacters();
 
   // 点击外部关闭侧栏
   useEffect(() => {
@@ -133,19 +136,35 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
     console.log('音量设置为:', val);
   };
 
-  const handleAvatarSelect = (avatarId: string, filename: string) => {
-    setSelectedAvatar(avatarId);
-    if (filename && filename !== '') {
-      // 只在有有效filename时才切换角色
-      switchCharacter(filename);
+  const handleAvatarSelect = async (characterId: string, modelName: string, modelFileName: string) => {
+    setSelectedAvatar(characterId);
+
+    try {
+      // 使用相对路径，因为vite代理会处理到后端的转发
+      const modelInfo = {
+        name: modelName,
+        url: `/live2d-models/${modelName}/runtime/${modelFileName}.model3.json`,
+        kScale: 1.0,
+        initialXshift: 0,
+        initialYshift: 0,
+      };
+
+      // 设置模型信息
+      setModelInfo(modelInfo);
+
       toaster.create({
-        title: `已切换到 ${avatarId === 'default' ? '小石' : avatarId}`,
+        title: `已切换到 ${modelName}`,
         type: 'success',
         duration: 2000,
       });
-    } else {
-      // 选择默认角色时不做任何操作
-      console.log('使用当前角色配置');
+    } catch (error) {
+      console.error('切换模型失败:', error);
+      toaster.create({
+        title: '切换模型失败',
+        description: String(error),
+        type: 'error',
+        duration: 3000,
+      });
     }
   };
 
@@ -340,30 +359,30 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
               </Text>
             </HStack>
             <VStack gap="2">
-              {avatarCharacters.map((avatar) => (
+              {live2dCharacters.map((character) => (
                 <Box
-                  key={avatar.id}
+                  key={character.id}
                   p="3"
                   rounded="lg"
                   border="1px solid"
-                  borderColor={selectedAvatar === avatar.id ? schoolColors.primary : schoolColors.border}
-                  bg={selectedAvatar === avatar.id ? schoolColors.accent : 'transparent'}
+                  borderColor={selectedAvatar === character.id ? schoolColors.primary : schoolColors.border}
+                  bg={selectedAvatar === character.id ? schoolColors.accent : 'transparent'}
                   cursor="pointer"
-                  onClick={() => handleAvatarSelect(avatar.id, avatar.filename)}
+                  onClick={() => handleAvatarSelect(character.id, character.modelName, character.modelFileName)}
                   _hover={{ borderColor: schoolColors.primary, bg: schoolColors.accent }}
                   transition="all 0.2s"
                 >
                   <HStack gap="3">
-                    <Text fontSize="2xl">{avatar.preview}</Text>
+                    <Text fontSize="2xl">{character.preview}</Text>
                     <VStack align="start" spacing="0" flex="1">
                       <Text fontSize="sm" fontWeight="medium" color={schoolColors.text}>
-                        {avatar.name}
+                        {character.name}
                       </Text>
                       <Text fontSize="xs" color={schoolColors.textSecondary}>
-                        {avatar.description}
+                        {character.description}
                       </Text>
                     </VStack>
-                    {selectedAvatar === avatar.id && (
+                    {selectedAvatar === character.id && (
                       <Badge bg={schoolColors.primary} color="white" fontSize="9px" px="2" py="0.5">
                         当前
                       </Badge>

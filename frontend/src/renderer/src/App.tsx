@@ -42,6 +42,7 @@ import { SchoolAdminLayout } from "./components/admin/school-admin-layout";
 import { SchoolDashboard } from "./components/admin/school-dashboard";
 import { SchoolTestConversation } from "./components/admin/school-test-conversation";
 import { ModernMainWorkspace } from "./components/admin/modern-workspace";
+import { CharacterConfig } from "./components/admin/character-config";
 
 // 定义路由类型
 type AppRoute = 'hero' | 'main' | 'campus' | 'main-admin';
@@ -239,16 +240,17 @@ function AppContent(): JSX.Element {
           <WebSocketStatus />
         </Box>
 
-        {/* Subtitle for hero page - positioned under the character */}
+        {/* Subtitle for hero page - positioned under the character on the right */}
         <Box
           position="absolute"
           bottom={{ base: "8%", md: "12%" }}
-          left={{ base: "50%", md: "25%" }}
-          transform="translateX(-50%)"
+          right={{ base: "0", md: "0" }}
+          left={{ base: "auto", md: "auto" }}
           zIndex={20}
-          width={{ base: "80%", md: "35%" }}
+          width={{ base: "85%", md: "45%" }}
           textAlign="center"
           pointerEvents="none"
+          paddingRight={{ base: "8", md: "12" }}
         >
           <Box
             bg="rgba(255, 255, 255, 0.95)"
@@ -257,6 +259,8 @@ function AppContent(): JSX.Element {
             boxShadow="0 4px 20px rgba(0, 0, 0, 0.1)"
             backdropFilter="blur(10px)"
             border="1px solid rgba(255, 255, 255, 0.5)"
+            margin="0 auto"
+            maxWidth="400px"
           >
             <Subtitle />
           </Box>
@@ -282,6 +286,9 @@ function AppContent(): JSX.Element {
         break;
       case 'workspace':
         content = <ModernMainWorkspace />;
+        break;
+      case 'character-config':
+        content = <CharacterConfig />;
         break;
       case 'knowledge-admin':
         return <KnowledgeAdmin />;

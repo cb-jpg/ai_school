@@ -158,8 +158,8 @@ const menuGroups: MenuGroupConfig[] = [
         label: '角色形象设置',
         icon: FiUser,
         onClick: () => {},
-        description: '无',
-        disabled: true,
+        description: '数字人选择和角色配置',
+        disabled: false,
       },
       {
         id: 'voice-settings',
@@ -342,6 +342,7 @@ export const SchoolAdminLayout: FC<{
       'test-conversation': '#/main/test-conversation',
       'knowledge-admin': '#/main/knowledge-admin',
       'unanswered-questions': '#/main/unanswered-questions',
+      'avatar-settings': '#/main/character-config',
     };
 
     if (routeMap[itemId]) {
