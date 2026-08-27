@@ -327,12 +327,13 @@ export const ModernSidebar: FC<{
                 size="sm"
                 justifyContent="flex-start"
                 onClick={() => {
-                  toaster.create({ title: '设置功能开发中', type: 'info' });
+                  window.location.hash = '#/main/character-config';
+                  toaster.create({ title: '打开角色配置', type: 'info' });
                 }}
               >
                 <HStack gap="3">
                   <FiSettings size="4" />
-                  <Text fontSize="sm">系统设置</Text>
+                  <Text fontSize="sm">角色配置</Text>
                 </HStack>
               </Button>
               <Button

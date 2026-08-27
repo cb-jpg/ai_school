@@ -32,6 +32,13 @@ interface AudioTaskOptions {
 const currentAudioRef: { current: HTMLAudioElement | null } = { current: null };
 const currentModelRef: { current: Live2DModel | null } = { current: null };
 
+// Global function to update volume of currently playing audio
+export const updateCurrentAudioVolume = (volume: number) => {
+  if (currentAudioRef.current) {
+    currentAudioRef.current.volume = volume / 100;
+  }
+};
+
 /**
  * Custom hook for handling audio playback tasks with Live2D lip sync
  */
@@ -50,6 +57,7 @@ export const useAudioTask = () => {
     setSubtitleText,
     appendResponse,
     appendAIMessage,
+    volume,
   });
 
   stateRef.current = {
@@ -57,6 +65,7 @@ export const useAudioTask = () => {
     setSubtitleText,
     appendResponse,
     appendAIMessage,
+    volume,
   };
 
   /**
@@ -192,6 +201,18 @@ export const useAudioTask = () => {
         // Setup audio element
         const audio = new Audio(audioDataUrl);
         audio.volume = volume / 100; // 设置音量 (0-1)
+
+        // 动态监听音量变化并更新正在播放的音频
+        const updateVolume = () => {
+          const { volume: currentVolume } = stateRef.current;
+          if (audio && currentAudioRef.current === audio) {
+            audio.volume = currentVolume / 100;
+          }
+        };
+
+        // 保存音量更新函数引用，以便音量context变化时调用
+        (audio as any)._updateVolumeFromContext = updateVolume;
+
         currentAudioRef.current = audio;
         let isFinished = false;
 

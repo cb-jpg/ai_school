@@ -27,11 +27,10 @@ import {
 } from 'react-icons/fi';
 import { Slider } from '@/components/ui/slider';
 import { useChatHistory } from '@/context/chat-history-context';
-import { useConfig } from '@/context/character-config-context';
+import { useLive2DConfig } from '@/context/live2d-config-context';
 import { useWebSocket } from '@/context/websocket-context';
 import { useBgUrl } from '@/context/bgurl-context';
 import { useCamera } from '@/context/camera-context';
-import { useSwitchCharacter } from '@/hooks/utils/use-switch-character';
 import { useVolume } from '@/context/volume-context';
 import { toaster } from '@/components/ui/toaster';
 import fileUploadDialog from '@/utils/file-upload-dialog';
@@ -49,31 +48,35 @@ const schoolColors = {
   gray50: '#F7FAFC',
 };
 
-// 数字人角色列表（从配置中获取）
-const getAvatarCharacters = (configs: any[] | undefined) => {
-  // 始终包含默认角色"小石"
-  const defaultCharacter = {
-    id: 'default',
-    name: '小石',
-    description: '石实实验学校AI数字人',
-    filename: '',  // 空字符串表示使用当前配置
-    preview: '🎓',
-  };
-
-  if (!configs || configs.length === 0) {
-    return [defaultCharacter];
-  }
-
-  // 添加配置的角色
-  const configCharacters = configs.map((conf: any, index: number) => ({
-    id: conf.filename || `character-${index}`,
-    name: conf.name || `角色 ${index + 1}`,
-    description: '数字人角色',
-    filename: conf.filename,
-    preview: ['👨‍🏫', '👩‍🏫', '📚', '🎨'][index % 4],
-  }));
-
-  return [defaultCharacter, ...configCharacters];
+// 数字人角色列表（从Live2D模型中获取）
+const getLive2DCharacters = () => {
+  // 直接返回Live2D模型列表
+  return [
+    {
+      id: 'mao_pro',
+      name: 'Mao Pro',
+      description: '猫咪角色',
+      modelName: 'mao_pro',
+      modelFileName: 'mao_pro',
+      preview: '🐱',
+    },
+    {
+      id: 'shizuku',
+      name: 'Shizuku',
+      description: '栀子',
+      modelName: 'shizuku',
+      modelFileName: 'shizuku',
+      preview: '🌸',
+    },
+    {
+      id: 'hiyori_pro',
+      name: 'Hiyori Pro',
+      description: '日葵 (专业版)',
+      modelName: 'hiyori_pro',
+      modelFileName: 'hiyori_pro_t11', // 修正实际的模型文件名
+      preview: '👩‍🏫',
+    },
+  ];
 };
 
 // 背景图片列表
@@ -81,12 +84,12 @@ const BACKGROUNDS = [
   { id: 'default', name: '默认背景', url: '' },
   { id: 'camera', name: '摄像头背景', url: '' },
   { id: 'upload', name: '上传图片', url: '' },
-  // 学校风格背景图片（需要添加到backgrounds目录）
-  { id: 'school_building', name: '学校建筑', url: '/bg/school-building.jpg' },
-  { id: 'library', name: '图书馆', url: '/bg/library.jpg' },
-  { id: 'classroom', name: '教室', url: '/bg/classroom.jpg' },
-  { id: 'campus_garden', name: '校园花园', url: '/bg/campus-garden.jpg' },
-  { id: 'sports_field', name: '运动场', url: '/bg/sports-field.jpg' },
+  // 学校风格背景图片（使用在线免费图片资源）
+  { id: 'school_building', name: '学校建筑', url: 'https://images.unsplash.com/photo-1562774053-701939374585?w=1920&q=80' },
+  { id: 'library', name: '图书馆', url: 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=1920&q=80' },
+  { id: 'classroom', name: '教室', url: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=1920&q=80' },
+  { id: 'campus_garden', name: '校园花园', url: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920&q=80' },
+  { id: 'sports_field', name: '运动场', url: 'https://images.unsplash.com/photo-1571896349842-6c5c1f7ce626?w=1920&q=80' },
 ];
 
 interface HeroSidebarProps {
@@ -96,19 +99,18 @@ interface HeroSidebarProps {
 
 export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
   const { historyList, currentHistoryUid, setMessages, setCurrentHistoryUid, setHistoryList } = useChatHistory();
-  const { sendMessage, baseUrl } = useWebSocket();
+  const { setModelInfo } = useLive2DConfig();
+  const { sendMessage } = useWebSocket();
   const { setBackgroundUrl, addBackgroundFile, setUseCameraBackground } = useBgUrl();
   const { startBackgroundCamera, stopBackgroundCamera, isBackgroundStreaming } = useCamera();
-  const { switchCharacter } = useSwitchCharacter();
   const { volume, setVolume } = useVolume();
-  const { configFiles: configs } = useConfig();
 
   const [selectedAvatar, setSelectedAvatar] = useState('');
   const [selectedBg, setSelectedBg] = useState('default');
   const sidebarRef = useRef<HTMLDivElement>(null);
 
-  // 获取数字人列表
-  const avatarCharacters = getAvatarCharacters(configs);
+  // 获取Live2D角色列表
+  const live2dCharacters = getLive2DCharacters();
 
   // 点击外部关闭侧栏
   useEffect(() => {
@@ -133,19 +135,36 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
     console.log('音量设置为:', val);
   };
 
-  const handleAvatarSelect = (avatarId: string, filename: string) => {
-    setSelectedAvatar(avatarId);
-    if (filename && filename !== '') {
-      // 只在有有效filename时才切换角色
-      switchCharacter(filename);
+  const handleAvatarSelect = async (characterId: string, modelName: string, modelFileName: string) => {
+    setSelectedAvatar(characterId);
+
+    try {
+      // 使用相对路径，因为vite代理会处理到后端的转发
+      const modelInfo = {
+        name: modelName,
+        url: `/live2d-models/${modelName}/runtime/${modelFileName}.model3.json`,
+        kScale: 1.0,
+        initialXshift: 0,
+        initialYshift: 0,
+        emotionMap: {},
+      };
+
+      // 设置模型信息
+      setModelInfo(modelInfo);
+
       toaster.create({
-        title: `已切换到 ${avatarId === 'default' ? '小石' : avatarId}`,
+        title: `已切换到 ${modelName}`,
         type: 'success',
         duration: 2000,
       });
-    } else {
-      // 选择默认角色时不做任何操作
-      console.log('使用当前角色配置');
+    } catch (error) {
+      console.error('切换模型失败:', error);
+      toaster.create({
+        title: '切换模型失败',
+        description: String(error),
+        type: 'error',
+        duration: 3000,
+      });
     }
   };
 
@@ -204,9 +223,8 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
           stopBackgroundCamera();
           setUseCameraBackground(false);
         }
-        // 构建完整URL
-        const fullUrl = bg.url ? `${baseUrl}${bg.url}` : '';
-        setBackgroundUrl(fullUrl);
+        // 直接使用URL（已经是完整的URL）
+        setBackgroundUrl(bg.url || '');
       }
     }
   };
@@ -342,30 +360,30 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
               </Text>
             </HStack>
             <VStack gap="2">
-              {avatarCharacters.map((avatar) => (
+              {live2dCharacters.map((character) => (
                 <Box
-                  key={avatar.id}
+                  key={character.id}
                   p="3"
                   rounded="lg"
                   border="1px solid"
-                  borderColor={selectedAvatar === avatar.id ? schoolColors.primary : schoolColors.border}
-                  bg={selectedAvatar === avatar.id ? schoolColors.accent : 'transparent'}
+                  borderColor={selectedAvatar === character.id ? schoolColors.primary : schoolColors.border}
+                  bg={selectedAvatar === character.id ? schoolColors.accent : 'transparent'}
                   cursor="pointer"
-                  onClick={() => handleAvatarSelect(avatar.id, avatar.filename)}
+                  onClick={() => handleAvatarSelect(character.id, character.modelName, character.modelFileName)}
                   _hover={{ borderColor: schoolColors.primary, bg: schoolColors.accent }}
                   transition="all 0.2s"
                 >
                   <HStack gap="3">
-                    <Text fontSize="2xl">{avatar.preview}</Text>
+                    <Text fontSize="2xl">{character.preview}</Text>
                     <VStack align="start" gap="0" flex="1">
                       <Text fontSize="sm" fontWeight="medium" color={schoolColors.text}>
-                        {avatar.name}
+                        {character.name}
                       </Text>
                       <Text fontSize="xs" color={schoolColors.textSecondary}>
-                        {avatar.description}
+                        {character.description}
                       </Text>
                     </VStack>
-                    {selectedAvatar === avatar.id && (
+                    {selectedAvatar === character.id && (
                       <Badge bg={schoolColors.primary} color="white" fontSize="9px" px="2" py="0.5">
                         当前
                       </Badge>
@@ -388,7 +406,7 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
             </HStack>
             <Box px="2">
               <Slider
-                defaultValue={[volume]}
+                value={[volume]}
                 min={0}
                 max={100}
                 onValueChange={(details) => handleVolumeChange(details.value[0])}

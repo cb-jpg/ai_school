@@ -9,6 +9,7 @@ import {
   useState,
   useCallback,
   ReactNode,
+  useEffect,
 } from 'react';
 
 interface VolumeContextState {
@@ -23,6 +24,16 @@ const DEFAULT_VOLUME = 80;
 export function VolumeProvider({ children }: { children: ReactNode }) {
   const [volume, setVolume] = useState(DEFAULT_VOLUME);
 
+  // 动态导入音量更新函数（避免循环依赖）
+  const updateAudioVolume = useCallback(async () => {
+    try {
+      const { updateCurrentAudioVolume } = await import('@/hooks/utils/use-audio-task');
+      updateCurrentAudioVolume(volume);
+    } catch (error) {
+      console.error('Failed to update audio volume:', error);
+    }
+  }, [volume]);
+
   const contextValue = useCallback(
     (vol: number) => {
       const clampedVolume = Math.max(0, Math.min(100, vol));
@@ -30,6 +41,11 @@ export function VolumeProvider({ children }: { children: ReactNode }) {
     },
     []
   );
+
+  // 当音量变化时，更新正在播放的音频
+  useEffect(() => {
+    updateAudioVolume();
+  }, [volume, updateAudioVolume]);
 
   return (
     <VolumeContext.Provider

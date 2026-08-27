@@ -44,6 +44,12 @@ const colors = {
   gray800: '#1e293b',
 };
 
+// 移除 emoji 表情符号，只保留纯文本
+function removeEmojiTags(text: string): string {
+  // 移除 [joy]、[smile] 等表情标签
+  return text.replace(/\[[a-z_]+\]/gi, '');
+}
+
 // 主测试对话组件
 export const SchoolTestConversation: FC = () => {
   const { messages, historyList, currentHistoryUid } = useChatHistory();
@@ -293,7 +299,7 @@ export const SchoolTestConversation: FC = () => {
                         : colors.gray800
                     }
                   >
-                    <Text fontSize="sm">{message.content}</Text>
+                    <Text fontSize="sm">{removeEmojiTags(message.content)}</Text>
                   </Box>
                   {message.role === 'human' && (
                     <Avatar
@@ -345,7 +351,7 @@ export const SchoolTestConversation: FC = () => {
                     }}
                   >
                     <Text fontSize="xs" color={colors.gray800} fontWeight="medium">
-                      {history.latest_message?.content || '空对话'}
+                      {history.latest_message?.content ? removeEmojiTags(history.latest_message.content) : '空对话'}
                     </Text>
                     <Text fontSize="9px" color={colors.gray600} mt="1">
                       {history.timestamp ? new Date(history.timestamp).toLocaleString() : '无时间'}
@@ -395,10 +401,13 @@ export const SchoolTestConversation: FC = () => {
               <IconButton
                 aria-label="麦克风"
                 size="sm"
-                variant={micOn ? 'solid' : 'ghost'}
-                bg={micOn ? colors.secondary : 'transparent'}
-                color={micOn ? 'white' : colors.gray600}
-                _hover={{ bg: micOn ? colors.secondary : colors.gray100 }}
+                variant="solid"
+                bg={micOn ? colors.secondary : colors.gray200}
+                color={micOn ? 'white' : colors.gray800}
+                _hover={{
+                  bg: micOn ? colors.secondary : colors.gray600,
+                  color: 'white'
+                }}
                 onClick={handleToggleMic}
               >
                 {micOn ? <FiMic /> : <FiMicOff />}

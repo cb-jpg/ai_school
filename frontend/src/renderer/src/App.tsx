@@ -58,6 +58,7 @@ import { ModernMainWorkspace } from "./components/admin/modern-workspace";
 import LoginPage from "./components/admin/login-page";
 import UnansweredQuestions from "./components/admin/unanswered-questions";
 import UserManagement from "./components/admin/user-management";
+import { CharacterConfig } from "./components/admin/character-config";
 
 // 定义路由类型
 type AppRoute = 'hero' | 'main' | 'campus' | 'main-admin';
@@ -213,6 +214,9 @@ function AppContent(): JSX.Element {
   if (currentRoute === 'hero') {
     return (
       <>
+        {/* Background layer for hero route */}
+        <Background />
+
         {/* Live2D layer for hero route - positioned on the right side */}
         <Box
           position="absolute"
@@ -253,6 +257,32 @@ function AppContent(): JSX.Element {
           <WebSocketStatus />
         </Box>
 
+        {/* Subtitle for hero page - positioned under the character on the right */}
+        <Box
+          position="absolute"
+          bottom={{ base: "8%", md: "12%" }}
+          right={{ base: "0", md: "0" }}
+          left={{ base: "auto", md: "auto" }}
+          zIndex={20}
+          width={{ base: "85%", md: "45%" }}
+          textAlign="center"
+          pointerEvents="none"
+          paddingRight={{ base: "8", md: "12" }}
+        >
+          <Box
+            bg="rgba(255, 255, 255, 0.95)"
+            borderRadius="16px"
+            padding="16px 24px"
+            boxShadow="0 4px 20px rgba(0, 0, 0, 0.1)"
+            backdropFilter="blur(10px)"
+            border="1px solid rgba(255, 255, 255, 0.5)"
+            margin="0 auto"
+            maxWidth="400px"
+          >
+            <Subtitle />
+          </Box>
+        </Box>
+
         {/* Hero UI overlay */}
         <HeroLanding
           activeCampusTopic={activeCampusTopic}
@@ -284,6 +314,9 @@ function AppContent(): JSX.Element {
         break;
       case 'user-management':
         content = <UserManagement />;
+        break;
+      case 'character-config':
+        content = <CharacterConfig />;
         break;
       case 'knowledge-admin':
         return <KnowledgeAdmin />;

@@ -28,36 +28,10 @@ import { useVAD } from '@/context/vad-context';
 import { useChatHistory } from '@/context/chat-history-context';
 import { useLive2DConfig } from '@/context/live2d-config-context';
 
-// Emoji 映射表 - 将 [joy] 等格式转换为真实 emoji
-const emojiMap: Record<string, string> = {
-  '[joy]': '😂',
-  '[smile]': '😊',
-  '[laugh]': '😄',
-  '[love]': '😍',
-  '[wink]': '😉',
-  '[sad]': '😢',
-  '[cry]': '😭',
-  '[angry]': '😠',
-  '[surprised]': '😲',
-  '[confused]': '😕',
-  '[thumbs_up]': '👍',
-  '[thumbs_down]': '👎',
-  '[clap]': '👏',
-  '[wave]': '👋',
-  '[heart]': '❤️',
-  '[fire]': '🔥',
-  '[star]': '⭐',
-  '[check]': '✅',
-  '[x]': '❌',
-};
-
-// 将文本中的 emoji 标记转换为真实 emoji
-function convertEmojis(text: string): string {
-  let result = text;
-  Object.entries(emojiMap).forEach(([marker, emoji]) => {
-    result = result.replace(new RegExp(marker.replace(/[[]]/g, '\\$&'), 'gi'), emoji);
-  });
-  return result;
+// 移除 emoji 表情符号，只保留纯文本
+function removeEmojiTags(text: string): string {
+  // 移除 [joy]、[smile] 等表情标签
+  return text.replace(/\[[a-z_]+\]/gi, '');
 }
 
 // 学校配色方案 - 基于石实实验学校的设计
@@ -254,7 +228,7 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
                 maxWidth="80%"
                 fontSize="sm"
               >
-                {convertEmojis(msg.content)}
+                {removeEmojiTags(msg.content)}
               </Box>
             ))}
 
@@ -269,7 +243,7 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
                 maxWidth="80%"
                 fontSize="sm"
               >
-                {convertEmojis(subtitleText)}
+                {removeEmojiTags(subtitleText)}
               </Box>
             )}
 

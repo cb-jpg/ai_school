@@ -1,6 +1,6 @@
 /* eslint-disable no-use-before-define */
 import {
-  createContext, useContext, useRef, useCallback, useEffect, useReducer, useMemo,
+  createContext, useContext, useRef, useCallback, useEffect, useReducer, useMemo, useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MicVAD } from '@ricky0123/vad-web';
@@ -110,8 +110,8 @@ export function VADProvider({ children }: { children: React.ReactNode }) {
   const previousTriggeredProbabilityRef = useRef(0);
   const previousAiStateRef = useRef<AiState>('idle');
 
-  // Persistent state management
-  const [micOn, setMicOn] = useLocalStorage('micOn', DEFAULT_VAD_STATE.micOn);
+  // Persistent state management (改为不持久化，每次重新启动时默认关闭)
+  const [micOn, setMicOn] = useState(DEFAULT_VAD_STATE.micOn);
   const autoStopMicRef = useRef(true);
   const [autoStopMic, setAutoStopMicState] = useLocalStorage(
     'autoStopMic',

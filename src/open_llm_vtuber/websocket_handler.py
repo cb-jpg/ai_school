@@ -50,7 +50,7 @@ class MessageType(Enum):
         "ai-speak-signal",
         "static-narration",
     ]
-    CONFIG = ["fetch-configs", "switch-config"]
+    CONFIG = ["fetch-configs", "switch-config", "switch-live2d-model"]
     CONTROL = ["interrupt-signal", "audio-play-start"]
     DATA = ["mic-audio-data"]
 
@@ -109,6 +109,7 @@ class WebSocketHandler:
             "static-narration": self._handle_static_narration,
             "fetch-configs": self._handle_fetch_configs,
             "switch-config": self._handle_config_switch,
+            "switch-live2d-model": self._handle_live2d_model_switch,
             "fetch-backgrounds": self._handle_fetch_backgrounds,
             "audio-play-start": self._handle_audio_play_start,
             "request-init-config": self._handle_init_config_request,
@@ -655,6 +656,15 @@ class WebSocketHandler:
         if config_file_name:
             context = self.client_contexts[client_uid]
             await context.handle_config_switch(websocket, config_file_name)
+
+    async def _handle_live2d_model_switch(
+        self, websocket: WebSocket, client_uid: str, data: dict
+    ):
+        """Handle switching Live2D model"""
+        model_name = data.get("model_name")
+        if model_name:
+            context = self.client_contexts[client_uid]
+            await context.handle_live2d_model_switch(websocket, model_name)
 
     async def _handle_fetch_backgrounds(
         self, websocket: WebSocket, client_uid: str, data: WSMessage

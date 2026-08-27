@@ -1,7 +1,7 @@
 /* eslint-disable react/require-default-props */
 import { useState } from 'react';
 import {
-  Text, Input, NumberInput, createListCollection, Flex, Box,
+  Text, Input, Textarea, NumberInput, createListCollection, Flex, Box,
 } from '@chakra-ui/react';
 import { HiQuestionMarkCircle } from 'react-icons/hi';
 import { Field } from '@/components/ui/field';
@@ -85,6 +85,10 @@ interface InputFieldProps {
   value: string
   onChange: (value: string) => void
   placeholder?: string
+  /** 渲染为多行文本框 */
+  textarea?: boolean
+  /** 多行文本框行数 */
+  rows?: number
 }
 
 // Reusable Components
@@ -185,18 +189,30 @@ export function InputField({
   value,
   onChange,
   placeholder,
+  textarea,
+  rows,
 }: InputFieldProps): JSX.Element {
   return (
     <Field
       {...settingStyles.general.field}
       label={<Text {...settingStyles.general.field.label}>{label}</Text>}
     >
-      <Input
-        {...settingStyles.general.input}
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      {textarea ? (
+        <Textarea
+          {...settingStyles.general.input}
+          placeholder={placeholder}
+          value={value}
+          rows={rows}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      ) : (
+        <Input
+          {...settingStyles.general.input}
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      )}
     </Field>
   );
 }
