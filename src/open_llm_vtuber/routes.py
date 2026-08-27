@@ -18,6 +18,40 @@ from verification.asr_config import build_asr_config, public_browser_config
 from .knowledge.routes import init_knowledge_routes
 
 
+def _load_model_dict(path: str = "model_dict.json") -> dict:
+    """读取 model_dict.json，返回 {模型名: 条目}；文件缺失或损坏时返回空 dict。"""
+    try:
+        with open(path, encoding="utf-8-sig") as f:
+            entries = json.load(f)
+        return {
+            entry["name"]: entry
+            for entry in entries
+            if isinstance(entry, dict) and "name" in entry
+        }
+    except Exception as e:
+        logger.warning(f"读取 {path} 失败，模型列表将不含描述与动作参数：{e}")
+        return {}
+
+
+def _find_model3_file(folder_path: str) -> "str | None":
+    """
+    在 Live2D 模型目录中定位 .model3.json（返回相对仓库根、以 / 分隔的路径）。
+    先查 runtime/ 子目录，再查模型根目录；不要求文件名与文件夹名一致。
+    """
+    runtime_dir = os.path.join(folder_path, "runtime")
+
+    def _list_model3(directory: str) -> list:
+        if not os.path.isdir(directory):
+            return []
+        return sorted(f for f in os.listdir(directory) if f.endswith(".model3.json"))
+
+    for directory in (runtime_dir, folder_path):
+        files = _list_model3(directory)
+        if files:
+            return os.path.join(directory, files[0]).replace("\\", "/")
+    return None
+
+
 def init_client_ws_route(default_context_cache: ServiceContext) -> APIRouter:
     """
     Create and return API routes for handling the `/client-ws` WebSocket connections.
@@ -129,25 +163,31 @@ def init_webtool_routes(default_context_cache: ServiceContext) -> APIRouter:
                 {"error": "Live2D models directory not found"}, status_code=404
             )
 
+        # model_dict.json 提供展示名与各模型的动作/表情参数（emotionMap 等）
+        model_dict = _load_model_dict("model_dict.json")
+
         valid_characters = []
         supported_extensions = [".png", ".jpg", ".jpeg"]
+        preset_keys = {
+            "kScale": "k_scale",
+            "initialXshift": "initial_xshift",
+            "initialYshift": "initial_yshift",
+            "kXOffset": "k_x_offset",
+            "idleMotionGroupName": "idle_motion_group_name",
+            "emotionMap": "emotion_map",
+            "tapMotions": "tap_motions",
+        }
 
         for entry in os.scandir(live2d_dir):
             if entry.is_dir():
                 folder_name = entry.name.replace("\\", "/")
 
-                # Try to find model3.json in runtime directory first, then directly
-                model3_file = os.path.join(
-                    live2d_dir, folder_name, "runtime", f"{folder_name}.model3.json"
-                ).replace("\\", "/")
+                # 扫描 runtime 目录和模型根目录下的任意 *.model3.json，
+                # 不再要求文件名与文件夹名一致（如 hiyori_pro_t11.model3.json）
+                folder_path = os.path.join(live2d_dir, folder_name)
+                model3_file = _find_model3_file(folder_path)
 
-                # If not found in runtime, try direct path
-                if not os.path.isfile(model3_file):
-                    model3_file = os.path.join(
-                        live2d_dir, folder_name, f"{folder_name}.model3.json"
-                    ).replace("\\", "/")
-
-                if os.path.isfile(model3_file):
+                if model3_file:
                     # Find avatar file if it exists (try both runtime and direct paths)
                     avatar_file = None
                     for ext in supported_extensions:
@@ -156,7 +196,7 @@ def init_webtool_routes(default_context_cache: ServiceContext) -> APIRouter:
                             live2d_dir, folder_name, "runtime", f"{folder_name}{ext}"
                         )
                         if os.path.isfile(avatar_path):
-                            avatar_file = avatar_path.replace("\\", "/")
+                            avatar_file = "/" + avatar_path.replace("\\", "/")
                             break
 
                         # If not found in runtime, try direct path
@@ -165,16 +205,26 @@ def init_webtool_routes(default_context_cache: ServiceContext) -> APIRouter:
                                 live2d_dir, folder_name, f"{folder_name}{ext}"
                             )
                             if os.path.isfile(avatar_path):
-                                avatar_file = avatar_path.replace("\\", "/")
+                                avatar_file = "/" + avatar_path.replace("\\", "/")
                                 break
 
-                    valid_characters.append(
-                        {
-                            "name": folder_name,
-                            "avatar": avatar_file,
-                            "model_path": model3_file,
-                        }
-                    )
+                    character = {
+                        "name": folder_name,
+                        "avatar": avatar_file,
+                        # 统一带前导斜杠，前端可直接用作请求路径
+                        "model_path": "/" + model3_file,
+                    }
+
+                    # 合并 model_dict.json 中该模型的描述与动作/表情参数
+                    preset = model_dict.get(folder_name)
+                    if preset:
+                        if "description" in preset:
+                            character["description"] = preset["description"]
+                        for src_key, dst_key in preset_keys.items():
+                            if src_key in preset:
+                                character[dst_key] = preset[src_key]
+
+                    valid_characters.append(character)
         return JSONResponse(
             {
                 "type": "live2d-models/info",

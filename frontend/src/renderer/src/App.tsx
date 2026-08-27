@@ -50,6 +50,8 @@ import CampusKnowledge from "./components/campus/campus-knowledge";
 import { CampusTopicId, isCampusTopicId } from "./data/campus-knowledge";
 import HeroLanding from "./components/hero/hero-landing";
 import KnowledgeAdmin from "./components/admin/knowledge-admin";
+import { DocumentKnowledge } from "./components/admin/document-knowledge";
+import { SystemLogs } from "./components/admin/system-logs";
 import ModernSidebar from "./components/admin/modern-sidebar";
 import { SchoolAdminLayout } from "./components/admin/school-admin-layout";
 import { SchoolDashboard } from "./components/admin/school-dashboard";
@@ -317,6 +319,12 @@ function AppContent(): JSX.Element {
         break;
       case 'character-config':
         content = <CharacterConfig />;
+        break;
+      case 'document-knowledge':
+        content = <DocumentKnowledge />;
+        break;
+      case 'system-logs':
+        content = <SystemLogs />;
         break;
       case 'knowledge-admin':
         return <KnowledgeAdmin />;

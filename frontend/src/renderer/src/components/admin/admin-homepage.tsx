@@ -5,6 +5,8 @@
 
 import { FC, useState } from 'react';
 import { motion } from 'framer-motion';
+import { toaster } from '@/components/ui/toaster';
+
 import {
   FiDatabase,
   FiUpload,
@@ -25,13 +27,6 @@ import {
   StatCard,
   ContentCard,
 } from './admin-dashboard-layout';
-import { createToaster } from '@chakra-ui/react';
-
-const toaster = createToaster({
-  placement: 'top-end',
-  overlap: true,
-  max: 3
-});
 
 // 模拟统计数据
 const statsData = [

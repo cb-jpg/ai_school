@@ -12,7 +12,6 @@ import {
   Tabs,
   Icon,
   Spinner,
-  createToaster
 } from '@chakra-ui/react';
 import {
   FiBookOpen,
@@ -30,12 +29,8 @@ import KnowledgeDashboard from './knowledge-dashboard';
 import KnowledgeList from './knowledge-list';
 import KnowledgeUpload from './knowledge-upload';
 import UnansweredQuestions from './unanswered-questions';
+import { toaster } from '@/components/ui/toaster';
 
-const toaster = createToaster({
-  placement: 'top-end',
-  overlap: true,
-  max: 3
-});
 
 const swissFont = '"Helvetica Neue", Arial, sans-serif';
 const ink = '#121826';
@@ -124,6 +119,8 @@ export default function KnowledgeAdmin({ onClose }: KnowledgeAdminProps) {
       fontFamily={swissFont}
       borderRadius="4px"
       overflow="hidden"
+      display="flex"
+      flexDirection="column"
     >
       {/* Header */}
       <Box
@@ -205,8 +202,8 @@ export default function KnowledgeAdmin({ onClose }: KnowledgeAdminProps) {
         </Flex>
       </Box>
 
-      {/* Tabs */}
-      <Box px={{ base: '16px', lg: '24px' }}>
+      {/* Tabs —— 区域可上下滚动，避免内容过多时无法滑动 */}
+      <Box px={{ base: '16px', lg: '24px' }} flex="1" overflowY="auto" minHeight="0">
         <Tabs.Root
           value={tabs[activeTab].id}
           onValueChange={(details) => setActiveTab(tabs.findIndex(t => t.id === details.value))}

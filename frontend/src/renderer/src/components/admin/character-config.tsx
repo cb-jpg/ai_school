@@ -3,7 +3,7 @@
  * 用于配置数字人角色名称、角色人设、用户名称和Live2D模型选择
  */
 
-import { FC, useState } from 'react';
+import { FC, useEffect, useState } from 'react';
 import {
   Box,
   VStack,
@@ -13,21 +13,23 @@ import {
   Input,
   Textarea,
   Badge,
-  createToaster,
 } from '@chakra-ui/react';
 import {
   FiUser,
   FiSettings,
   FiCheck,
+  FiSave,
 } from 'react-icons/fi';
 import { useLocalStorage } from '@/hooks/utils/use-local-storage';
 import { useLive2DConfig } from '@/context/live2d-config-context';
+import { useLive2dModels } from '@/hooks/live2d/use-live2d-models';
+import type { Live2dCharacter } from '@/services/live2d-models-api';
+import { toaster } from '@/components/ui/toaster';
 
-const toaster = createToaster({
-  placement: 'top-end',
-  overlap: true,
-  max: 3
-});
+import {
+  fetchBackendCharacterConfig,
+  saveBackendCharacterConfig,
+} from '@/services/character-config-api';
 
 // 角色配置接口
 interface CharacterConfig {
@@ -88,48 +90,26 @@ const defaultUserConfig: UserConfig = {
   avatar: '',
 };
 
-// 数字人角色列表（从Live2D模型中获取）
-const getLive2DCharacters = () => {
-  // 直接返回Live2D模型列表
-  return [
-    {
-      id: 'mao_pro',
-      name: 'Mao Pro',
-      description: '猫咪角色',
-      modelName: 'mao_pro',
-      modelFileName: 'mao_pro',
-      preview: '🐱',
-    },
-    {
-      id: 'shizuku',
-      name: 'Shizuku',
-      description: '栀子',
-      modelName: 'shizuku',
-      modelFileName: 'shizuku',
-      preview: '🌸',
-    },
-    {
-      id: 'hiyori_pro',
-      name: 'Hiyori Pro',
-      description: '日葵 (专业版)',
-      modelName: 'hiyori_pro',
-      modelFileName: 'hiyori_pro_t11', // 修正实际的模型文件名
-      preview: '👩‍🏫',
-    },
-  ];
-};
+// 数字人角色列表改为运行时从后端 /api/live2d-models/info 获取（见 useLive2dModels）
 
 export const CharacterConfig: FC = () => {
   // Live2D配置hook
   const { setModelInfo } = useLive2DConfig();
 
-  // 角色配置状态
-  const [characterConfig, setCharacterConfig] = useLocalStorage<CharacterConfig>(
-    'characterConfig',
+  // 角色配置状态：以【后端当前生效值】为初始值，编辑后需显式保存
+  const [characterConfig, setCharacterConfig] = useState<CharacterConfig>(
     defaultCharacterConfig
   );
+  const [savedConfig, setSavedConfig] = useState<CharacterConfig>(
+    defaultCharacterConfig
+  );
+  const [configLoading, setConfigLoading] = useState(true);
+  const [configSaving, setConfigSaving] = useState(false);
+  const configDirty =
+    characterConfig.name !== savedConfig.name ||
+    characterConfig.systemPrompt !== savedConfig.systemPrompt;
 
-  // 用户配置状态
+  // 用户配置状态（用户名称/身份仅用于界面显示，不参与 AI 行为）
   const [userConfig, setUserConfig] = useLocalStorage<UserConfig>(
     'userConfig',
     defaultUserConfig
@@ -138,52 +118,132 @@ export const CharacterConfig: FC = () => {
   // 数字人选择状态
   const [selectedAvatar, setSelectedAvatar] = useState('');
 
-  // 获取Live2D角色列表
-  const live2dCharacters = getLive2DCharacters();
+  // 获取Live2D角色列表（后端接口，会话内缓存）
+  const {
+    characters: live2dCharacters,
+    loading: modelsLoading,
+    error: modelsError,
+    refresh: refreshModels,
+  } = useLive2dModels();
 
-  // 实时更新角色配置（立即应用）
+  // 挂载时从后端读取当前生效的角色名称/人设
+  useEffect(() => {
+    let cancelled = false;
+    fetchBackendCharacterConfig()
+      .then((backend) => {
+        if (cancelled) return;
+        const loaded: CharacterConfig = {
+          ...defaultCharacterConfig,
+          name: backend.character_name || defaultCharacterConfig.name,
+          systemPrompt: backend.persona_prompt || defaultCharacterConfig.systemPrompt,
+        };
+        setCharacterConfig(loaded);
+        setSavedConfig(loaded);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        toaster.create({
+          title: '读取角色配置失败',
+          description: `${e instanceof Error ? e.message : String(e)}；请确认后端服务与登录状态`,
+          type: 'error',
+          duration: 4000,
+        });
+      })
+      .finally(() => {
+        if (!cancelled) setConfigLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // 编辑角色名称/人设（本地暂存，点"保存"才写入后端）
   const handleCharacterConfigChange = (field: keyof CharacterConfig, value: string) => {
-    const updatedConfig = { ...characterConfig, [field]: value };
-    setCharacterConfig(updatedConfig);
-
-    toaster.create({
-      title: '角色配置已更新',
-      type: 'success',
-      duration: 1000,
-    });
+    setCharacterConfig((prev) => ({ ...prev, [field]: value }));
   };
 
-  // 重置配置
+  // 保存到后端：写入 conf.yaml 并热更新 LLM system prompt
+  const handleSaveToBackend = async () => {
+    if (!characterConfig.name.trim()) {
+      toaster.create({
+        title: '角色名称不能为空',
+        type: 'error',
+        duration: 2000,
+      });
+      return;
+    }
+    if (!characterConfig.systemPrompt.trim()) {
+      toaster.create({
+        title: '角色人设不能为空',
+        type: 'error',
+        duration: 2000,
+      });
+      return;
+    }
+    setConfigSaving(true);
+    try {
+      const message = await saveBackendCharacterConfig(
+        characterConfig.name.trim(),
+        characterConfig.systemPrompt
+      );
+      const savedNow: CharacterConfig = {
+        ...characterConfig,
+        name: characterConfig.name.trim(),
+      };
+      setSavedConfig(savedNow);
+      setCharacterConfig(savedNow);
+      toaster.create({
+        title: message,
+        description: '新的人设将应用于之后的新对话；进行中的对话保持原设定。',
+        type: 'success',
+        duration: 5000,
+      });
+    } catch (e) {
+      toaster.create({
+        title: '保存失败',
+        description: e instanceof Error ? e.message : String(e),
+        type: 'error',
+        duration: 4000,
+      });
+    } finally {
+      setConfigSaving(false);
+    }
+  };
+
+  // 重置为"后端当前生效值"（放弃未保存的本地修改）
   const handleResetConfig = () => {
-    setCharacterConfig(defaultCharacterConfig);
+    setCharacterConfig(savedConfig);
     toaster.create({
-      title: '配置已重置为默认值',
+      title: '已还原为当前生效的配置',
       type: 'info',
       duration: 2000,
     });
   };
 
   // 数字人选择处理
-  const handleAvatarSelect = async (characterId: string, modelName: string, modelFileName: string) => {
-    setSelectedAvatar(characterId);
+  const handleAvatarSelect = async (character: Live2dCharacter) => {
+    setSelectedAvatar(character.id);
 
     try {
       // 使用相对路径，因为vite代理会处理到后端的转发
-      // kScale设置为0.5，在Live2DConfigProvider中会乘以2得到最终值1.0
+      // 参数来自 /api/live2d-models/info（含真实的 model3.json 路径与表情映射）
+      // kScale使用后端配置值（如0.5），在Live2DConfigProvider中会乘以2得到最终值
       const newModelInfo = {
-        name: modelName,
-        url: `/live2d-models/${modelName}/runtime/${modelFileName}.model3.json`,
-        kScale: 0.5,
-        initialXshift: 0,
-        initialYshift: 0,
-        emotionMap: {},
+        name: character.id,
+        url: character.modelPath,
+        kScale: character.kScale,
+        initialXshift: character.initialXshift,
+        initialYshift: character.initialYshift,
+        idleMotionGroupName: character.idleMotionGroupName,
+        emotionMap: character.emotionMap,
+        tapMotions: character.tapMotions,
       };
 
       // 设置模型信息
       setModelInfo(newModelInfo);
 
       toaster.create({
-        title: `已切换到 ${modelName}`,
+        title: `已切换到 ${character.name}`,
         type: 'success',
         duration: 2000,
       });
@@ -273,6 +333,33 @@ export const CharacterConfig: FC = () => {
                 </Text>
               </HStack>
               <VStack gap="2">
+                {modelsLoading && (
+                  <Text fontSize="xs" color={colors.gray600} py="2">
+                    正在加载角色列表…
+                  </Text>
+                )}
+                {modelsError && !modelsLoading && (
+                  <Box
+                    p="3"
+                    rounded="lg"
+                    border="1px solid"
+                    borderColor="#FED7D7"
+                    bg="#FFF5F5"
+                    width="100%"
+                  >
+                    <Text fontSize="xs" color="#C53030">
+                      角色列表加载失败：{modelsError}
+                    </Text>
+                    <Button size="xs" mt="2" onClick={refreshModels}>
+                      重试
+                    </Button>
+                  </Box>
+                )}
+                {!modelsLoading && !modelsError && live2dCharacters.length === 0 && (
+                  <Text fontSize="xs" color={colors.gray600} py="2">
+                    后端未发现可用的 Live2D 模型
+                  </Text>
+                )}
                 {live2dCharacters.map((character) => (
                   <Box
                     key={character.id}
@@ -282,7 +369,7 @@ export const CharacterConfig: FC = () => {
                     borderColor={selectedAvatar === character.id ? colors.primary : colors.gray200}
                     bg={selectedAvatar === character.id ? 'blue.50' : 'transparent'}
                     cursor="pointer"
-                    onClick={() => handleAvatarSelect(character.id, character.modelName, character.modelFileName)}
+                    onClick={() => handleAvatarSelect(character)}
                     _hover={{ borderColor: colors.primary, bg: 'blue.50' }}
                     transition="all 0.2s"
                   >
@@ -314,9 +401,21 @@ export const CharacterConfig: FC = () => {
 
             {/* 角色基本信息 */}
             <Box>
-              <Text fontSize="sm" fontWeight="semibold" color={colors.gray800} mb="3">
-                角色基本信息
-              </Text>
+              <HStack justify="space-between" mb="3">
+                <Text fontSize="sm" fontWeight="semibold" color={colors.gray800}>
+                  角色基本信息
+                </Text>
+                {configLoading && (
+                  <Text fontSize="2xs" color={colors.gray600}>
+                    正在从后端读取…
+                  </Text>
+                )}
+                {!configLoading && configDirty && (
+                  <Badge bg="orange.100" color="orange.700" fontSize="9px" px="2" py="0.5" rounded="md">
+                    未保存
+                  </Badge>
+                )}
+              </HStack>
               <VStack gap="3" align="stretch">
                 <Box>
                   <Text fontSize="xs" color={colors.gray600} mb="1">
@@ -332,12 +431,12 @@ export const CharacterConfig: FC = () => {
 
                 <Box>
                   <Text fontSize="xs" color={colors.gray600} mb="1">
-                    角色描述
+                    角色描述（仅用于界面展示）
                   </Text>
                   <Input
                     value={characterConfig.description}
                     onChange={(e) => handleCharacterConfigChange('description', e.target.value)}
-                    placeholder="请输入角色描述"
+                    placeholder="仅显示在界面上，不影响 AI 行为"
                     size="sm"
                   />
                 </Box>
@@ -348,11 +447,9 @@ export const CharacterConfig: FC = () => {
 
             {/* 角色人设 */}
             <Box>
-              <HStack justify="space-between" mb="3">
-                <Text fontSize="sm" fontWeight="semibold" color={colors.gray800}>
-                  角色人设（系统提示词）
-                </Text>
-              </HStack>
+              <Text fontSize="sm" fontWeight="semibold" color={colors.gray800} mb="3">
+                角色人设（系统提示词）
+              </Text>
 
               <Textarea
                 value={characterConfig.systemPrompt}
@@ -363,6 +460,27 @@ export const CharacterConfig: FC = () => {
                 fontFamily="monospace"
                 fontSize="xs"
               />
+
+              <HStack mt="3" justify="flex-end" align="center">
+                {configDirty && (
+                  <Button size="sm" variant="outline" onClick={handleResetConfig}>
+                    还原
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  bg={colors.primary}
+                  color="white"
+                  _hover={{ bg: colors.primaryLight }}
+                  disabled={!configDirty || configSaving || configLoading}
+                  loading={configSaving}
+                  loadingText="保存中…"
+                  onClick={handleSaveToBackend}
+                >
+                  <FiSave />
+                  保存到后端
+                </Button>
+              </HStack>
             </Box>
 
             {/* 配置提示 */}
@@ -374,7 +492,8 @@ export const CharacterConfig: FC = () => {
               rounded="md"
             >
               <Text fontSize="xs" color="blue.700">
-                💡 角色人设会影响数字人的回答风格和内容。请根据学校特色和教育需求进行定制。
+                💡 角色名称与人设保存后写入后端配置（conf.yaml），并即时对之后的新对话生效；
+                进行中的对话仍使用保存前的设定。角色描述与用户名称仅用于界面展示。
               </Text>
             </Box>
           </VStack>

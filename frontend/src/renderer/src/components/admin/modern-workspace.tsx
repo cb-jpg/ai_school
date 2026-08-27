@@ -15,15 +15,10 @@ import {
   FiTrendingDown,
   FiPlus,
 } from 'react-icons/fi';
-import { createToaster } from '@chakra-ui/react';
 import { useAdmin } from '@/context/admin-context';
 import { useKnowledgeAdminAPI } from '@/services/knowledge-admin-api';
+import { toaster } from '@/components/ui/toaster';
 
-const toaster = createToaster({
-  placement: 'top-end',
-  overlap: true,
-  max: 3
-});
 
 // 数据来源说明类型
 interface DataSource {
@@ -193,83 +188,79 @@ const ActionCard: FC<{
 // 主工作台组件
 export const ModernMainWorkspace: FC = () => {
   const { openAdmin } = useAdmin();
-  const { getStatistics } = useKnowledgeAdminAPI();
-  const [stats, setStats] = useState<any>(null);
+  const { fetchWorkspaceStats } = useKnowledgeAdminAPI();
+  const [stats, setStats] = useState<WorkspaceStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 获取统计数据
+  // 获取统计数据（/api/knowledge/workspace-stats）
   useEffect(() => {
+    let cancelled = false;
     const loadStats = async () => {
       setIsLoading(true);
       try {
-        const data = await getStatistics();
-        setStats(data);
+        const data = await fetchWorkspaceStats();
+        if (!cancelled) setStats(data);
       } catch (error) {
-        console.log('知识库API连接失败，使用模拟数据');
-        setStats(null);
+        console.log('工作台统计API连接失败', error);
+        if (!cancelled) setStats(null);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
     loadStats();
-  }, [getStatistics]);
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchWorkspaceStats]);
 
   // 统计数据配置
   const statsConfig = [
     {
       title: '知识条目',
-      getValue: () => stats?.total_entries || '暂无数据',
-      change: stats?.total_entries ? '+12.5%' : undefined,
-      trend: 'up' as const,
+      getValue: () => stats?.total_entries ?? '暂无数据',
+      change: undefined,
+      trend: undefined,
       icon: FiDatabase,
       dataSource: {
-        source: stats?.total_entries ? ('api' as const) : ('mock' as const),
-        description: stats?.total_entries
-          ? '来自知识库API实际数据'
-          : '模拟数据 - 等待知识库API连接',
-        logic: stats?.total_entries
-          ? '统计knowledge表中所有已发布的条目数量'
-          : '固定值1,248，待API连接后显示真实数据',
+        source: stats ? ('api' as const) : ('mock' as const),
+        description: stats
+          ? '来自知识库实际数据'
+          : '暂无数据 - 无法连接知识库API或库为空',
+        logic: stats
+          ? `其中已向量化 ${stats.indexed_entries} 条，共切分 ${stats.total_chunks} 块`
+          : 'GET /api/knowledge/workspace-stats 的 total_entries',
       },
     },
     {
       title: '本月上传',
-      getValue: () => stats?.published_entries || '暂无数据',
-      change: stats?.published_entries ? '+8.2%' : undefined,
-      trend: 'up' as const,
+      getValue: () => stats?.uploads_this_month ?? '暂无数据',
+      change: undefined,
+      trend: undefined,
       icon: FiUpload,
       dataSource: {
-        source: stats?.published_entries ? ('api' as const) : ('mock' as const),
-        description: stats?.published_entries
-          ? '来自知识库API实际数据'
-          : '模拟数据 - 等待知识库API连接',
-        logic: stats?.published_entries
-          ? '统计本月创建的知识条目数量（按created_at字段）'
-          : '固定值89，待API连接后显示真实数据',
+        source: stats ? ('api' as const) : ('mock' as const),
+        description: stats
+          ? '来自知识库操作审计记录'
+          : '暂无数据 - 等待本月的上传/抓取/新建记录',
+        logic: stats
+          ? '统计本月通过 上传文件/网页抓取/手动录入 新增的条目数'
+          : '按 audit_log 中 upload/add_url/create 动作的本月发生次数统计',
       },
     },
     {
       title: '搜索次数',
-      getValue: () => '暂无数据',
+      getValue: () => stats?.search_total ?? '暂无数据',
       change: undefined,
       trend: undefined,
       icon: FiSearch,
       dataSource: {
-        source: 'mock' as const,
-        description: '功能未实现 - 需要搜索日志统计功能',
-        logic: '需要在后端添加搜索日志记录和统计接口',
-      },
-    },
-    {
-      title: '活跃用户',
-      getValue: () => '暂无数据',
-      change: undefined,
-      trend: undefined,
-      icon: FiUsers,
-      dataSource: {
-        source: 'mock' as const,
-        description: '功能未实现 - 需要用户活动和会话管理',
-        logic: '需要实现用户登录、会话管理和活跃度统计',
+        source: stats ? ('api' as const) : ('mock' as const),
+        description: stats
+          ? '来自后端搜索计数器'
+          : '暂无数据 - 尚无检索记录',
+        logic: stats
+          ? '累计语义检索调用次数（含对话RAG与手动测试）'
+          : 'POST /api/knowledge/search 每次成功调用累加 1',
       },
     },
   ];

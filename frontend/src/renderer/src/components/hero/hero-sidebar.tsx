@@ -32,6 +32,8 @@ import { useWebSocket } from '@/context/websocket-context';
 import { useBgUrl } from '@/context/bgurl-context';
 import { useCamera } from '@/context/camera-context';
 import { useVolume } from '@/context/volume-context';
+import { useLive2dModels } from '@/hooks/live2d/use-live2d-models';
+import type { Live2dCharacter } from '@/services/live2d-models-api';
 import { toaster } from '@/components/ui/toaster';
 import fileUploadDialog from '@/utils/file-upload-dialog';
 
@@ -48,48 +50,18 @@ const schoolColors = {
   gray50: '#F7FAFC',
 };
 
-// 数字人角色列表（从Live2D模型中获取）
-const getLive2DCharacters = () => {
-  // 直接返回Live2D模型列表
-  return [
-    {
-      id: 'mao_pro',
-      name: 'Mao Pro',
-      description: '猫咪角色',
-      modelName: 'mao_pro',
-      modelFileName: 'mao_pro',
-      preview: '🐱',
-    },
-    {
-      id: 'shizuku',
-      name: 'Shizuku',
-      description: '栀子',
-      modelName: 'shizuku',
-      modelFileName: 'shizuku',
-      preview: '🌸',
-    },
-    {
-      id: 'hiyori_pro',
-      name: 'Hiyori Pro',
-      description: '日葵 (专业版)',
-      modelName: 'hiyori_pro',
-      modelFileName: 'hiyori_pro_t11', // 修正实际的模型文件名
-      preview: '👩‍🏫',
-    },
-  ];
-};
+// 数字人角色列表改为运行时从后端 /api/live2d-models/info 获取（见 useLive2dModels）
 
-// 背景图片列表
+// 背景图片列表：本地矢量背景由后端 /bg 静态目录提供（国内可离线可靠加载）
 const BACKGROUNDS = [
   { id: 'default', name: '默认背景', url: '' },
   { id: 'camera', name: '摄像头背景', url: '' },
   { id: 'upload', name: '上传图片', url: '' },
-  // 学校风格背景图片（使用在线免费图片资源）
-  { id: 'school_building', name: '学校建筑', url: 'https://images.unsplash.com/photo-1562774053-701939374585?w=1920&q=80' },
-  { id: 'library', name: '图书馆', url: 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=1920&q=80' },
-  { id: 'classroom', name: '教室', url: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=1920&q=80' },
-  { id: 'campus_garden', name: '校园花园', url: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920&q=80' },
-  { id: 'sports_field', name: '运动场', url: 'https://images.unsplash.com/photo-1571896349842-6c5c1f7ce626?w=1920&q=80' },
+  { id: 'school_building', name: '学校建筑', url: '/bg/school/campus_skyline.svg' },
+  { id: 'library', name: '图书馆', url: '/bg/school/library_warm.svg' },
+  { id: 'classroom', name: '教室', url: '/bg/school/classroom_bright.svg' },
+  { id: 'campus_garden', name: '校园花园', url: '/bg/school/garden_green.svg' },
+  { id: 'sports_field', name: '运动场', url: '/bg/school/sports_energy.svg' },
 ];
 
 interface HeroSidebarProps {
@@ -109,8 +81,13 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
   const [selectedBg, setSelectedBg] = useState('default');
   const sidebarRef = useRef<HTMLDivElement>(null);
 
-  // 获取Live2D角色列表
-  const live2dCharacters = getLive2DCharacters();
+  // 获取Live2D角色列表（后端接口，会话内缓存）
+  const {
+    characters: live2dCharacters,
+    loading: modelsLoading,
+    error: modelsError,
+    refresh: refreshModels,
+  } = useLive2dModels();
 
   // 点击外部关闭侧栏
   useEffect(() => {
@@ -135,25 +112,28 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
     console.log('音量设置为:', val);
   };
 
-  const handleAvatarSelect = async (characterId: string, modelName: string, modelFileName: string) => {
-    setSelectedAvatar(characterId);
+  const handleAvatarSelect = async (character: Live2dCharacter) => {
+    setSelectedAvatar(character.id);
 
     try {
       // 使用相对路径，因为vite代理会处理到后端的转发
+      // 参数来自 /api/live2d-models/info（含真实的 model3.json 路径与表情映射）
       const modelInfo = {
-        name: modelName,
-        url: `/live2d-models/${modelName}/runtime/${modelFileName}.model3.json`,
-        kScale: 1.0,
-        initialXshift: 0,
-        initialYshift: 0,
-        emotionMap: {},
+        name: character.id,
+        url: character.modelPath,
+        kScale: character.kScale,
+        initialXshift: character.initialXshift,
+        initialYshift: character.initialYshift,
+        idleMotionGroupName: character.idleMotionGroupName,
+        emotionMap: character.emotionMap,
+        tapMotions: character.tapMotions,
       };
 
       // 设置模型信息
       setModelInfo(modelInfo);
 
       toaster.create({
-        title: `已切换到 ${modelName}`,
+        title: `已切换到 ${character.name}`,
         type: 'success',
         duration: 2000,
       });
@@ -223,8 +203,26 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
           stopBackgroundCamera();
           setUseCameraBackground(false);
         }
+        const targetUrl = bg.url || '';
         // 直接使用URL（已经是完整的URL）
-        setBackgroundUrl(bg.url || '');
+        setBackgroundUrl(targetUrl);
+
+        // 加载校验：预设图片加载失败时回退默认背景并提示，避免黑屏/裂图
+        if (targetUrl && !targetUrl.startsWith('blob:') && !targetUrl.startsWith('data:')) {
+          const probe = new Image();
+          probe.onerror = () => {
+            console.error('背景图片加载失败:', targetUrl);
+            setBackgroundUrl('');
+            setSelectedBg('default');
+            toaster.create({
+              title: '背景图片加载失败',
+              description: '已恢复为默认背景',
+              type: 'error',
+              duration: 3000,
+            });
+          };
+          probe.src = targetUrl;
+        }
       }
     }
   };
@@ -360,6 +358,33 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
               </Text>
             </HStack>
             <VStack gap="2">
+              {modelsLoading && (
+                <Text fontSize="xs" color={schoolColors.textSecondary} py="2">
+                  正在加载角色列表…
+                </Text>
+              )}
+              {modelsError && !modelsLoading && (
+                <Box
+                  p="3"
+                  rounded="lg"
+                  border="1px solid"
+                  borderColor="#FED7D7"
+                  bg="#FFF5F5"
+                  width="100%"
+                >
+                  <Text fontSize="xs" color="#C53030">
+                    角色列表加载失败：{modelsError}
+                  </Text>
+                  <Button size="xs" mt="2" onClick={refreshModels}>
+                    重试
+                  </Button>
+                </Box>
+              )}
+              {!modelsLoading && !modelsError && live2dCharacters.length === 0 && (
+                <Text fontSize="xs" color={schoolColors.textSecondary} py="2">
+                  后端未发现可用的 Live2D 模型
+                </Text>
+              )}
               {live2dCharacters.map((character) => (
                 <Box
                   key={character.id}
@@ -369,7 +394,7 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
                   borderColor={selectedAvatar === character.id ? schoolColors.primary : schoolColors.border}
                   bg={selectedAvatar === character.id ? schoolColors.accent : 'transparent'}
                   cursor="pointer"
-                  onClick={() => handleAvatarSelect(character.id, character.modelName, character.modelFileName)}
+                  onClick={() => handleAvatarSelect(character)}
                   _hover={{ borderColor: schoolColors.primary, bg: schoolColors.accent }}
                   transition="all 0.2s"
                 >

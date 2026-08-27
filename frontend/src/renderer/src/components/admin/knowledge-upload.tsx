@@ -15,7 +15,6 @@ import {
   Spinner,
   Icon,
   SimpleGrid,
-  createToaster
 } from '@chakra-ui/react';
 import {
   FiUpload,
@@ -27,12 +26,8 @@ import {
 } from 'react-icons/fi';
 import { useState, useCallback } from 'react';
 import { useKnowledgeAdminAPI } from '@/services/knowledge-admin-api';
+import { toaster } from '@/components/ui/toaster';
 
-const toaster = createToaster({
-  placement: 'top-end',
-  overlap: true,
-  max: 3
-});
 
 const swissFont = '"Helvetica Neue", Arial, sans-serif';
 const ink = '#121826';

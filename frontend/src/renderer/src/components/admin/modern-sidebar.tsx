@@ -19,7 +19,6 @@ import {
   FiPlus,
   FiLayers,
 } from 'react-icons/fi';
-import { createToaster } from '@chakra-ui/react';
 import { useAdmin } from '@/context/admin-context';
 import { useKnowledgeAdminAPI } from '@/services/knowledge-admin-api';
 import { useSidebar } from '@/hooks/sidebar/use-sidebar';
@@ -27,12 +26,8 @@ import GroupDrawer from '../sidebar/group-drawer';
 import HistoryDrawer from '../sidebar/history-drawer';
 import KnowledgeDrawer from '../knowledge/knowledge-drawer';
 import { ModeType } from '@/context/mode-context';
+import { toaster } from '@/components/ui/toaster';
 
-const toaster = createToaster({
-  placement: 'top-end',
-  overlap: true,
-  max: 3
-});
 
 // 导航菜单项定义
 interface MenuItem {

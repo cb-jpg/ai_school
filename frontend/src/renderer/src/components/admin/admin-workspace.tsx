@@ -5,6 +5,8 @@
 
 import { FC, useState } from 'react';
 import { Box, Button, HStack, VStack, Text, Input } from '@chakra-ui/react';
+import { toaster } from '@/components/ui/toaster';
+
 import {
   FiDatabase,
   FiSettings,
@@ -20,14 +22,6 @@ import {
   FiLogOut,
   FiGrid,
 } from 'react-icons/fi';
-import { createToaster } from '@chakra-ui/react';
-
-// Toast通知
-const toaster = createToaster({
-  placement: 'top-end',
-  overlap: true,
-  max: 3
-});
 
 // 类型定义
 interface NavItem {

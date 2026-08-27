@@ -117,6 +117,18 @@ class WebSocketServer:
 
         self.app.include_router(init_auth_routes())
 
+        # Include character config routes (name/persona -> conf.yaml + hot reload agent)
+        from .character_config_api import init_character_config_routes
+
+        self.app.include_router(
+            init_character_config_routes(default_context_cache=self.default_context_cache)
+        )
+
+        # Include system logs routes (audit trail / service log tail / stats)
+        from .system_logs_api import init_system_logs_routes
+
+        self.app.include_router(init_system_logs_routes())
+
         # Initialize and include proxy routes if proxy is enabled
         system_config = config.system_config
         if hasattr(system_config, "enable_proxy") and system_config.enable_proxy:

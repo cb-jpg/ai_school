@@ -5,6 +5,8 @@
 
 import { FC, ReactNode, useState } from 'react';
 import { motion } from 'framer-motion';
+import { toaster } from '@/components/ui/toaster';
+
 import {
   FiHome,
   FiDatabase,
@@ -20,14 +22,6 @@ import {
   FiSearch,
   FiLogOut,
 } from 'react-icons/fi';
-import { createToaster } from '@chakra-ui/react';
-
-// Toast通知
-const toaster = createToaster({
-  placement: 'top-end',
-  overlap: true,
-  max: 3
-});
 
 // 动画变体配置
 const fadeInUp = {

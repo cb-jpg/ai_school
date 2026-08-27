@@ -16,7 +16,6 @@ import {
   Icon,
   Input,
   SimpleGrid,
-  createToaster
 } from '@chakra-ui/react';
 import {
   FiHelpCircle,
@@ -28,12 +27,8 @@ import { BiBulb } from 'react-icons/bi';
 import { useCallback, useEffect, useState } from 'react';
 import { useKnowledgeAdminAPI } from '@/services/knowledge-admin-api';
 import { authFetch } from '@/services/auth';
+import { toaster } from '@/components/ui/toaster';
 
-const toaster = createToaster({
-  placement: 'top-end',
-  overlap: true,
-  max: 3
-});
 
 const swissFont = '"Helvetica Neue", Arial, sans-serif';
 const ink = '#121826';

@@ -299,6 +299,81 @@ export async function rebuildIndex(): Promise<{ success: boolean; message: strin
   return { success: true, message: `已对 ${ids.length} 个条目重建索引` };
 }
 
+// ============== 文档知识库（切分结果 / 向量化状态） ==============
+
+export type KnowledgeEntryStatus = 'processing' | 'indexed' | 'published' | 'archived' | 'error';
+export type KnowledgeSourceType = 'file' | 'url' | 'manual' | 'ocr';
+
+/** GET /api/knowledge/list 返回的条目 */
+export interface KnowledgeListItemRaw {
+  id: string;
+  title: string;
+  category: string;
+  source_type: KnowledgeSourceType;
+  status: KnowledgeEntryStatus;
+  chunk_count: number;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+  file_name?: string | null;
+}
+
+/** GET /api/knowledge/{id} 返回的原始切分块 */
+export interface KnowledgeChunkRaw {
+  id: string;
+  content: string;
+  source_id: string;
+  chunk_index: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface KnowledgeDetailRaw {
+  id: string;
+  title: string;
+  category: string;
+  tags: string[];
+  source_type: KnowledgeSourceType;
+  source_url?: string | null;
+  file_name?: string | null;
+  status: KnowledgeEntryStatus;
+  chunk_count: number;
+  summary?: string | null;
+  error_message?: string | null;
+  created_at: string;
+  updated_at: string;
+  chunks: KnowledgeChunkRaw[];
+}
+
+/** 文档列表 → GET /api/knowledge/list */
+export async function listKnowledgeEntries(): Promise<KnowledgeListItemRaw[]> {
+  const data = await request('/api/knowledge/list');
+  return Array.isArray(data) ? data : [];
+}
+
+/** 主工作台统计 → GET /api/knowledge/workspace-stats */
+export interface WorkspaceStats {
+  total_entries: number;
+  indexed_entries: number;
+  total_chunks: number;
+  uploads_this_month: number;
+  search_total: number;
+}
+
+export async function fetchWorkspaceStats(): Promise<WorkspaceStats> {
+  return request<WorkspaceStats>('/api/knowledge/workspace-stats');
+}
+
+/** 文档详情（含原始切分块）→ GET /api/knowledge/{id} */
+export async function getKnowledgeDetail(docId: string): Promise<KnowledgeDetailRaw> {
+  return request(`/api/knowledge/${docId}`);
+}
+
+/** 重建单个文档的向量索引 → POST /api/knowledge/{id}/reindex */
+export async function reindexEntry(docId: string): Promise<{ success: boolean }> {
+  await request(`/api/knowledge/${docId}/reindex`, { method: 'POST' });
+  return { success: true };
+}
+
 /**
  * Hook for knowledge admin API
  */

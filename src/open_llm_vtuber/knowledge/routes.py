@@ -7,6 +7,9 @@ from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from loguru import logger
 
 from .auth import require_user
+from .audit import record as audit_record
+from .audit import bump_counter
+from .audit import list_entries as audit_list_entries
 
 from .models import (
     KnowledgeEntry, KnowledgeStatus, KnowledgeCategory,
@@ -127,7 +130,7 @@ async def get_knowledge_stats():
 # 若放在 /unanswered、/low-confidence 之前会把它们当作 entry_id 吞掉。
 
 @router.post("/create", response_model=KnowledgeListItem)
-async def create_knowledge(request: KnowledgeCreateRequest):
+async def create_knowledge(request: KnowledgeCreateRequest, _user: dict = Depends(require_user)):
     """Create a new manual knowledge entry"""
     try:
         entry, chunks = await processor.create_manual_entry(
@@ -145,6 +148,11 @@ async def create_knowledge(request: KnowledgeCreateRequest):
         if chunks:
             vector_store.index_chunks(entry.id, chunks)
 
+        audit_record(
+            _user["username"], "create", entry.id, entry.title,
+            f"手动录入，切分 {len(chunks)} 块",
+        )
+
         return KnowledgeListItem(**created.model_dump())
 
     except Exception as e:
@@ -153,7 +161,9 @@ async def create_knowledge(request: KnowledgeCreateRequest):
 
 
 @router.put("/{entry_id}", response_model=KnowledgeListItem)
-async def update_knowledge(entry_id: str, request: KnowledgeUpdateRequest):
+async def update_knowledge(
+    entry_id: str, request: KnowledgeUpdateRequest, _user: dict = Depends(require_user)
+):
     """Update a knowledge entry"""
     try:
         # Update only provided fields
@@ -173,6 +183,11 @@ async def update_knowledge(entry_id: str, request: KnowledgeUpdateRequest):
         if not entry:
             raise HTTPException(status_code=404, detail="Knowledge entry not found")
 
+        audit_record(
+            _user["username"], "update", entry_id, entry.title,
+            f"更新字段：{', '.join(update_data.keys()) or '无'}",
+        )
+
         return KnowledgeListItem(**entry.model_dump())
 
     except HTTPException:
@@ -183,15 +198,20 @@ async def update_knowledge(entry_id: str, request: KnowledgeUpdateRequest):
 
 
 @router.delete("/{entry_id}")
-async def delete_knowledge(entry_id: str):
+async def delete_knowledge(entry_id: str, _user: dict = Depends(require_user)):
     """Delete a knowledge entry"""
     try:
+        existing = crud.get(entry_id)
+        title = existing.title if existing else ""
+
         success = crud.delete(entry_id)
         if not success:
             raise HTTPException(status_code=404, detail="Knowledge entry not found")
 
         # Remove from vector store
         vector_store.remove_entry(entry_id)
+
+        audit_record(_user["username"], "delete", entry_id, title)
 
         return {"message": "Knowledge entry deleted successfully"}
 
@@ -203,7 +223,7 @@ async def delete_knowledge(entry_id: str):
 
 
 @router.post("/bulk-operation")
-async def bulk_operation(request: BulkOperationRequest):
+async def bulk_operation(request: BulkOperationRequest, _user: dict = Depends(require_user)):
     """Perform bulk operations on multiple entries"""
     try:
         if request.operation == "delete":
@@ -240,6 +260,11 @@ async def bulk_operation(request: BulkOperationRequest):
         else:
             raise HTTPException(status_code=400, detail=f"Unknown operation: {request.operation}")
 
+        audit_record(
+            _user["username"], f"bulk_{request.operation}", "",
+            "", f"批量操作 {len(request.entry_ids)} 个条目",
+        )
+
     except HTTPException:
         raise
     except Exception as e:
@@ -255,7 +280,8 @@ async def upload_file(
     title: str = Form(...),
     category: str = Form(...),
     tags: str = Form(""),
-    summary: Optional[str] = Form(None)
+    summary: Optional[str] = Form(None),
+    _user: dict = Depends(require_user),
 ):
     """Upload a file and process it into the knowledge base"""
     import uuid
@@ -305,6 +331,11 @@ async def upload_file(
         if chunks:
             vector_store.index_chunks(entry.id, chunks)
 
+        audit_record(
+            _user["username"], "upload", entry.id, entry.title,
+            f"文件 {file.filename}，切分 {len(chunks)} 块",
+        )
+
         return UploadProgressResponse(
             upload_id=upload_id,
             file_name=file.filename,
@@ -330,7 +361,7 @@ async def upload_file(
 # ============== URL Processing ==============
 
 @router.post("/add-url", response_model=UploadProgressResponse)
-async def add_url(request: UrlAddRequest):
+async def add_url(request: UrlAddRequest, _user: dict = Depends(require_user)):
     """Add knowledge from a URL"""
     import uuid
     upload_id = str(uuid.uuid4())
@@ -359,6 +390,11 @@ async def add_url(request: UrlAddRequest):
         if chunks:
             vector_store.index_chunks(entry.id, chunks)
 
+        audit_record(
+            _user["username"], "add_url", entry.id, entry.title,
+            f"网页抓取 {request.url}，切分 {len(chunks)} 块",
+        )
+
         return UploadProgressResponse(
             upload_id=upload_id,
             file_name=request.url,
@@ -382,7 +418,7 @@ async def add_url(request: UrlAddRequest):
 # ============== Reindex Entry ==============
 
 @router.post("/{entry_id}/reindex")
-async def reindex_entry(entry_id: str):
+async def reindex_entry(entry_id: str, _user: dict = Depends(require_user)):
     """Reindex a knowledge entry"""
     try:
         entry = crud.get(entry_id)
@@ -400,6 +436,11 @@ async def reindex_entry(entry_id: str):
         # Update entry status
         if success:
             crud.update(entry_id, chunk_count=len(chunks))
+
+        audit_record(
+            _user["username"], "reindex", entry_id, entry.title,
+            f"重建向量索引，{len(chunks)} 块，{'成功' if success else '失败'}",
+        )
 
         return {
             "message": "Entry reindexed successfully" if success else "Reindex failed",
@@ -421,10 +462,39 @@ async def search_knowledge(request: SearchRequest):
     """Search published knowledge chunks by semantic similarity"""
     try:
         docs = await get_rag_service().search(request.query, top_k=request.top_k)
+        # 搜索计数：供主工作台"搜索次数"卡片使用
+        bump_counter("search_total")
         return {"success": True, "query": request.query, "results": docs, "total": len(docs)}
     except Exception as e:
         logger.error(f"Error searching knowledge: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============== Workspace Stats（主工作台统计卡片） ==============
+
+@router.get("/workspace-stats")
+async def get_workspace_stats():
+    """主工作台统计：知识条目 / 本月上传 / 搜索次数。
+    注意：必须定义在 GET /{entry_id} 之前，否则路径会被吞。"""
+    from .audit import get_counters
+
+    stats = crud.get_statistics()
+
+    month_prefix = datetime.now().strftime("%Y-%m")
+    uploads_this_month = sum(
+        1
+        for item in audit_list_entries(limit=100000)["entries"]
+        if item.get("action") in ("upload", "add_url", "create")
+        and datetime.fromtimestamp(item.get("ts", 0)).strftime("%Y-%m") == month_prefix
+    )
+
+    return {
+        "total_entries": stats["total_entries"],
+        "indexed_entries": stats["status_counts"].get("indexed", 0),
+        "total_chunks": stats["total_chunks"],
+        "uploads_this_month": uploads_this_month,
+        "search_total": get_counters().get("search_total", 0),
+    }
 
 
 # ============== Unanswered Queries ==============

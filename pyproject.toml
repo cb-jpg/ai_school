@@ -47,8 +47,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# aiohttp 已由主依赖提供（>=3.10,<4），此处只补充 B 站直播所需的编解码包。
+# 旧版这里的 "aiohttp~=3.9.0" 与主依赖的 "aiohttp>=3.10" 冲突，导致 uv 无法解析锁定。
 bilibili = [
-    "aiohttp~=3.9.0",
     "Brotli~=1.1.0",
     "yarl~=1.9.3",
 ]

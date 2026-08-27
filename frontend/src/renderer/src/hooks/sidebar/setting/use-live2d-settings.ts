@@ -30,7 +30,9 @@ export const useLive2dSettings = () => {
   }, [Live2DConfigContext?.modelInfo]);
 
   useEffect(() => {
-    if (Live2DConfigContext && modelInfo) {
+    // url 为空的兜底对象不要推回 Provider：会覆盖真实模型配置（emotionMap 等）为最小值。
+    // 只有上下文里已有有效模型、或用户确实改动开关字段时才同步。
+    if (Live2DConfigContext && modelInfo?.url) {
       Live2DConfigContext.setModelInfo(modelInfo);
     }
   }, [modelInfo.pointerInteractive, modelInfo.scrollToResize]);

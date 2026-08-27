@@ -70,6 +70,11 @@ const createConfig = async (outDir: string) => ({
         target: 'http://localhost:12393',
         changeOrigin: true,
       },
+      // Proxy background images to backend
+      '/bg': {
+        target: 'http://localhost:12393',
+        changeOrigin: true,
+      },
     },
   },
   build: {

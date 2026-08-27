@@ -14,7 +14,6 @@ import {
   Spinner,
   Checkbox,
   Badge,
-  createToaster
 } from '@chakra-ui/react';
 import {
   DialogRoot,
@@ -33,12 +32,8 @@ import {
 } from 'react-icons/fi';
 import { useEffect, useState, useCallback } from 'react';
 import { useKnowledgeAdminAPI, type SearchResult, type Document } from '@/services/knowledge-admin-api';
+import { toaster } from '@/components/ui/toaster';
 
-const toaster = createToaster({
-  placement: 'top-end',
-  overlap: true,
-  max: 3
-});
 
 const swissFont = '"Helvetica Neue", Arial, sans-serif';
 const ink = '#121826';

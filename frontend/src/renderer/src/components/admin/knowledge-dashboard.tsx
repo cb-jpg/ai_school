@@ -11,7 +11,6 @@ import {
   HStack,
   VStack,
   Spinner,
-  createToaster
 } from '@chakra-ui/react';
 import {
   FiFileText,
@@ -22,12 +21,8 @@ import {
 } from 'react-icons/fi';
 import { useEffect, useState } from 'react';
 import { useKnowledgeAdminAPI, type Statistics } from '@/services/knowledge-admin-api';
+import { toaster } from '@/components/ui/toaster';
 
-const toaster = createToaster({
-  placement: 'top-end',
-  overlap: true,
-  max: 3
-});
 
 const ink = '#121826';
 const muted = '#586174';
