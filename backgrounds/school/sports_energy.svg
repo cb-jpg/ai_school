@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sp" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fff4e5"/>
+      <stop offset="100%" stop-color="#ffe3c2"/>
+    </linearGradient>
+    <g id="lane"><rect width="1920" height="150"/></g>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#sp)"/>
+  <!-- 跑道：透视弧形色带 -->
+  <path d="M-100 1120 C 500 900 1420 900 2020 1120 L 2020 1220 L -100 1220 Z" fill="#e76f51"/>
+  <path d="M-100 1060 C 520 860 1400 860 2020 1060 L 2020 1140 L -100 1140 Z" fill="#f4a261"/>
+  <path d="M-100 1000 C 540 820 1380 820 2020 1000 L 2020 1076 L -100 1076 Z" fill="#ffd166"/>
+  <g stroke="#ffffff" stroke-width="7" stroke-dasharray="36 30" fill="none" opacity="0.9">
+    <path d="M-100 1010 C 540 832 1380 832 2020 1010"/>
+    <path d="M-100 1070 C 520 872 1400 872 2020 1070"/>
+  </g>
+  <!-- 起点旗门与球 -->
+  <circle cx="960" cy="560" r="120" fill="#3e7cb1" opacity="0.16"/>
+  <circle cx="420" cy="600" r="70" fill="#ffffff"/><path d="M366 573 A70 70 0 0 1 474 573 L420 600 Z" fill="#e05263"/><rect x="416" y="600" width="8" height="34" rx="4" fill="#333"/>
+  <circle cx="1560" cy="640" r="56" fill="#f4971b"/><path d="M1516 608 A52 52 0 0 1 1604 610 M1550 594 h24 M1562 586 v18" stroke="#fff" stroke-width="8" fill="none"/>
+  <!-- 活力星芒 -->
+  <g stroke="#f08a3c" stroke-width="14" stroke-linecap="round" opacity="0.75">
+    <path d="M1180 330 v-90"/><path d="M1180 330 l64 -64"/><path d="M1180 330 l-64 -64"/>
+  </g>
+</svg>

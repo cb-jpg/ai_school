@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="cw" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fffdf5"/>
+      <stop offset="100%" stop-color="#fdf6e3"/>
+    </linearGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#cw)"/>
+  <!-- 黑板 -->
+  <rect x="510" y="160" width="900" height="470" rx="14" fill="#2f5d50"/>
+  <rect x="530" y="180" width="860" height="430" rx="10" fill="#38705f"/>
+  <g stroke="#e9f4ef" stroke-width="6" stroke-linecap="round" fill="none" opacity="0.85">
+    <path d="M600 260 h380"/><path d="M600 320 h300"/><path d="M600 380 h420"/>
+    <circle cx="1180" cy="300" r="52"/>
+    <path d="M1128 346 a80 80 0 0 0 104 -92" stroke="#ffd98a"/>
+    <path d="M1240 480 l64 -46 l64 46 M1252 480 v70 h104 v-70"/>
+    <path d="M600 452 c30 -26 60 -26 90 0 s60 26 90 0 s60 -26 90 0" stroke="#cfe8dd"/>
+  </g>
+  <!-- 粉笔槽 -->
+  <rect x="500" y="640" width="920" height="22" rx="11" fill="#d9cdb2"/>
+  <!-- 讲台 -->
+  <polygon points="640,700 1280,700 1240,1080 680,1080" fill="#c9a56a"/>
+  <polygon points="620,660 1300,660 1280,700 640,700" fill="#b58f52"/>
+  <!-- 課桌轮廓 -->
+  <g fill="#88b4a2" opacity="0.55">
+    <ellipse cx="300" cy="1020" rx="230" ry="90"/><ellipse cx="1620" cy="1020" rx="230" ry="90"/>
+  </g>
+  <text x="960" y="1230" font-family="'Segoe UI', sans-serif" font-size="44" fill="#98a86a" text-anchor="middle" opacity="0.001">.</text>
+</svg>
