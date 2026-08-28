@@ -1,6 +1,7 @@
 """
 FastAPI routes for knowledge base management.
 """
+import asyncio
 from typing import List, Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
@@ -144,9 +145,9 @@ async def create_knowledge(request: KnowledgeCreateRequest, _user: dict = Depend
         # Save entry
         created = crud.create(entry)
 
-        # Index chunks
+        # Index chunks（embedding 是 CPU 密集运算，放线程池避免阻塞事件循环）
         if chunks:
-            vector_store.index_chunks(entry.id, chunks)
+            await asyncio.to_thread(vector_store.index_chunks, entry.id, chunks)
 
         audit_record(
             _user["username"], "create", entry.id, entry.title,
@@ -249,10 +250,11 @@ async def bulk_operation(request: BulkOperationRequest, _user: dict = Depends(re
 
         elif request.operation == "reindex":
             results = {}
+            # 重建是重操作，逐条放线程池避免阻塞事件循环
             for entry_id in request.entry_ids:
-                chunks = vector_store.load_entry_chunks(entry_id)
+                chunks = await asyncio.to_thread(vector_store.load_entry_chunks, entry_id)
                 if chunks:
-                    results[entry_id] = vector_store.index_chunks(entry_id, chunks)
+                    results[entry_id] = await asyncio.to_thread(vector_store.index_chunks, entry_id, chunks)
                 else:
                     results[entry_id] = False
             return {"results": results, "message": "Bulk reindex completed"}
@@ -302,7 +304,8 @@ async def upload_file(
         upload_dir = Path("data/knowledge/documents")
         upload_dir.mkdir(parents=True, exist_ok=True)
 
-        file_path = upload_dir / file.filename
+        # 不信任客户端文件名：防路径穿越（如 ../../conf.yaml）与同名覆盖，仅保留扩展名
+        file_path = upload_dir / f"{upload_id}{Path(file.filename).suffix}"
         with open(file_path, "wb") as f:
             content = await file.read()
             f.write(content)
@@ -327,9 +330,9 @@ async def upload_file(
         # Save entry
         crud.create(entry)
 
-        # Index chunks
+        # Index chunks（embedding 是 CPU 密集运算，放线程池避免阻塞事件循环）
         if chunks:
-            vector_store.index_chunks(entry.id, chunks)
+            await asyncio.to_thread(vector_store.index_chunks, entry.id, chunks)
 
         audit_record(
             _user["username"], "upload", entry.id, entry.title,
@@ -386,9 +389,9 @@ async def add_url(request: UrlAddRequest, _user: dict = Depends(require_user)):
         # Save entry
         crud.create(entry)
 
-        # Index chunks
+        # Index chunks（embedding 是 CPU 密集运算，放线程池避免阻塞事件循环）
         if chunks:
-            vector_store.index_chunks(entry.id, chunks)
+            await asyncio.to_thread(vector_store.index_chunks, entry.id, chunks)
 
         audit_record(
             _user["username"], "add_url", entry.id, entry.title,
@@ -430,8 +433,8 @@ async def reindex_entry(entry_id: str, _user: dict = Depends(require_user)):
         if not chunks:
             raise HTTPException(status_code=400, detail="No chunks found for entry")
 
-        # Reindex
-        success = vector_store.index_chunks(entry_id, chunks)
+        # Reindex（放线程池，避免 embedding 阻塞事件循环）
+        success = await asyncio.to_thread(vector_store.index_chunks, entry_id, chunks)
 
         # Update entry status
         if success:

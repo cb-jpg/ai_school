@@ -69,17 +69,19 @@ class DocumentProcessor:
         try:
             # Extract text based on file type
             if file_ext == '.txt':
-                text_content = await self._process_txt(file_path)
+                extractor = self._process_txt
             elif file_ext == '.md':
-                text_content = await self._process_markdown(file_path)
+                extractor = self._process_markdown
             elif file_ext == '.pdf':
-                text_content = await self._process_pdf(file_path)
+                extractor = self._process_pdf
             elif file_ext in ['.doc', '.docx']:
-                text_content = await self._process_word(file_path)
+                extractor = self._process_word
             elif file_ext in ['.xls', '.xlsx']:
-                text_content = await self._process_excel(file_path)
+                extractor = self._process_excel
             else:
                 raise ValueError(f"Unsupported file type: {file_ext}")
+            # 文件解析是同步操作，放线程池避免大文件卡住事件循环
+            text_content = await asyncio.to_thread(extractor, file_path)
 
             if not text_content or len(text_content.strip()) < 10:
                 raise ValueError("Extracted text is too short or empty")
@@ -168,8 +170,8 @@ class DocumentProcessor:
                         raise ValueError("网页内容超过 5MB 限制")
                     html = await response.text()
 
-            # Parse HTML
-            soup = BeautifulSoup(html, 'html.parser')
+            # Parse HTML（放线程池，大页面解析避免阻塞事件循环）
+            soup = await asyncio.to_thread(BeautifulSoup, html, 'html.parser')
 
             # Extract title if not provided
             if not title:
@@ -177,7 +179,7 @@ class DocumentProcessor:
                 title = title_tag.text.strip() if title_tag else url
 
             # Extract main content
-            text_content = self._extract_main_content(soup)
+            text_content = await asyncio.to_thread(self._extract_main_content, soup)
 
             if not text_content or len(text_content.strip()) < 10:
                 raise ValueError("Extracted web content is too short or empty")
@@ -285,12 +287,12 @@ class DocumentProcessor:
             logger.error(f"Error creating manual entry {title}: {e}")
             raise
 
-    async def _process_txt(self, file_path: Path) -> str:
+    def _process_txt(self, file_path: Path) -> str:
         """Process plain text file"""
         with open(file_path, 'r', encoding='utf-8') as f:
             return f.read()
 
-    async def _process_markdown(self, file_path: Path) -> str:
+    def _process_markdown(self, file_path: Path) -> str:
         """Process markdown file"""
         with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
@@ -298,7 +300,7 @@ class DocumentProcessor:
         content = re.sub(r'[#*`_\[\]]', '', content)
         return content
 
-    async def _process_pdf(self, file_path: Path) -> str:
+    def _process_pdf(self, file_path: Path) -> str:
         """Process PDF file"""
         try:
             import PyPDF2
@@ -311,7 +313,7 @@ class DocumentProcessor:
         except ImportError:
             raise RuntimeError("PyPDF2 not installed. Install with: pip install PyPDF2")
 
-    async def _process_word(self, file_path: Path) -> str:
+    def _process_word(self, file_path: Path) -> str:
         """Process Word document"""
         try:
             import docx
@@ -323,7 +325,7 @@ class DocumentProcessor:
         except ImportError:
             raise RuntimeError("python-docx not installed. Install with: pip install python-docx")
 
-    async def _process_excel(self, file_path: Path) -> str:
+    def _process_excel(self, file_path: Path) -> str:
         """Process Excel file"""
         try:
             import openpyxl
