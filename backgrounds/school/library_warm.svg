@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fdf3e3"/>
+      <stop offset="100%" stop-color="#f3e0c7"/>
+    </linearGradient>
+    <linearGradient id="shelf" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a0714b"/>
+      <stop offset="100%" stop-color="#6b4425"/>
+    </linearGradient>
+    <g id="books">
+      <rect width="26" height="86" fill="#c94f3d"/>
+      <rect x="28" width="20" height="72" y="14" fill="#3e6b8f"/>
+      <rect x="50" width="30" height="90" y="-4" fill="#d9a441"/>
+      <rect x="82" width="22" height="80" y="6" fill="#5f8a5c"/>
+      <rect x="106" width="26" height="68" y="18" fill="#8a5fa0"/>
+      <rect x="134" width="24" height="84" y="2" fill="#40829a"/>
+      <rect x="160" width="30" height="74" y="12" fill="#b0562f"/>
+    </g>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#wall)"/>
+  <!-- 三排书架 -->
+  <g transform="translate(140,220)"><rect width="520" height="300" rx="10" fill="url(#shelf)"/>
+    <use href="#books" x="60" y="190"/><use href="#books" x="270" y="180"/>
+    <rect y="98" width="520" height="12" fill="#59371d"/></g>
+  <g transform="translate(700,140)"><rect width="520" height="380" rx="10" fill="url(#shelf)"/>
+    <use href="#books" x="66" y="150"/><use href="#books" x="280" y="165"/>
+    <rect y="98" width="520" height="12" fill="#59371d"/></g>
+  <g transform="translate(1260,240)"><rect width="520" height="280" rx="10" fill="url(#shelf)"/>
+    <use href="#books" x="70" y="170"/><use href="#books" x="276" y="182"/>
+    <rect y="96" width="520" height="12" fill="#59371d"/></g>
+  <!-- 阅读台灯 -->
+  <circle cx="960" cy="950" r="140" fill="#ffd98a" opacity="0.45"/>
+  <path d="M900 720 h120 l-24 -70 h-72 z" fill="#40829a"/>
+  <rect x="952" y="720" width="16" height="90" fill="#2c5a75"/>
+  <rect x="900" y="810" width="120" height="14" rx="7" fill="#2c5a75"/>
+  <text x="960" y="1046" font-family="'Segoe UI', sans-serif" font-size="44" fill="#8a6a48" text-anchor="middle" opacity="0.8">阅 读 · 思 考 · 成 长</text>
+</svg>

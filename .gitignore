@@ -16,6 +16,7 @@ conf.yaml
 # ignore non-default character configs
 /characters/*
 !/characters/README.md
+!/characters/HOW_TO_ADD_CHARACTER.md
 
 # ignore avatars
 avatars/*
@@ -68,7 +69,6 @@ asset
 # Local development outputs
 .pytest_cache/
 .ruff_cache/
-uv.lock
 node_modules/
 frontend/dist/
 frontend/out/

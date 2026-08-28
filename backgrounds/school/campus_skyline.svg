@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#dbeafe"/>
+      <stop offset="55%" stop-color="#e8f0fe"/>
+      <stop offset="100%" stop-color="#f5f7fa"/>
+    </linearGradient>
+    <linearGradient id="bldg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#9dbdd8"/>
+      <stop offset="100%" stop-color="#1e5494"/>
+    </linearGradient>
+    <linearGradient id="bldgFar" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#c3d6e8"/>
+      <stop offset="100%" stop-color="#7fa4c4"/>
+    </linearGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#sky)"/>
+  <circle cx="1600" cy="220" r="90" fill="#ffe9a8" opacity="0.9"/>
+  <!-- 远处楼群 -->
+  <rect x="120" y="600" width="260" height="480" fill="url(#bldgFar)" opacity="0.55"/>
+  <rect x="420" y="520" width="300" height="560" fill="url(#bldgFar)" opacity="0.45"/>
+  <rect x="1480" y="560" width="340" height="520" fill="url(#bldgFar)" opacity="0.5"/>
+  <!-- 主教学楼与钟楼 -->
+  <rect x="700" y="300" width="90" height="780" fill="url(#bldg)"/>
+  <polygon points="745,180 700,300 790,300" fill="#1e5494"/>
+  <circle cx="745" cy="255" r="34" fill="#ffffff"/>
+  <path d="M745 235 v22 M735 247 h20" stroke="#1e5494" stroke-width="5" stroke-linecap="round"/>
+  <polygon points="700,300 745,283 790,300" fill="#16406f"/>
+  <rect x="830" y="450" width="420" height="630" fill="url(#bldg)"/>
+  <rect x="1290" y="560" width="240" height="520" fill="url(#bldg)"/>
+  <rect x="330" y="640" width="350" height="440" fill="url(#bldg)" opacity="0.9"/>
+  <g fill="#ffffff" opacity="0.75">
+    <rect x="860" y="500" width="52" height="72"/><rect x="950" y="500" width="52" height="72"/><rect x="1040" y="500" width="52" height="72"/><rect x="1130" y="500" width="52" height="72"/>
+    <rect x="860" y="640" width="52" height="72"/><rect x="950" y="640" width="52" height="72"/><rect x="1040" y="640" width="52" height="72"/><rect x="1130" y="640" width="52" height="72"/>
+    <rect x="1320" y="620" width="46" height="64"/><rect x="1400" y="620" width="46" height="64"/><rect x="1480" y="620" width="26" height="64"/>
+    <rect x="370" y="700" width="44" height="60"/><rect x="450" y="700" width="44" height="60"/><rect x="530" y="700" width="44" height="60"/><rect x="610" y="700" width="44" height="60"/>
+  </g>
+  <!-- 前景绿化带 -->
+  <ellipse cx="400" cy="1090" rx="520" ry="130" fill="#a7c957" opacity="0.65"/>
+  <ellipse cx="1500" cy="1100" rx="640" ry="150" fill="#a7c957" opacity="0.55"/>
+</svg>
