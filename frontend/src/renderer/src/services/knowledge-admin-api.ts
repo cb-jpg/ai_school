@@ -68,7 +68,7 @@ function normalizeCategory(category?: string): string {
   return CATEGORY_MAP[category] || 'other';
 }
 
-async function request(path: string, init: RequestInit = {}): Promise<any> {
+async function request<T = any>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await authFetch(path, init);
   if (!response.ok) {
     const detail = await response

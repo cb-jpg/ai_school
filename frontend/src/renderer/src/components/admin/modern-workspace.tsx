@@ -10,13 +10,12 @@ import {
   FiDatabase,
   FiUpload,
   FiSearch,
-  FiUsers,
   FiTrendingUp,
   FiTrendingDown,
   FiPlus,
 } from 'react-icons/fi';
 import { useAdmin } from '@/context/admin-context';
-import { useKnowledgeAdminAPI } from '@/services/knowledge-admin-api';
+import { fetchWorkspaceStats, WorkspaceStats } from '@/services/knowledge-admin-api';
 import { toaster } from '@/components/ui/toaster';
 
 
@@ -188,7 +187,6 @@ const ActionCard: FC<{
 // 主工作台组件
 export const ModernMainWorkspace: FC = () => {
   const { openAdmin } = useAdmin();
-  const { fetchWorkspaceStats } = useKnowledgeAdminAPI();
   const [stats, setStats] = useState<WorkspaceStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
