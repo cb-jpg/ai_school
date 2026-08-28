@@ -4,11 +4,14 @@ conf.yaml
 # ignore non-default background images
 /backgrounds/*
 !/backgrounds/README.md
+!/backgrounds/school
 
 # ignore non-default live2d models
 /live2d-models/*
 !/live2d-models/mao_pro
 !/live2d-models/shizuku
+!/live2d-models/hiyori_free
+!/live2d-models/hiyori_pro
 
 # ignore non-default character configs
 /characters/*
