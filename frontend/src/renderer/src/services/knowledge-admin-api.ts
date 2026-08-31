@@ -6,6 +6,7 @@
  */
 
 import { authFetch } from '@/services/auth';
+import { apiUrl } from '@/services/api-base';
 
 // ============== Type Definitions ==============
 
@@ -86,7 +87,7 @@ async function request<T = any>(path: string, init: RequestInit = {}): Promise<T
  * Check API health（主服务 /health，无需登录）
  */
 export async function checkHealth(): Promise<{ status: string; timestamp: string; service: string }> {
-  const response = await fetch('/health');
+  const response = await fetch(apiUrl('/health'));
   if (!response.ok) {
     throw new Error(`Health check failed: ${response.statusText}`);
   }

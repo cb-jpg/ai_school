@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { apiUrl } from '@/services/api-base';
 
 export type AsrMode = 'auto' | 'web_speech' | 'sherpa_onnx';
 export type AsrInputType = 'web_speech' | 'server_asr';
@@ -375,7 +376,7 @@ export class ServerAsrAdapter {
       view.setInt16(44 + index * 2, clipped * (clipped < 0 ? 0x8000 : 0x7fff), true);
     });
 
-    const response = await fetch('/asr', {
+    const response = await fetch(apiUrl('/asr'), {
       method: 'POST',
       body: (() => {
         const form = new FormData();
@@ -416,7 +417,7 @@ export function useDualAsr(onText: (text: string, inputType: AsrInputType) => vo
   };
 
   useEffect(() => {
-    fetch('/verification/config')
+    fetch(apiUrl('/verification/config'))
       .then((response) => response.json())
       .then((value) => {
         setMode(value.asr_mode || 'auto');

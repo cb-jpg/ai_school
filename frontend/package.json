@@ -22,9 +22,13 @@
     "build:linux": "electron-vite build && electron-builder --linux",
     "dev:web": "vite serve src/renderer --config vite.config.ts",
     "build:web": "vite build --config vite.config.ts --mode web",
+    "android:sync": "npm run build:web && npx cap sync android",
+    "android:run": "npx cap run android",
     "extract-translations": "i18next-scanner --config i18next-scanner.config.js"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
     "@chakra-ui/react": "^3.2.3",
     "@chatscope/chat-ui-kit-react": "^2.0.3",
     "@chatscope/chat-ui-kit-styles": "^1.4.0",
@@ -50,6 +54,8 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.0",
     "@electron-toolkit/eslint-config-prettier": "^2.0.0",
     "@electron-toolkit/eslint-config-ts": "^2.0.0",
     "@electron-toolkit/tsconfig": "^1.0.1",

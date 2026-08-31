@@ -6,6 +6,7 @@
 // @ts-nocheck
 import { useEffect, useRef, useCallback, useState, RefObject } from "react";
 import { ModelInfo } from "@/context/live2d-config-context";
+import { resolveApiBaseUrl } from "@/services/api-base";
 import { updateModelConfig } from '../../../WebSDK/src/lappdefine';
 import { LAppDelegate } from '../../../WebSDK/src/lappdelegate';
 import { initializeLive2D } from '@cubismsdksamples/main';
@@ -29,13 +30,11 @@ function parseModelUrl(url: string): { baseUrl: string; modelDir: string; modelF
   try {
     console.log('[parseModelUrl] Parsing URL:', url);
 
-    // 如果是相对路径，转换为绝对路径
+    // 如果是相对路径，转换为后端绝对地址
     let absoluteUrl = url;
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      // 使用当前页面的协议和主机
-      const protocol = window.location.protocol || 'http:';
-      const host = window.location.host || 'localhost:12393'; // 使用后端服务器的端口
-      absoluteUrl = `${protocol}//${host}${url.startsWith('/') ? url : '/' + url}`;
+      const base = resolveApiBaseUrl();
+      absoluteUrl = `${base}${url.startsWith('/') ? url : '/' + url}`;
     }
 
     const urlObj = new URL(absoluteUrl);

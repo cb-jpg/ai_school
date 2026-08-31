@@ -45,6 +45,9 @@ const createConfig = async (outDir: string) => ({
   },
   root: path.join(__dirname, "src/renderer"),
   publicDir: path.join(__dirname, "src/renderer/public"),
+  // env 文件放在 frontend/ 根（.env.web / .env.web.local）。
+  // 不设置时 envDir 默认跟 root（src/renderer），导致 .env.* 从未被加载。
+  envDir: __dirname,
   base: "./",
   server: {
     port: 3000,

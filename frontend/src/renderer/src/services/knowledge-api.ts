@@ -2,6 +2,7 @@
  * Knowledge base API service
  */
 import { useWebSocket } from '@/context/websocket-context';
+import { apiUrl } from '@/services/api-base';
 import {
   KnowledgeEntry,
   KnowledgeDetailResponse,
@@ -11,7 +12,7 @@ import {
   UrlAddRequest
 } from '@/types/knowledge';
 
-const API_BASE = '/api/knowledge';
+const API_BASE = apiUrl('/api/knowledge');
 
 /**
  * Fetch knowledge list with filters

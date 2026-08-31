@@ -4,6 +4,8 @@
  * 收到 401 时清除本地凭证并广播 kb-unauthorized 事件（AuthProvider 监听后回到登录页）。
  */
 
+import { apiUrl } from '@/services/api-base';
+
 const TOKEN_KEY = 'kb_token';
 const USER_KEY = 'kb_user';
 
@@ -36,7 +38,7 @@ export function clearAuth(): void {
 }
 
 export async function login(username: string, password: string): Promise<AuthUser> {
-  const response = await fetch('/api/auth/login', {
+  const response = await fetch(apiUrl('/api/auth/login'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
@@ -53,14 +55,16 @@ export async function login(username: string, password: string): Promise<AuthUse
   return data.user as AuthUser;
 }
 
-/** 带认证的 fetch：401 时清除凭证并通知全局回到登录页 */
+/** 带认证的 fetch：相对路径自动拼接后端地址；401 时清除凭证并通知全局回到登录页 */
 export async function authFetch(input: RequestInfo, init: RequestInit = {}): Promise<Response> {
   const token = getStoredToken();
   const headers = new Headers(init.headers || {});
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
-  const response = await fetch(input, { ...init, headers });
+  // 相对路径在 App 内会打到 WebView 本地，统一解析为后端绝对地址
+  const url = typeof input === 'string' ? apiUrl(input) : input;
+  const response = await fetch(url, { ...init, headers });
   if (response.status === 401) {
     clearAuth();
     window.dispatchEvent(new Event('kb-unauthorized'));

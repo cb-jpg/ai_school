@@ -4,6 +4,8 @@
  * 会话内缓存一次结果；模型目录变更后可调用 invalidateLive2dModelsCache() 强制刷新。
  */
 
+import { apiUrl } from '@/services/api-base';
+
 export interface Live2dCharacter {
   /** 模型目录名，同时作为唯一标识 */
   id: string;
@@ -63,7 +65,7 @@ function splitDescription(raw: string): { name: string; description: string } {
 
 export async function fetchLive2dModels(): Promise<Live2dCharacter[]> {
   // 注意：该接口在 routes.py 中注册时无 /api 前缀；vite 代理与生产部署均会转发 /live2d-models
-  const response = await fetch('/live2d-models/info');
+  const response = await fetch(apiUrl('/live2d-models/info'));
   if (!response.ok) {
     throw new Error(`获取角色列表失败（${response.status}）`);
   }

@@ -9,6 +9,7 @@
 import { CubismMatrix44 } from '@framework/math/cubismmatrix44';
 import { ACubismMotion } from '@framework/motion/acubismmotion';
 import { csmVector } from '@framework/type/csmvector';
+import { CubismFramework } from '@framework/live2dcubismframework';
 
 import * as LAppDefine from './lappdefine';
 import { canvas } from './lappglmanager';
@@ -16,6 +17,24 @@ import { LAppModel } from './lappmodel';
 import { LAppPal } from './lapppal';
 
 export let s_instance: LAppLive2DManager | null | undefined = null;
+
+let _cubismFrameworkReady = false;
+
+// Fresh sessions can reach model loading before LAppDelegate.initializeCubism()
+// runs (e.g. model info arriving over WebSocket), which used to crash with
+// "Cannot read properties of null (reading 'getId')". Make the framework
+// startup idempotent and run it before any model load.
+export function ensureCubismFramework(): void {
+  if (_cubismFrameworkReady) {
+    return;
+  }
+  CubismFramework.startUp({
+    logFunction: LAppPal.printMessage,
+    loggingLevel: LAppDefine.CubismLoggingLevel,
+  });
+  CubismFramework.initialize();
+  _cubismFrameworkReady = true;
+}
 
 /**
  * サンプルアプリケーションにおいてCubismModelを管理するクラス
@@ -188,6 +207,9 @@ export class LAppLive2DManager {
     if (LAppDefine.DebugLogEnable) {
       LAppPal.printMessage(`[APP]model index: ${this._sceneIndex}`);
     }
+
+    // Model loading requires the Cubism framework to be started first
+    ensureCubismFramework();
 
     // Use the directory name and file name from our configuration
     const model: string = LAppDefine.ModelDir[index];

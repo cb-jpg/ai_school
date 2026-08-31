@@ -4,34 +4,9 @@ import React, {
 } from 'react';
 import { wsService } from '@/services/websocket-service';
 import { useLocalStorage } from '@/hooks/utils/use-local-storage';
-
-const LEGACY_WS_URL = 'ws://127.0.0.1:12393/client-ws';
-const LEGACY_BASE_URL = 'http://127.0.0.1:12393';
-
-const getDefaultUrls = () => {
-  if (typeof window !== 'undefined' && ['http:', 'https:'].includes(window.location.protocol)) {
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-
-    // 检测是否在开发模式下运行（端口不是 12393）
-    const isDevMode = !host.includes(':12393') && !host.includes('127.0.0.1:12393');
-
-    if (isDevMode) {
-      // 开发模式下，使用后端服务器的地址
-      console.log('[WebSocket] 检测到开发模式，使用后端服务器地址');
-      return {
-        wsUrl: `${wsProtocol}//127.0.0.1:12393/client-ws`,
-        baseUrl: 'http://127.0.0.1:12393',
-      };
-    }
-
-    return {
-      wsUrl: `${wsProtocol}//${host}/client-ws`,
-      baseUrl: window.location.origin,
-    };
-  }
-  return { wsUrl: LEGACY_WS_URL, baseUrl: LEGACY_BASE_URL };
-};
+import {
+  LEGACY_WS_URL, LEGACY_BASE_URL, getDefaultUrls,
+} from '@/services/api-base';
 
 const defaults = getDefaultUrls();
 const DEFAULT_WS_URL = defaults.wsUrl;

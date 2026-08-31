@@ -2,6 +2,7 @@ import { Box, Image } from '@chakra-ui/react';
 import { memo, useEffect, useRef } from 'react';
 import { useCamera } from '@/context/camera-context';
 import { useBgUrl } from '@/context/bgurl-context';
+import { apiUrl } from '@/services/api-base';
 
 const Background = memo(({ children }: { children?: React.ReactNode }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -50,7 +51,7 @@ const Background = memo(({ children }: { children?: React.ReactNode }) => {
       ) : (
         backgroundUrl ? (
           <Image
-            src={backgroundUrl}
+            src={backgroundUrl.startsWith('/') ? apiUrl(backgroundUrl) : backgroundUrl}
             alt="background"
             width="100%"
             height="100%"

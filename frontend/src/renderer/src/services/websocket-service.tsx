@@ -5,6 +5,7 @@ import { Subject } from 'rxjs';
 import { ModelInfo } from '@/context/live2d-config-context';
 import { HistoryInfo } from '@/context/websocket-context';
 import { ConfigFile } from '@/context/character-config-context';
+import { withToken } from '@/services/api-base';
 import { toaster } from '@/components/ui/toaster';
 
 export interface DisplayText {
@@ -147,7 +148,7 @@ class WebSocketService {
     }
 
     try {
-      this.ws = new WebSocket(url);
+      this.ws = new WebSocket(withToken(url));
       this.currentState = 'CONNECTING';
       this.stateSubject.next('CONNECTING');
 

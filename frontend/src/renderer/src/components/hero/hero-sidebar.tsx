@@ -5,6 +5,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
+import { apiUrl } from '@/services/api-base';
 import {
   Box,
   VStack,
@@ -203,8 +204,8 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
           stopBackgroundCamera();
           setUseCameraBackground(false);
         }
-        const targetUrl = bg.url || '';
-        // 直接使用URL（已经是完整的URL）
+        const targetUrl = bg.url ? apiUrl(bg.url) : '';
+        // 相对路径已拼接为后端绝对地址
         setBackgroundUrl(targetUrl);
 
         // 加载校验：预设图片加载失败时回退默认背景并提示，避免黑屏/裂图
