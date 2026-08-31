@@ -181,6 +181,8 @@ adb install -r D:/SRP/AI_school/Open-LLM-VTuber/frontend/android/app/build/outpu
 3. 改前端后重新出 APK：`npm run android:sync` → gradle（见上文命令序列）
 4. 改服务端 py：scp 对应文件到 ~/ai_school 相对路径 → 按标准姿势重启 → 跑 `scripts/ws_token_e2e_test.py` 回归
 
+> ⏭️ **本文记录到这里为止。后续进展（手机端布局优化/体验补全/二轮修复）见 `DAILY_PROGRESS_2026-09-01.md`。**
+
 ---
 
 ## 🌙 晚间追加：真机 USB 联调完成（23:40 更新，待办 #1 ✅）
