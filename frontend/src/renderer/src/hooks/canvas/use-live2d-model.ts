@@ -11,6 +11,7 @@ import { updateModelConfig } from '../../../WebSDK/src/lappdefine';
 import { LAppDelegate } from '../../../WebSDK/src/lappdelegate';
 import { initializeLive2D } from '@cubismsdksamples/main';
 import { useMode } from '@/context/mode-context';
+import { applyScale } from './use-live2d-resize';
 
 interface UseLive2DModelProps {
   modelInfo: ModelInfo | undefined;
@@ -429,6 +430,62 @@ export const useLive2DModel = ({
     }
   }, [isPet, isDragging, electronApi, handleMouseUp]);
 
+  // --- 触摸支持（手机端）：单指拖动/点按复用鼠标逻辑，双指捏合缩放 ---
+  const pinchStartDistRef = useRef(0);
+  const pinchAppliedFactorRef = useRef(1);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      handleMouseDown({ clientX: t.clientX, clientY: t.clientY } as React.MouseEvent);
+    } else if (e.touches.length >= 2) {
+      // 进入双指缩放：取消进行中的单指点按/拖动
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      pinchStartDistRef.current = Math.sqrt(dx * dx + dy * dy);
+      pinchAppliedFactorRef.current = 1;
+      isPotentialTapRef.current = false;
+      setIsDragging(false);
+    }
+  }, [handleMouseDown]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (pinchStartDistRef.current > 0 && e.touches.length >= 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      // 累计目标系数与已应用系数之差即为本次增量（Cubism 的 scale 是乘法）
+      const targetFactor = dist / pinchStartDistRef.current;
+      const delta = targetFactor / (pinchAppliedFactorRef.current || 1);
+      if (delta !== 1) {
+        applyScale(delta);
+        pinchAppliedFactorRef.current = targetFactor;
+      }
+      return;
+    }
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      handleMouseMove({ clientX: t.clientX, clientY: t.clientY } as React.MouseEvent);
+    }
+  }, [handleMouseMove]);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (pinchStartDistRef.current > 0) {
+      // 双指未完全抬起时不结束缩放会话
+      if (e.touches.length < 2) {
+        pinchStartDistRef.current = 0;
+        pinchAppliedFactorRef.current = 1;
+      }
+      return;
+    }
+    const t = e.changedTouches[0];
+    if (t) {
+      handleMouseUp({ clientX: t.clientX, clientY: t.clientY } as React.MouseEvent);
+    } else {
+      handleMouseLeave();
+    }
+  }, [handleMouseUp, handleMouseLeave]);
+
   useEffect(() => {
     if (!isPet && electronApi && isHoveringModelRef.current) {
       isHoveringModelRef.current = false;
@@ -443,6 +500,9 @@ export const useLive2DModel = ({
       onMouseMove: handleMouseMove,
       onMouseUp: handleMouseUp,
       onMouseLeave: handleMouseLeave,
+      onTouchStart: handleTouchStart,
+      onTouchMove: handleTouchMove,
+      onTouchEnd: handleTouchEnd,
     },
   };
 };

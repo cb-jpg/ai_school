@@ -1,11 +1,12 @@
 import { Box, Image } from '@chakra-ui/react';
-import { memo, useEffect, useRef } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { useCamera } from '@/context/camera-context';
 import { useBgUrl } from '@/context/bgurl-context';
 import { apiUrl } from '@/services/api-base';
 
 const Background = memo(({ children }: { children?: React.ReactNode }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [resolvedBgUrl, setResolvedBgUrl] = useState<string | null>(null);
   const {
     backgroundStream, isBackgroundStreaming, startBackgroundCamera, stopBackgroundCamera,
   } = useCamera();
@@ -24,6 +25,44 @@ const Background = memo(({ children }: { children?: React.ReactNode }) => {
       videoRef.current.srcObject = backgroundStream;
     }
   }, [backgroundStream]);
+
+  // 部分 ROM（实测 MagicOS）的 WebView 拦截 <img> 加载 http 图片（请求不进网络栈），
+  // 与 Live2D 纹理同坑。改用 fetch 拿 blob 再走 objectURL 展示。
+  useEffect(() => {
+    if (useCameraBackground || !backgroundUrl) {
+      setResolvedBgUrl(null);
+      return undefined;
+    }
+    // 本地已生成的 blob:/data: 直接用，无需转手
+    if (!backgroundUrl.startsWith('/') && !backgroundUrl.startsWith('http')) {
+      setResolvedBgUrl(backgroundUrl);
+      return undefined;
+    }
+
+    let cancelled = false;
+    let createdUrl: string | null = null;
+    const fullUrl = backgroundUrl.startsWith('/') ? apiUrl(backgroundUrl) : backgroundUrl;
+
+    fetch(fullUrl, { mode: 'cors' })
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.blob();
+      })
+      .then((blob) => {
+        if (cancelled) return;
+        createdUrl = URL.createObjectURL(blob);
+        setResolvedBgUrl(createdUrl);
+      })
+      .catch((error) => {
+        console.warn('[Background] 背景图加载失败，回退渐变底:', error);
+        if (!cancelled) setResolvedBgUrl(null);
+      });
+
+    return () => {
+      cancelled = true;
+      if (createdUrl) URL.revokeObjectURL(createdUrl);
+    };
+  }, [useCameraBackground, backgroundUrl]);
 
   return (
     <Box
@@ -49,9 +88,9 @@ const Background = memo(({ children }: { children?: React.ReactNode }) => {
           }}
         />
       ) : (
-        backgroundUrl ? (
+        resolvedBgUrl ? (
           <Image
-            src={backgroundUrl.startsWith('/') ? apiUrl(backgroundUrl) : backgroundUrl}
+            src={resolvedBgUrl}
             alt="background"
             width="100%"
             height="100%"
@@ -59,6 +98,9 @@ const Background = memo(({ children }: { children?: React.ReactNode }) => {
             position="absolute"
             top={0}
             left={0}
+            // 整体轻虚化：降低背景存在感、突出前景人物与对话（scale 防止模糊边缘露白）
+            filter="blur(8px)"
+            transform="scale(1.08)"
           />
         ) : (
           <Box

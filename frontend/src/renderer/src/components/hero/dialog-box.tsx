@@ -27,6 +27,7 @@ import { useSubtitleDisplay } from '@/hooks/canvas/use-subtitle-display';
 import { useVAD } from '@/context/vad-context';
 import { useChatHistory } from '@/context/chat-history-context';
 import { useLive2DConfig } from '@/context/live2d-config-context';
+import { useSidebar } from '@/hooks/sidebar/use-sidebar';
 
 // 移除 emoji 表情符号，只保留纯文本
 function removeEmojiTags(text: string): string {
@@ -62,8 +63,18 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
   const { micOn, startMic, stopMic, autoStopMic, setAutoStopMic } = useVAD();
   const { messages, historyList } = useChatHistory();
   const { modelInfo, isLoading: modelLoading } = useLive2DConfig();
+  const { createNewHistory } = useSidebar();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const prevMessageCountRef = useRef(messages.length);
+
+  // 继续对话时自动收起历史面板（新消息一到即收）
+  useEffect(() => {
+    if (showHistory && messages.length > prevMessageCountRef.current) {
+      setShowHistory(false);
+    }
+    prevMessageCountRef.current = messages.length;
+  }, [messages.length, showHistory]);
 
   // 确保麦克风不会自动启动（仅在首次加载时执行）
   useEffect(() => {
@@ -141,9 +152,14 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
         </Alert>
       )}
 
-      <VStack gap={6} align="stretch" flex={1} overflow="hidden">
-        {/* Status Indicator */}
-        <HStack gap={2} mb={4} justify="space-between">
+      <VStack gap={{ base: 3, md: 6 }} align="stretch" flex={1} overflow="hidden">
+        {/* Status Indicator（手机端排在标题下方，order 见各块） */}
+        <HStack
+          gap={2}
+          mb={{ base: 2, md: 4 }}
+          justify="space-between"
+          order={{ base: 1, md: 0 }}
+        >
           <HStack gap={2}>
             <Box
               w={2}
@@ -167,8 +183,9 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
               variant="ghost"
               color={schoolColors.textSecondary}
               onClick={() => {
-                // 创建新对话的逻辑
-                console.log('创建新对话');
+                // 创建新对话：打断播报 + 通知后端开新会话
+                createNewHistory();
+                setShowHistory(false);
               }}
             >
               <FiPlus />
@@ -185,22 +202,23 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
           </HStack>
         </HStack>
 
-        <Box>
+        {/* 标题块：手机端移到最上方并缩小，为聊天卡片腾出空间 */}
+        <Box order={{ base: 0, md: 1 }}>
           <Text
-            fontSize={{ base: '2xl', sm: '4xl', md: '5xl' }}
+            fontSize={{ base: 'lg', sm: '4xl', md: '5xl' }}
             fontWeight="bold"
             color={schoolColors.text}
-            mb={3}
+            mb={{ base: 1, sm: 3 }}
             style={{ fontFamily: '"Helvetica Neue", Arial, sans-serif' }}
           >
             {tagline}
           </Text>
 
           <Text
-            fontSize={{ base: 'sm', sm: 'base', md: 'lg' }}
+            fontSize={{ base: 'xs', sm: 'base', md: 'lg' }}
             color={schoolColors.textSecondary}
             maxW={{ base: 'sm', sm: 'lg', md: 'xl' }}
-            mb={{ base: 4, sm: 5 }}
+            mb={{ base: 1, sm: 5 }}
           >
             {description}
           </Text>
@@ -216,6 +234,7 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
           border="1px solid"
           borderColor={schoolColors.border}
           boxShadow="sm"
+          order={2}
         >
           <VStack gap={3} align="stretch">
             {messages.map((msg, index) => (
@@ -294,7 +313,7 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
         </Box>
 
         {/* Input Area */}
-        <HStack gap={3} alignItems="center">
+        <HStack gap={3} alignItems="center" order={3}>
           <Textarea
             value={textInput.inputText}
             onChange={(e) => textInput.setInputText({ target: { value: e.target.value } } as React.ChangeEvent<HTMLInputElement>)}
@@ -385,7 +404,7 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
         </HStack>
 
         {/* 麦克风自动停止设置 */}
-        <HStack gap={3} fontSize="xs" color={schoolColors.textSecondary}>
+        <HStack gap={3} fontSize="xs" color={schoolColors.textSecondary} order={4}>
           <Switch
             checked={autoStopMic}
             onCheckedChange={(e) => setAutoStopMic(e.checked)}

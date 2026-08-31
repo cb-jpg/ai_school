@@ -230,7 +230,8 @@ function AppContent(): JSX.Element {
             md: isElectron ? "calc(100vh - 30px)" : "100vh",
           }}
           zIndex={1}
-          pointerEvents="none"
+          /* 手机端人物区可交互（拖动/缩放/点按动作）；桌面端保持不拦截左侧 UI */
+          pointerEvents={{ base: "auto", md: "none" }}
         >
           <Live2D showSidebar={false} />
         </Box>

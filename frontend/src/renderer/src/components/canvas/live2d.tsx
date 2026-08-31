@@ -104,6 +104,8 @@ export const Live2D = memo(
           overflow: "hidden",
           position: "relative",
           cursor: isDragging ? "grabbing" : "default",
+          // 手机端手势（拖动/捏合缩放）由组件处理，屏蔽浏览器默认的页面滚动/缩放
+          touchAction: "none",
         }}
         onPointerDown={handlePointerDown}
         onContextMenu={handleContextMenu}
