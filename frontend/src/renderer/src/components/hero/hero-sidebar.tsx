@@ -208,21 +208,25 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
         // 相对路径已拼接为后端绝对地址
         setBackgroundUrl(targetUrl);
 
-        // 加载校验：预设图片加载失败时回退默认背景并提示，避免黑屏/裂图
+        // 加载校验：预设图片加载失败时回退默认背景并提示，避免黑屏/裂图。
+        // 注意必须用 fetch 校验——MagicOS 的 WebView 拦截 <img>/Image 加载 http
+        // 图片（必触发 onerror），用 Image 探针会把刚选好的背景立刻清空。
         if (targetUrl && !targetUrl.startsWith('blob:') && !targetUrl.startsWith('data:')) {
-          const probe = new Image();
-          probe.onerror = () => {
-            console.error('背景图片加载失败:', targetUrl);
-            setBackgroundUrl('');
-            setSelectedBg('default');
-            toaster.create({
-              title: '背景图片加载失败',
-              description: '已恢复为默认背景',
-              type: 'error',
-              duration: 3000,
+          fetch(targetUrl, { mode: 'cors' })
+            .then((response) => {
+              if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            })
+            .catch((error) => {
+              console.error('背景图片加载失败:', targetUrl, error);
+              setBackgroundUrl('');
+              setSelectedBg('default');
+              toaster.create({
+                title: '背景图片加载失败',
+                description: '已恢复为默认背景',
+                type: 'error',
+                duration: 3000,
+              });
             });
-          };
-          probe.src = targetUrl;
         }
       }
     }

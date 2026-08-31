@@ -9,9 +9,9 @@ import { ModelInfo } from "@/context/live2d-config-context";
 import { resolveApiBaseUrl } from "@/services/api-base";
 import { updateModelConfig } from '../../../WebSDK/src/lappdefine';
 import { LAppDelegate } from '../../../WebSDK/src/lappdelegate';
+import { LAppLive2DManager } from '../../../WebSDK/src/lapplive2dmanager';
 import { initializeLive2D } from '@cubismsdksamples/main';
 import { useMode } from '@/context/mode-context';
-import { applyScale } from './use-live2d-resize';
 
 interface UseLive2DModelProps {
   modelInfo: ModelInfo | undefined;
@@ -434,6 +434,26 @@ export const useLive2DModel = ({
   const pinchStartDistRef = useRef(0);
   const pinchAppliedFactorRef = useRef(1);
 
+  /**
+   * 缩放增量必须走与拖动一致的取模型路径（getLAppAdapter）。
+   * WebSDK 存在多实例包装：LAppLive2DManager.getInstance() 可能拿到
+   * 未挂载模型的另一实例，缩放会静默失效（2026-09-01 真机踩坑）。
+   */
+  const applyScaleDelta = useCallback((delta: number) => {
+    const adapter = (window as any).getLAppAdapter?.();
+    let model = adapter?.getModel?.();
+    if (!model) {
+      try {
+        model = LAppLive2DManager.getInstance()?.getModel(0);
+      } catch (err) {
+        model = null;
+      }
+    }
+    if (model && model._modelMatrix) {
+      model._modelMatrix.scale(delta, delta);
+    }
+  }, []);
+
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (e.touches.length === 1) {
       const t = e.touches[0];
@@ -458,7 +478,7 @@ export const useLive2DModel = ({
       const targetFactor = dist / pinchStartDistRef.current;
       const delta = targetFactor / (pinchAppliedFactorRef.current || 1);
       if (delta !== 1) {
-        applyScale(delta);
+        applyScaleDelta(delta);
         pinchAppliedFactorRef.current = targetFactor;
       }
       return;
@@ -467,7 +487,7 @@ export const useLive2DModel = ({
       const t = e.touches[0];
       handleMouseMove({ clientX: t.clientX, clientY: t.clientY } as React.MouseEvent);
     }
-  }, [handleMouseMove]);
+  }, [handleMouseMove, applyScaleDelta]);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     if (pinchStartDistRef.current > 0) {
