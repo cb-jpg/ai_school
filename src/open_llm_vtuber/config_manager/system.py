@@ -1,6 +1,6 @@
 # config_manager/system.py
 from pydantic import Field, model_validator
-from typing import Dict, ClassVar
+from typing import Dict, Optional, ClassVar
 from .i18n import I18nMixin, Description
 
 
@@ -13,6 +13,9 @@ class SystemConfig(I18nMixin):
     config_alts_dir: str = Field(..., alias="config_alts_dir")
     tool_prompts: Dict[str, str] = Field(..., alias="tool_prompts")
     enable_proxy: bool = Field(False, alias="enable_proxy")
+    # 共享访问令牌；留空/不设置则不做访问控制。设置后除静态页面壳外，
+    # 所有 WebSocket 与 API 请求都需携带 ?token= 或 X-Access-Token 头
+    access_token: Optional[str] = Field(None, alias="access_token")
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
         "conf_version": Description(en="Configuration version", zh="配置文件版本"),
@@ -28,6 +31,10 @@ class SystemConfig(I18nMixin):
         "enable_proxy": Description(
             en="Enable proxy mode for multiple clients",
             zh="启用代理模式以支持多个客户端使用一个 ws 连接",
+        ),
+        "access_token": Description(
+            en="Shared access token; leave empty to disable access control",
+            zh="共享访问令牌；留空则不做访问控制",
         ),
     }
 

@@ -8,17 +8,75 @@ It uses FastAPI for the server and Starlette for static file serving.
 
 import os
 import shutil
+import hmac
+from urllib.parse import parse_qs
 from loguru import logger
 
 from fastapi import FastAPI
+from starlette.datastructures import Headers
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 from starlette.staticfiles import StaticFiles as StarletteStaticFiles
 
 from .routes import init_client_ws_route, init_webtool_routes, init_proxy_route, init_knowledge_management_routes
 from .campus_routes import init_campus_topics_route
 from .service_context import ServiceContext
 from .config_manager.utils import Config
+
+
+class AccessTokenMiddleware:
+    """共享访问令牌门禁（用于公网裸奔场景的最低限度防护）。
+
+    覆盖：所有 WebSocket 握手、全部 API 路由、/cache 音频。
+    放开：SPA 壳与其 bundle（内部相对路径请求无法逐个携带 token）、
+    /live2d-models、/bg、/avatars、/web-tool（惰性静态文件，无算力价值；
+    Live2D 走 Cubism WebSDK 内部 XHR，无法透传 token）。
+
+    令牌来源（任一即可）：?token= 查询参数 / X-Access-Token 头 / Bearer 头。
+    """
+
+    PUBLIC_PREFIXES = ("/assets/", "/live2d-models", "/bg", "/avatars", "/web-tool")
+    PUBLIC_PATHS = ("/", "/favicon.ico", "/vite.svg", "/robots.txt")
+
+    def __init__(self, app, access_token: str):
+        self.app = app
+        self.access_token = access_token
+
+    def _is_public(self, scope) -> bool:
+        if scope["type"] != "http":
+            return False
+        if scope.get("method") == "OPTIONS":  # CORS 预检
+            return True
+        path = scope.get("path", "")
+        return path in self.PUBLIC_PATHS or path.startswith(self.PUBLIC_PREFIXES)
+
+    def _has_valid_token(self, scope) -> bool:
+        headers = Headers(scope=scope)
+        candidates = [headers.get("x-access-token", "")]
+        auth = headers.get("authorization", "")
+        if auth.startswith("Bearer "):
+            candidates.append(auth[7:])
+        params = parse_qs(scope.get("query_string", b"").decode("utf-8", "ignore"))
+        candidates.extend(params.get("token", []))
+        return any(
+            c and hmac.compare_digest(c, self.access_token) for c in candidates
+        )
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] not in ("http", "websocket"):
+            return await self.app(scope, receive, send)
+
+        if self._is_public(scope) or self._has_valid_token(scope):
+            return await self.app(scope, receive, send)
+
+        if scope["type"] == "websocket":
+            # 握手完成前直接拒绝（uvicorn 会回 403）
+            await send({"type": "websocket.close", "code": 1008})
+            return
+        response = JSONResponse(
+            {"error": "missing or invalid access token"}, status_code=401
+        )
+        await response(scope, receive, send)
 
 
 # Create a custom StaticFiles class that adds CORS headers
@@ -88,6 +146,16 @@ class WebSocketServer:
             default_context_cache or ServiceContext()
         )  # Use provided context or initialize a new empty one waiting to be loaded
         # It will be populated during the initialize method call
+
+        # Optional shared-token gate (conf: system_config.access_token).
+        # Added BEFORE CORS so CORS stays outermost and 401s still carry ACAO.
+        access_token = getattr(config.system_config, "access_token", None)
+        if access_token:
+            self.app.add_middleware(AccessTokenMiddleware, access_token=access_token)
+            logger.warning(
+                "访问控制已启用：除静态资源外，所有请求需携带 access_token"
+                "（?token= / X-Access-Token / Bearer）"
+            )
 
         # Add global CORS middleware
         self.app.add_middleware(
