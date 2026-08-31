@@ -15,9 +15,9 @@
 | 安卓图标/启动屏生成（昨日待办 #1） | ✅ 87 个资源已生成 |
 | 新 APK（图标 + 内置 token） | ✅ 2026-08-31 13:48 构建 |
 | 前端 vite envDir 重大配置坑 | ✅ 修复 |
-| Git 提交（昨日遗留 + 今日改动） | ✅ 4 个 commit（未 push） |
+| Git 提交 + 推送 GitHub + 里程碑标签 | ✅ 5 个 commit 已 push，tag `android-alpha-20260831` |
 | 专题页数据补传服务器（部署遗漏） | ✅ 校史/成就/学习标兵接口恢复 |
-| 真机 USB 联调（昨日待办 #2） | ⏳ 待用户连手机 |
+| 真机 USB 联调（昨日待办 #2） | ⏳ 用户安排今晚做 |
 
 ---
 
@@ -122,22 +122,27 @@ cd android && ./gradlew assembleDebug   # 增量约 2 分钟
 
 ---
 
-## ✅ 三、Git 提交（4 个 commit，在本地 main，**未 push**）
+## ✅ 三、Git 提交与推送（已完成 push + tag）
 
-| commit | 内容 |
+本地 5 个 commit 已 rebase 到协作者 wow-wogua 的 `0adbe46`（知识库线程池/路径穿越修复，8月28日）之上，全部推送到 `github.com/cb-jpg/ai_school` main 分支，并打了里程碑标签：
+
+| commit（rebase 后） | 内容 |
 |---|---|
-| `a37fbfe` | fix: llama.cpp 空流修复（昨日遗留） |
-| `48ed3d6` | feat: 服务端共享访问令牌门禁 |
-| （第3个） | feat: 安卓 App（Capacitor）+ 前端地址集中化 + token 透传 + envDir 修复 |
-| （第4个） | docs: 工作日志（08-30 + 08-31） |
+| `f39373d` | fix: llama.cpp 空流修复（昨日遗留） |
+| `2971380` | feat: 服务端共享访问令牌门禁 |
+| `782e11e` | feat: 安卓 App（Capacitor）+ 前端地址集中化 + token 透传 + envDir 修复 |
+| `6600ec7` | docs: 工作日志（08-30 + 08-31） |
+| `926cd52` | docs: 补记专题页数据补传 |
 
-**push 前注意**：确认没有把 token 提交进任何 tracked 文件（已核对：token 只在 conf.yaml[gitignored]、.env.web.local[gitignored]、服务器上）。push 到 github.com/chenxundaozu/Open-LLM-VTuber 需用户拍板。
+- 标签：`android-alpha-20260831`（annotated，标记"安卓 APK 可安装 + 服务端门禁上线"里程碑）
+- 推送前已做敏感扫描：token 只在 gitignored 文件；SSH 密码前缀残留已从日志抹除
+- ⚠️ 注意：**wow-wogua 的知识库修复（3d7e4ce：上传路径穿越修复 + embedding 线程池）还没部署到服务器**——服务器是 8月30 从旧代码部署的。下次部署时把 `run_server.py`、`src/open_llm_vtuber/knowledge/document_processor.py`、`src/open_llm_vtuber/knowledge/routes.py` 一并 scp 过去并重启。
 
 ---
 
 ## ⏳ 待办事项（下次继续，按优先级）
 
-### 1. 真机 USB 联调（昨日待办 #2，今日未做——手机没连）
+### 1. 真机 USB 联调（**用户安排今晚做**；今日手机未连）
 
 ```bash
 export PATH="$PATH:/d/SRP/android-tools/android-sdk/platform-tools"
@@ -156,7 +161,8 @@ adb install -r D:/SRP/AI_school/Open-LLM-VTuber/frontend/android/app/build/outpu
 
 ### 2. 服务端（用户未再强调，但仍是风险）
 
-- [ ] 服务器 SSH 密码修改（明文已在聊天中泄露过，此处不记录；本机免密 key 可用，改密不影响本机）
+- [ ] **wow-wogua 知识库修复部署**（见上文第三节末尾，下次部署顺手带上）
+- [ ] 服务器 SSH 密码修改（用户暂缓；明文已在聊天中泄露过，此处不记录；本机免密 key 可用，改密不影响本机）
 - [ ] 若要进一步防护：门禁 token 轮换脚本、失败连接日志告警
 
 ### 3. 功能缺口（`D:\SRP\AI_school\数字人缺失功能点.txt`，今日未动）
