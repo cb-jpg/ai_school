@@ -61,6 +61,39 @@ class AsyncLLM(StatelessLLMInterface):
             f"Initialized AsyncLLM with the parameters: {self.base_url}, {self.model}"
         )
 
+    @staticmethod
+    def _normalize_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Normalize messages for OpenAI-compatible backends.
+
+        - Flatten text-only multimodal content lists to plain strings: some
+          backends (e.g. llama-cpp-python server) silently return an empty
+          stream for list-format content.
+        - Drop a user message that is an exact duplicate of the immediately
+          preceding user message: the conversation pipeline can append the
+          same input twice (plain string + multimodal list).
+        """
+        normalized: List[Dict[str, Any]] = []
+        for msg in messages:
+            content = msg.get("content")
+            if (
+                isinstance(content, list)
+                and content
+                and all(
+                    isinstance(part, dict) and part.get("type") == "text"
+                    for part in content
+                )
+            ):
+                msg = {**msg, "content": "\n".join(part["text"] for part in content)}
+            if (
+                normalized
+                and msg.get("role") == "user"
+                and normalized[-1].get("role") == "user"
+                and normalized[-1].get("content") == msg.get("content")
+            ):
+                continue
+            normalized.append(msg)
+        return normalized
+
     async def chat_completion(
         self,
         messages: List[Dict[str, Any]],
@@ -97,6 +130,7 @@ class AsyncLLM(StatelessLLMInterface):
                     {"role": "system", "content": system},
                     *messages,
                 ]
+            messages_with_system = self._normalize_messages(messages_with_system)
             logger.debug(f"Messages: {messages_with_system}")
 
             available_tools = tools if self.support_tools else NOT_GIVEN
