@@ -16,6 +16,7 @@
 | 新 APK（图标 + 内置 token） | ✅ 2026-08-31 13:48 构建 |
 | 前端 vite envDir 重大配置坑 | ✅ 修复 |
 | Git 提交（昨日遗留 + 今日改动） | ✅ 4 个 commit（未 push） |
+| 专题页数据补传服务器（部署遗漏） | ✅ 校史/成就/学习标兵接口恢复 |
 | 真机 USB 联调（昨日待办 #2） | ⏳ 待用户连手机 |
 
 ---
@@ -78,6 +79,10 @@ setsid nohup ~/ai_school/start_server.sh >> ~/server_run.log 2>&1 < /dev/null &
 sleep 2; echo relaunched
 # 启动到监听约 40-90s（HF 离线后不再受网络拖累，但 load 86 时仍慢）
 ```
+
+### 附：专题页数据文件补传（部署遗漏，顺手修掉）
+
+验证门禁时发现 `/api/topics/history` 带 token 返回 404「校史数据文件不存在」——**昨天部署 tar 漏了 `school_rag/models/` 下的数据文件**（本地有 data.json/achievements.json/students.json，服务器目录为空）。已 scp 补传，三个专题接口（校史/成就/学习标兵）全部返回正常数据。这类 json 是请求时读取，无需重启。**手机验收专题页前若再遇 404，先查服务器 `~/ai_school/school_rag/models/`。**
 
 ---
 
@@ -151,7 +156,7 @@ adb install -r D:/SRP/AI_school/Open-LLM-VTuber/frontend/android/app/build/outpu
 
 ### 2. 服务端（用户未再强调，但仍是风险）
 
-- [ ] 服务器 SSH 密码修改（今天聊天里又出现过明文密码 kDwJ...；本机免密 key 可用，改密不影响本机）
+- [ ] 服务器 SSH 密码修改（明文已在聊天中泄露过，此处不记录；本机免密 key 可用，改密不影响本机）
 - [ ] 若要进一步防护：门禁 token 轮换脚本、失败连接日志告警
 
 ### 3. 功能缺口（`D:\SRP\AI_school\数字人缺失功能点.txt`，今日未动）
