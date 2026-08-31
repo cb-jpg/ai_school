@@ -147,7 +147,8 @@ export default function HeroLanding({
           height="full"
           zIndex={5}
           pointerEvents="none"
-          display="flex"
+          /* 手机端 Live2D 已是全屏背景，此空位不占宽度，避免把对话区挤成窄条 */
+          display={{ base: 'none', md: 'flex' }}
           alignItems="center"
           justifyContent="center"
           ml={4}

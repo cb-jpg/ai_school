@@ -59,25 +59,24 @@ export class LAppTextureManager {
         ite.ptr().usePremultply == usePremultiply
       ) {
         // 2回目以降はキャッシュが使用される(待ち時間なし)
-        // WebKitでは同じImageのonloadを再度呼ぶには再インスタンスが必要
-        // 詳細：https://stackoverflow.com/a/5024181
-        ite.ptr().img = new Image();
-        ite
-          .ptr()
-          .img.addEventListener("load", (): void => callback(ite.ptr()), {
-            passive: true,
-          });
-        ite.ptr().img.src = fileName;
+        callback(ite.ptr());
         return;
       }
     }
 
-    // データのオンロードをトリガーにする
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.addEventListener(
-      "load",
-      (): void => {
+    // 部分深度定制 ROM（实测 MagicOS/荣耀）的 WebView 会拦截 <img> 加载 http
+    // 图片：请求不进网络栈、onload/onerror 均不触发，Live2D 纹理永远加载不出。
+    // fetch + createImageBitmap 不经过该拦截（2026-08-31 真机验证可行），
+    // 故放弃 HTMLImageElement，改用 fetch 拿位图再上传纹理。
+    fetch(fileName, { mode: "cors" })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${fileName}`);
+        }
+        return response.blob();
+      })
+      .then((blob) => createImageBitmap(blob))
+      .then((bitmap) => {
         // テクスチャオブジェクトの作成
         const tex: WebGLTexture = gl.createTexture();
 
@@ -104,7 +103,7 @@ export class LAppTextureManager {
           gl.RGBA,
           gl.RGBA,
           gl.UNSIGNED_BYTE,
-          img
+          bitmap
         );
 
         // ミップマップを生成
@@ -116,19 +115,23 @@ export class LAppTextureManager {
         const textureInfo: TextureInfo = new TextureInfo();
         if (textureInfo != null) {
           textureInfo.fileName = fileName;
-          textureInfo.width = img.width;
-          textureInfo.height = img.height;
+          textureInfo.width = bitmap.width;
+          textureInfo.height = bitmap.height;
           textureInfo.id = tex;
-          textureInfo.img = img;
+          textureInfo.img = bitmap;
           textureInfo.usePremultply = usePremultiply;
           this._textures.pushBack(textureInfo);
         }
 
         callback(textureInfo);
-      },
-      { passive: true }
-    );
-    img.src = fileName;
+      })
+      .catch((error) => {
+        console.error(
+          "[LAppTextureManager] Failed to load texture:",
+          fileName,
+          error
+        );
+      });
   }
 
   /**
@@ -185,7 +188,7 @@ export class LAppTextureManager {
  * 画像情報構造体
  */
 export class TextureInfo {
-  img: HTMLImageElement; // 画像
+  img: HTMLImageElement | ImageBitmap; // 画像（ROM 兼容：现在也可能是 createImageBitmap 的产物）
   id: WebGLTexture = null; // テクスチャ
   width = 0; // 横幅
   height = 0; // 高さ

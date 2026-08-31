@@ -180,3 +180,41 @@ adb install -r D:/SRP/AI_school/Open-LLM-VTuber/frontend/android/app/build/outpu
 2. 用户连手机 → 直接从待办 1（真机联调）开始
 3. 改前端后重新出 APK：`npm run android:sync` → gradle（见上文命令序列）
 4. 改服务端 py：scp 对应文件到 ~/ai_school 相对路径 → 按标准姿势重启 → 跑 `scripts/ws_token_e2e_test.py` 回归
+
+---
+
+## 🌙 晚间追加：真机 USB 联调完成（23:40 更新，待办 #1 ✅）
+
+设备：荣耀 X60 Pro（VID_339B，Android 14 / MagicOS）。**最终结果：WS 连接、Live2D 渲染、麦克风→VAD→ASR、语音打断、文本对话全链路真机打通。**
+
+### 联调中发现并修复的 5 个问题
+
+| # | 症状 | 根因 | 修复 |
+|---|---|---|---|
+| 1 | adb 看不到手机 | 荣耀新 VID(339B) 的 ADB 接口绑定的是通用 WinUSB，没注册 AdbWinApi 需要的接口 GUID | 注册表给 `USB\VID_339B&PID_107D&MI_01\...\Device Parameters` 写 `DeviceInterfaceGUIDs={F72FE0D4-CBCB-407d-8814-9ED673D0DD6B}`（脚本 `D:\SRP\android-tools\fix_adb_guid.ps1`，改线重插后生效） |
+| 2 | 布局挤成左侧窄条 | 手机端 HeroLanding 右侧"Live2D 空位" Box 仍占 ~207px 宽度 | `hero-landing.tsx` 空 Box 改 `display:{base:'none',md:'flex'}`；index.html 补 viewport meta（`viewport-fit=cover`） |
+| 3 | WS 断线后永远卡"正在连接" | ① 前端 onclose 无自动重连 ② uvicorn 默认 20s ping/20s pong 超时，弱网丢 pong 即被踢 | 前端 `websocket-service.tsx` 加指数退避重连(1s→15s 封顶)；服务器 `run_server.py` uvicorn 参数放宽 `ws_ping_interval/timeout=60`（已 scp+重启+回归 PASS；顺带把 wow-wogua 的知识库修复 3 个文件一并部署了） |
+| 4 | 麦克风 NotAllowedError（红框） | 两层：a) 缺运行时权限请求；b) **Manifest 未声明 `MODIFY_AUDIO_SETTINGS`** —— Capacitor 的 onPermissionRequest 把它和 RECORD_AUDIO 一起请求，未声明→整套判 false→deny | MainActivity 加 requestMediaPermissions()（RECORD_AUDIO+CAMERA）；Manifest 补 `<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>`。**调试期注意：曾用 `pm clear` 清过应用数据** |
+| 5 | Live2D 模型文件全下载完但 `_models` 空、永不渲染 | **MagicOS 的 WebView 拦截 `<img>` 加载 http 图片**：请求不进网络栈、无 onload/onerror；`setMixedContentMode(ALWAYS_ALLOW)` 被无视（set 后 get 仍=0/NEVER_ALLOW），`setBlockNetworkImage(false)` 也无效。fetch/XHR 不走该拦截路径，全部正常 | `lapptexturemanager.ts` 纹理加载弃用 HTMLImageElement，改 `fetch(mode:'cors')→blob→createImageBitmap→texImage2D`；TextureInfo.img 类型放宽为 `HTMLImageElement \| ImageBitmap` |
+
+### 调试方法沉淀（下次直接用）
+
+- 手机 WebView 调试：`adb forward tcp:9222 localabstract:webview_devtools_remote_<pid>` → CDP `Runtime.evaluate` 直接在页面里执行 JS（工具 `D:\SRP\AI_school\cdp_eval.py`，自动发现页面）。PID 每次重启会变，用 `adb shell pidof com.shishi.ai` 现取。
+- WebView 控制台日志在 logcat 的 `Capacitor/Console` 标签；荣耀系统日志刷屏极快，环形缓冲一两分钟就滚没，要 `adb logcat -v time Capacitor/Console:V Capacitor:V "*:S" > file` 持续落盘。
+- 图片类"永不加载"问题用 `performance.getEntriesByType('resource')` + CDP Network 域 `requestWillBeSent` 区分：没进网络栈=客户端策略拦截，进了失败=网络/CORS。
+- 预授权权限免弹窗：`adb shell pm grant com.shishi.ai android.permission.RECORD_AUDIO`（CAMERA 同理）。
+
+### 验收清单进度
+
+- [x] 启动 → WS 连上远程后端（token 内置生效）
+- [x] 文本对话全链路（语音输入的转写文本已能进对话、AI 正常 Thinking）
+- [x] Live2D 渲染/待机动画（表情帧有变化）
+- [x] 麦克风权限 → VAD 收音 → ASR（转写文字已上屏）→ 语音打断逻辑触发
+- [ ] **TTS 播报声音实际听感**（当时 AI 还在 Thinking，下次开局先确认声音+口型）
+- [ ] 断网重连、杀进程重开（重连代码已加，未实测弱网场景）
+- [ ] 专题页、管理后台（后台需先带 access token 进站）
+
+### 安装包状态
+
+- 手机上现装的 APK（23:35 构建）= 本地最新代码，含上述全部修复。
+- 服务器已部署：run_server.py（心跳 60s + wow-wogua 知识库修复的 document_processor.py / routes.py），重启后 `ws_token_e2e_test.py` 公网回归 PASS。

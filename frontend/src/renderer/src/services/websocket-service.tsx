@@ -119,6 +119,15 @@ class WebSocketService {
 
   private currentState: 'CONNECTING' | 'OPEN' | 'CLOSING' | 'CLOSED' = 'CLOSED';
 
+  // 自动重连（移动端网络抖动/服务器心跳超时后必须能自愈，否则 UI 永远卡在"正在连接"）
+  private lastUrl: string | null = null;
+
+  private manualClose = false;
+
+  private reconnectAttempts = 0;
+
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
   static getInstance() {
     if (!WebSocketService.instance) {
       WebSocketService.instance = new WebSocketService();
@@ -146,6 +155,9 @@ class WebSocketService {
         this.ws?.readyState === WebSocket.OPEN) {
       this.disconnect();
     }
+    this.clearReconnectTimer();
+    this.manualClose = false;
+    this.lastUrl = url;
 
     try {
       this.ws = new WebSocket(withToken(url));
@@ -155,6 +167,7 @@ class WebSocketService {
       this.ws.onopen = () => {
         this.currentState = 'OPEN';
         this.stateSubject.next('OPEN');
+        this.reconnectAttempts = 0;
         this.initializeConnection();
       };
 
@@ -175,6 +188,10 @@ class WebSocketService {
       this.ws.onclose = () => {
         this.currentState = 'CLOSED';
         this.stateSubject.next('CLOSED');
+        // 非人为断开（网络抖动、心跳超时等）时自动重连
+        if (!this.manualClose) {
+          this.scheduleReconnect();
+        }
       };
 
       this.ws.onerror = () => {
@@ -185,6 +202,30 @@ class WebSocketService {
       console.error('Failed to connect to WebSocket:', error);
       this.currentState = 'CLOSED';
       this.stateSubject.next('CLOSED');
+      if (!this.manualClose) {
+        this.scheduleReconnect();
+      }
+    }
+  }
+
+  /** 指数退避重连：1s 起步，翻倍，封顶 15s */
+  private scheduleReconnect() {
+    if (this.reconnectTimer !== null || !this.lastUrl) return;
+    const delay = Math.min(1000 * 2 ** this.reconnectAttempts, 15000);
+    this.reconnectAttempts += 1;
+    console.log(`[WebSocketService] will reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (!this.manualClose && this.lastUrl) {
+        this.connect(this.lastUrl);
+      }
+    }, delay);
+  }
+
+  private clearReconnectTimer() {
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
     }
   }
 
@@ -212,6 +253,8 @@ class WebSocketService {
   }
 
   disconnect() {
+    this.manualClose = true;
+    this.clearReconnectTimer();
     this.ws?.close();
     this.ws = null;
   }

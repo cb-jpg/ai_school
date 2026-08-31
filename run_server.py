@@ -164,6 +164,10 @@ def run(console_log_level: str):
         host=server_config.host,
         port=server_config.port,
         log_level=console_log_level.lower(),
+        # uvicorn 默认 20s ping/20s pong 超时，移动端弱网下 pong 易丢导致连接被误杀；
+        # 放宽到 60s/60s（死连接清理变慢对本场景无影响）
+        ws_ping_interval=60.0,
+        ws_ping_timeout=60.0,
     )
 
 

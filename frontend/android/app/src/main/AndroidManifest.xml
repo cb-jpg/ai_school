@@ -35,6 +35,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- 语音问答：WebView getUserMedia 需要 -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Capacitor 的 onPermissionRequest 会连同本权限一起请求，
+         未声明会导致整套请求判 false、麦克风被拒（2026-08-31 真机踩坑） -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- 摄像头画面作背景 -->
     <uses-permission android:name="android.permission.CAMERA" />
 </manifest>
