@@ -82,29 +82,31 @@ export default function HeroLanding({
         mobileMenuOpen={mobileMenuOpen}
       />
 
-      {/* 设置按钮 - 打开右侧侧栏 */}
-      <Box
-        position="absolute"
-        top={{ base: 20, md: 24 }}
-        right={{ base: 4, md: 8, lg: 12 }}
-        zIndex={20}
-      >
-        <IconButton
-          aria-label="设置"
-          size="lg"
-          rounded="full"
-          shadow="md"
-          onClick={toggleSidebar}
-          bg={schoolColors.white}
-          color={schoolColors.primary}
-          _hover={{
-            bg: schoolColors.primary,
-            color: 'white',
-          }}
+      {/* 设置按钮 - 打开右侧侧栏（专题页打开时隐藏，避免浮在专题页上） */}
+      {!activeCampusTopic && (
+        <Box
+          position="absolute"
+          top={{ base: 20, md: 24 }}
+          right={{ base: 4, md: 8, lg: 12 }}
+          zIndex={20}
         >
-          <FiSettings />
-        </IconButton>
-      </Box>
+          <IconButton
+            aria-label="设置"
+            size="lg"
+            rounded="full"
+            shadow="md"
+            onClick={toggleSidebar}
+            bg={schoolColors.white}
+            color={schoolColors.primary}
+            _hover={{
+              bg: schoolColors.primary,
+              color: 'white',
+            }}
+          >
+            <FiSettings />
+          </IconButton>
+        </Box>
+      )}
 
       {/* Mobile Menu */}
       <MobileMenu
@@ -119,8 +121,9 @@ export default function HeroLanding({
         alignItems="center"
         justifyContent="space-between"
         px={{ base: 6, md: 12, lg: 16 }}
-        pt={{ base: 20, md: 24 }}
-        pb={{ base: 10, md: 16 }}
+        /* 手机端：上半屏 (42vh) 是 Live2D 人物区，对话区从其下方开始，避免重叠 */
+        pt={{ base: '42vh', md: 24 }}
+        pb={{ base: 4, md: 16 }}
         gap={8}
       >
         {/* Left Side: 对话界面 */}
@@ -129,8 +132,9 @@ export default function HeroLanding({
             flex="1"
             maxWidth="600px"
             zIndex={10}
+            h={{ base: 'full', md: 'auto' }}
           >
-            <Box height="75vh">
+            <Box height={{ base: 'full', md: '75vh' }}>
               <DialogBox
                 schoolName={SCHOOL_CONFIG.name}
                 tagline={SCHOOL_CONFIG.tagline}

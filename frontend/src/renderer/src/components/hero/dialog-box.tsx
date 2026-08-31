@@ -130,8 +130,9 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
     <Flex
       flexDirection="column"
       h="full"
-      maxHeight="75vh"
-      minHeight="500px"
+      /* 手机端人物区占上半屏，对话区填剩余高度；桌面端保持 75vh/500px 设计 */
+      maxHeight={{ base: 'none', md: '75vh' }}
+      minHeight={{ base: '0px', md: '500px' }}
     >
       {/* Connection Status Alert */}
       {wsState !== 'OPEN' && (

@@ -219,13 +219,16 @@ function AppContent(): JSX.Element {
         {/* Background layer for hero route */}
         <Background />
 
-        {/* Live2D layer for hero route - positioned on the right side */}
+        {/* Live2D layer for hero route - 手机端占上半屏，桌面端右侧 55% */}
         <Box
           position="absolute"
           top={0}
           right={0}
           width={{ base: "100%", md: "55%" }}
-          height={isElectron ? "calc(100vh - 30px)" : "100vh"}
+          height={{
+            base: "42vh",
+            md: isElectron ? "calc(100vh - 30px)" : "100vh",
+          }}
           zIndex={1}
           pointerEvents="none"
         >
@@ -254,12 +257,15 @@ function AppContent(): JSX.Element {
           </Box>
         )}
 
-        {/* WebSocketStatus indicator */}
-        <Box position="absolute" top="20px" left="20px" zIndex={10}>
-          <WebSocketStatus />
-        </Box>
+        {/* WebSocketStatus indicator（专题页打开时隐藏，避免浮在专题页导航上） */}
+        {!activeCampusTopic && (
+          <Box position="absolute" top="20px" left="20px" zIndex={10}>
+            <WebSocketStatus />
+          </Box>
+        )}
 
-        {/* Subtitle for hero page - positioned under the character on the right */}
+        {/* Subtitle for hero page - 手机端对话卡片内已展示文本，隐藏；专题页打开时隐藏 */}
+        {!activeCampusTopic && (
         <Box
           position="absolute"
           bottom={{ base: "8%", md: "12%" }}
@@ -270,6 +276,7 @@ function AppContent(): JSX.Element {
           textAlign="center"
           pointerEvents="none"
           paddingRight={{ base: "8", md: "12" }}
+          display={{ base: "none", md: "block" }}
         >
           <Box
             bg="rgba(255, 255, 255, 0.95)"
@@ -284,6 +291,7 @@ function AppContent(): JSX.Element {
             <Subtitle />
           </Box>
         </Box>
+        )}
 
         {/* Hero UI overlay */}
         <HeroLanding

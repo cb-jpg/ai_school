@@ -261,26 +261,34 @@ export default function CampusKnowledge({
   };
 
   return (
-    <>
-      {/* Navigation Bar - 在所有模式下都显示，但在 Hero 模式下样式调整 */}
+    /* 根容器：纵向 flex（导航卡 + 内容面板），结构上保证两者永不互相遮挡。
+       手机端整体避开学校顶部导航栏(~86px)；桌面端维持原视觉位置。 */
+    <Box
+      position="absolute"
+      top={{ base: '92px', lg: '16px' }}
+      left={{ base: '12px', lg: '24px' }}
+      right={{ base: '12px', lg: '24px' }}
+      bottom={{ base: '12px', lg: '24px' }}
+      display="flex"
+      flexDirection="column"
+      gap={{ base: '10px', lg: '16px' }}
+      zIndex={30}
+      fontFamily={swissFont}
+    >
+      {/* Navigation Bar */}
       <Box
         data-testid="campus-navigation"
-        display="block"
-        position="absolute"
-        top={{ base: '10px', lg: '16px' }}
-        left={{ base: '12px', lg: '24px' }}
-        right={{ base: '12px', lg: '24px' }}
-        zIndex={30}
-        px={{ base: '16px', md: '20px', lg: '24px' }}
-        py={{ base: '16px', md: '20px' }}
+        flexShrink={0}
+        px={{ base: '12px', md: '20px', lg: '24px' }}
+        py={{ base: '10px', md: '20px' }}
         background={paper}
         borderRadius="lg"
         boxShadow="sm"
         border="1px solid"
         borderColor={hairline}
-        fontFamily={swissFont}
       >
-        <Flex align="center" justify="space-between" gap="16px" flexWrap="wrap">
+        {/* 手机端隐藏 logo 行（顶部学校导航栏已有校名），只保留一行 tab */}
+        <Flex align="center" justify="space-between" gap="16px" flexWrap="wrap" display={{ base: 'none', md: 'flex' }}>
           <Flex align="center" gap="16px">
             <Box width="40px" height="40px" background={blue} color={paper} display="grid" placeItems="center" borderRadius="lg">
               <FiBookOpen size={20} />
@@ -294,8 +302,17 @@ export default function CampusKnowledge({
               </Text>
             </Box>
           </Flex>
+        </Flex>
 
-          <Flex align="center" justify="flex-end" gap="8px" flexWrap="wrap">
+        {/* 手机端一行横向滑动；桌面端保持换行布局 */}
+        <Flex
+          align="center"
+          justify={{ base: 'flex-start', lg: 'flex-end' }}
+          gap="8px"
+          flexWrap={{ base: 'nowrap', lg: 'wrap' }}
+          overflowX={{ base: 'auto', lg: 'visible' }}
+          css={{ '&::-webkit-scrollbar': { display: 'none' } }}
+        >
             {campusTopics.map((topic) => (
               <TopicNavigationButton
                 key={topic.id}
@@ -323,7 +340,6 @@ export default function CampusKnowledge({
                 返回对话
               </Button>
             )}
-          </Flex>
         </Flex>
       </Box>
 
@@ -331,15 +347,12 @@ export default function CampusKnowledge({
         <Box
           data-testid="campus-topic-page"
           data-topic={activeTopic.id}
-          position="absolute"
-          top={isHeroMode ? { base: '80px', lg: '76px' } : { base: '116px', lg: '86px' }}
-          left={{ base: '12px', lg: '24px' }}
-          bottom={{ base: '20px', lg: '24px' }}
-          width={isHeroMode ? { base: 'calc(100% - 24px)', lg: 'calc(50% - 24px)' } : { base: 'calc(100% - 24px)', lg: '55%' }}
-          zIndex={22}
+          flex="1"
+          minHeight="0"
+          alignSelf={{ base: 'stretch', lg: 'flex-start' }}
+          width={{ base: '100%', lg: isHeroMode ? 'calc(50% - 24px)' : '55%' }}
           background={paper}
           overflow="hidden"
-          fontFamily={swissFont}
           borderRadius="lg"
           boxShadow="sm"
           border="1px solid"
@@ -539,6 +552,6 @@ export default function CampusKnowledge({
           </Box>
         </Box>
       )}
-    </>
+    </Box>
   );
 }
