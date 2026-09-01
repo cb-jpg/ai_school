@@ -229,3 +229,5 @@
 5. **子页面适配**：真机逐页巡检（dashboard/workspace/test-conversation/character-config/knowledge-admin/unanswered-questions/document-knowledge/user-management/system-logs 共 9 页截图）。发现并修：系统日志统计卡第三张溢出屏幕（flex=1+文字 min-content → 改 flexWrap+1 1 40% 两列换行）；待补充问题库/文档知识库/用户管理/仪表盘/主工作台实测本来就可用。另加：管理后台抽屉在 hashchange 时自动收起
 
 **坑**：修复过程中曾因管道 `typecheck | tail && build` 掩盖 TS 报错（重复 JSX 属性）构建出坏包又重修——验证类命令勿接管道后依赖退出码。
+
+> ⏭️ **本文记录到这里为止。09-02 凌晨的五项反馈修复全记录、真机巡检结论、技术坑清单与恢复路径见 `DAILY_PROGRESS_2026-09-02.md`。**
