@@ -200,7 +200,7 @@ export const useAudioTask = () => {
 
         // Setup audio element
         const audio = new Audio(audioDataUrl);
-        audio.volume = volume / 100; // 设置音量 (0-1)
+        audio.volume = stateRef.current.volume / 100; // 设置音量 (0-1)
 
         // 动态监听音量变化并更新正在播放的音频
         const updateVolume = () => {
@@ -294,6 +294,7 @@ export const useAudioTask = () => {
         utterance.lang = 'zh-CN';
         utterance.rate = 1;
         utterance.pitch = 1;
+        utterance.volume = stateRef.current.volume / 100; // 浏览器回退播报同样受音量控制
         const voices = window.speechSynthesis.getVoices();
         utterance.voice = voices.find((voice) => voice.lang.toLowerCase() === 'zh-cn')
           || voices.find((voice) => voice.lang.toLowerCase().startsWith('zh'))

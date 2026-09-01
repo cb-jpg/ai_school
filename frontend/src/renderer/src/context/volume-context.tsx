@@ -6,11 +6,11 @@
 import {
   createContext,
   useContext,
-  useState,
   useCallback,
   ReactNode,
   useEffect,
 } from 'react';
+import { useLocalStorage } from '@/hooks/utils/use-local-storage';
 
 interface VolumeContextState {
   volume: number;
@@ -22,7 +22,8 @@ const VolumeContext = createContext<VolumeContextState | null>(null);
 const DEFAULT_VOLUME = 80;
 
 export function VolumeProvider({ children }: { children: ReactNode }) {
-  const [volume, setVolume] = useState(DEFAULT_VOLUME);
+  // 音量持久化到 localStorage，避免每次启动都回到默认值
+  const [volume, setVolumeState] = useLocalStorage<number>('ttsVolume', DEFAULT_VOLUME);
 
   // 动态导入音量更新函数（避免循环依赖）
   const updateAudioVolume = useCallback(async () => {
@@ -34,12 +35,12 @@ export function VolumeProvider({ children }: { children: ReactNode }) {
     }
   }, [volume]);
 
-  const contextValue = useCallback(
+  const setVolume = useCallback(
     (vol: number) => {
       const clampedVolume = Math.max(0, Math.min(100, vol));
-      setVolume(clampedVolume);
+      setVolumeState(clampedVolume);
     },
-    []
+    [setVolumeState]
   );
 
   // 当音量变化时，更新正在播放的音频
@@ -51,7 +52,7 @@ export function VolumeProvider({ children }: { children: ReactNode }) {
     <VolumeContext.Provider
       value={{
         volume,
-        setVolume: contextValue,
+        setVolume,
       }}
     >
       {children}

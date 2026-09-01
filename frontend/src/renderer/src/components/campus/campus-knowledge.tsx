@@ -189,7 +189,7 @@ export default function CampusKnowledge({
 }: CampusKnowledgeProps) {
   const { sendMessage, wsState } = useWebSocket();
   const { aiState, setAiState } = useAiState();
-  const { setSubtitleText } = useSubtitle();
+  const { subtitleText, setSubtitleText } = useSubtitle();
   const { interrupt } = useInterrupt();
   const [, setNarrationError] = useState('');
   const activeTopic = activeTopicId ? campusTopicMap[activeTopicId] : null;
@@ -550,6 +550,50 @@ export default function CampusKnowledge({
               )}
             </Box>
           </Box>
+        </Box>
+      )}
+
+      {/* 讲解字幕条：讲解过程中在页面底部同步显示当前播报内容与状态 */}
+      {isSpeaking && (
+        <Box
+          data-testid="campus-narration-caption"
+          pointerEvents="none"
+          position="absolute"
+          left="50%"
+          transform="translateX(-50%)"
+          bottom={{ base: '10px', lg: '16px' }}
+          maxWidth={{ base: '94%', lg: '560px' }}
+          width="max-content"
+          px="18px"
+          py="10px"
+          background="rgba(255, 255, 255, 0.96)"
+          borderRadius="12px"
+          boxShadow="0 4px 20px rgba(0, 0, 0, 0.12)"
+          border="1px solid"
+          borderColor={hairline}
+          zIndex={40}
+        >
+          <Flex align="center" justify="center" gap="6px" mb="2px">
+            <Box width="7px" height="7px" borderRadius="full" background={blue} />
+            <Text color={blue} fontSize="11px" fontWeight="600" letterSpacing="0.08em">
+              正在讲解
+            </Text>
+          </Flex>
+          <Text
+            color={ink}
+            fontSize={{ base: '13px', lg: '14px' }}
+            lineHeight="1.6"
+            textAlign="center"
+            whiteSpace="pre-wrap"
+            css={{
+              display: '-webkit-box',
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }}
+          >
+            {subtitleText}
+          </Text>
         </Box>
       )}
     </Box>
