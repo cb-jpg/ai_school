@@ -43,7 +43,8 @@ class CDP:
 async def main():
     targets = http_json("/json")
     page = next(t for t in targets
-                if t.get("type") == "page" and "12393" in t.get("url", ""))
+                if t.get("type") == "page"
+                and ("12393" in t.get("url", "") or "localhost" in t.get("url", "")))
     async with websockets.connect(page["webSocketDebuggerUrl"],
                                   max_size=50 * 1024 * 1024) as ws:
         cdp = CDP(ws)
