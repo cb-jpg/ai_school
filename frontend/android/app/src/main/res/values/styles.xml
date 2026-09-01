@@ -13,6 +13,9 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- WebView 布局视口之外的系统条区域（底部手势条）用白色兜底，
+             避免下拉菜单等全屏层底部露出深色窗口背景 -->
+        <item name="android:windowBackground">#FFFFFF</item>
     </style>
 
 

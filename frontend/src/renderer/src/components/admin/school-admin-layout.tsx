@@ -3,7 +3,7 @@
  * 学校主题风格的管理后台布局
  */
 
-import { FC, useState } from 'react';
+import { FC, useEffect, useState } from 'react';
 import { Box, HStack, VStack, Text, Button, Badge, IconButton } from '@chakra-ui/react';
 import { Avatar } from '@/components/ui/avatar';
 import { useAuth } from '@/context/auth-context';
@@ -292,6 +292,13 @@ export const SchoolAdminLayout: FC<{
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeItem, setActiveItem] = useState<string | null>('dashboard');
+
+  // 路由变化时收起手机端抽屉（浏览器返回键/代码跳转等非菜单点击的导航）
+  useEffect(() => {
+    const close = () => setMobileOpen(false);
+    window.addEventListener('hashchange', close);
+    return () => window.removeEventListener('hashchange', close);
+  }, []);
   const [openGroups, setOpenGroups] = useState<Set<string>>(
     new Set(menuGroups.filter(g => g.defaultOpen).map(g => g.id))
   );

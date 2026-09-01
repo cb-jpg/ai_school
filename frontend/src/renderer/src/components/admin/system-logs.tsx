@@ -152,7 +152,7 @@ export const SystemLogs: FC = () => {
           </Text>
         )}
         {!statsError && stats && (
-          <HStack gap="3">
+          <HStack gap="3" flexWrap="wrap" rowGap="3">
             <StatCard icon={<FiDatabase />} label="知识条目总数" value={stats.total_entries} />
             <StatCard
               icon={<FiCheck />}
@@ -352,13 +352,13 @@ function StatCard({
 }) {
   return (
     <Box
-      flex="1"
+      flex="1 1 40%"
+      minWidth="40%"
       bg="white"
       border="1px solid"
       borderColor={colors.gray200}
       rounded="lg"
       p="3.5"
-      minWidth="140px"
     >
       <HStack gap="2" mb="1">
         {icon}

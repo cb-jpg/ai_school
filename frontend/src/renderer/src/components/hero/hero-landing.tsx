@@ -89,7 +89,7 @@ export default function HeroLanding({
         <Box
           display={{ base: 'block', md: 'none' }}
           position="absolute"
-          top="84px"
+          top="96px"
           left={0}
           right={0}
           zIndex={0}

@@ -265,7 +265,13 @@ export const CharacterConfig: FC = () => {
   };
 
   return (
-    <Box width="full" height="full" display="flex" gap="6">
+    <Box
+      width="full"
+      height={{ base: 'auto', md: 'full' }}
+      display="flex"
+      flexDirection={{ base: 'column', md: 'row' }}
+      gap={{ base: '4', md: '6' }}
+    >
       {/* 左侧：角色配置 */}
       <Box
         flex="1"
@@ -275,7 +281,7 @@ export const CharacterConfig: FC = () => {
         borderColor={colors.gray200}
         display="flex"
         flexDirection="column"
-        height="full"
+        height={{ base: 'auto', md: 'full' }}
         overflow="hidden"
       >
         {/* 标题栏 */}
@@ -500,16 +506,16 @@ export const CharacterConfig: FC = () => {
         </Box>
       </Box>
 
-      {/* 右侧：用户配置 */}
+      {/* 右侧：用户配置（手机端堆叠到角色配置下方，占满宽度） */}
       <Box
-        width="300px"
+        width={{ base: 'full', md: '300px' }}
         bg="white"
         rounded="xl"
         border="1px solid"
         borderColor={colors.gray200}
         display="flex"
         flexDirection="column"
-        height="full"
+        height={{ base: 'auto', md: 'full' }}
       >
         {/* 标题栏 */}
         <Box

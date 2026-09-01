@@ -180,24 +180,34 @@ export default function KnowledgeAdmin({ onClose }: KnowledgeAdminProps) {
               <Icon as={FiSettings} />
               重建索引
             </Button>
-            {onClose && (
-              <Button
-                size="sm"
-                onClick={onClose}
-                height="32px"
-                px="12px"
-                borderRadius="2px"
-                border="1px solid"
-                borderColor={hairline}
-                background={paper}
-                color={muted}
-                fontFamily={swissFont}
-                _hover={{ borderColor: '#B3261E', color: '#B3261E' }}
-              >
-                <Icon as={FiLogOut} />
-                关闭
-              </Button>
-            )}
+            {(() => {
+              const exitLabel = onClose ? '关闭' : '返回工作台';
+              return (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (onClose) {
+                      onClose();
+                    } else {
+                      // 路由直开（无 onClose）时返回管理工作台首页
+                      window.location.hash = '#/main/dashboard';
+                    }
+                  }}
+                  height="32px"
+                  px="12px"
+                  borderRadius="2px"
+                  border="1px solid"
+                  borderColor={hairline}
+                  background={paper}
+                  color={muted}
+                  fontFamily={swissFont}
+                  _hover={{ borderColor: '#B3261E', color: '#B3261E' }}
+                >
+                  <Icon as={FiLogOut} />
+                  {exitLabel}
+                </Button>
+              );
+            })()}
           </HStack>
         </Flex>
       </Box>
@@ -211,7 +221,12 @@ export default function KnowledgeAdmin({ onClose }: KnowledgeAdminProps) {
           <Tabs.List
             borderBottom="2px solid"
             borderColor={hairline}
-            gap="24px"
+            gap={{ base: '16px', lg: '24px' }}
+            flexWrap="nowrap"
+            overflowX="auto"
+            css={{
+              '&::-webkit-scrollbar': { display: 'none' },
+            }}
           >
             {tabs.map((tab) => (
               <Tabs.Trigger
@@ -219,6 +234,8 @@ export default function KnowledgeAdmin({ onClose }: KnowledgeAdminProps) {
                 value={tab.id}
                 py="12px"
                 px="0"
+                flexShrink={0}
+                whiteSpace="nowrap"
                 borderBottom="3px solid transparent"
                 borderBottomColor={activeTab === tabs.indexOf(tab) ? blue : 'transparent'}
                 color={activeTab === tabs.indexOf(tab) ? ink : muted}
