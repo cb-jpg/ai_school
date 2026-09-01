@@ -167,3 +167,40 @@
 - 工作台页（modern-workspace）欢迎区/主内容 padding 响应式
 
 **状态**：typecheck ✅ → Web bundle 已部署服务器并重启 → APK 已重新出包。刷新浏览器即可看到（无需重装 APK 也能在浏览器验证，APK 端待下次安装生效）。
+
+---
+
+## 🌙 深夜二轮：main 布局 flex 修复 + 重大发现 /libs 门禁致浏览器端白屏（`667bffd`，已部署）
+
+### 用户二次反馈 → 两个真问题
+
+**1. main 布局仍压缩**：上轮删了坏的 width calc 但没加 `flex:1`——内容区是 flex 子项，宽度塌成内容固有宽度（dashboard 内容窄 → 右侧大片空白）。补 `flex:1 + minW:0`。
+
+**2. 排查缩放时用 headless 浏览器实测，暴露重大问题**：
+- **`/libs` 不在门禁放行清单** → `/libs/live2dcubismcore.js`（Live2D 核心，`<script>` 标签加载，天然不带 token）自 08-31 门禁上线起一直 401
+- `main.tsx` 逻辑：核心加载失败 → **整个应用拒绝渲染**（白屏报错"Error loading required components"）
+- 即 **08-31 之后纯浏览器端整站一直是坏的**！此前没人发现是因为所有验证都走 APK（Capacitor 从本地 assets 取核心，不经过服务器）
+- 修复：`PUBLIC_PREFIXES` 加 `/libs`（静态惰性资源，与 /bg、/live2d-models 同理）+ `main.tsx` 加 `.min.js` 回退不再单点失败。已部署重启，curl 200 ✅
+
+### 缩放修复的实证（headless Edge + CDP 注入双指触摸，新增 `scripts/cdp_pinch_test.py`）
+
+刷新后模型正常加载（证明门禁修复生效），双指捏合实测：
+
+| 步骤 | 预期 | 实测 |
+|---|---|---|
+| 双指落下（间距100） | scale 不变 | 1 ✅ |
+| 张开间距300 | 3.0 | **3.0** ✅ |
+| 张开间距400（超上限） | 钳制 3.0 | **3.0** ✅ |
+| 捏拢间距60 | 0.6 | **0.6** ✅ |
+
+无抖动、数学精确。**用户仍报缩放抖动 = 手机上跑的是旧 APK（今日修复均未安装）**。
+
+### 测试基建沉淀
+
+- `scripts/cdp_pinch_test.py`：CDP 双指捏合回归脚本，本机 headless 或手机（adb forward tcp:9333 localabstract:webview_devtools_remote_<pid>）通用
+- CDP 坑：Edge 的 `Input.dispatchTouchEvent` 不回响应（fire-and-forget）；headless 下该接口不产生 DOM touch 事件（需 touch 模拟），用 JS 构造 `new TouchEvent` 派发可直接测处理逻辑
+
+### 状态
+
+- 服务器：web bundle + server.py 已部署并重启；`/libs` 200；待办回归 PASS（rag_e2e_probe 已跑过两轮 PASS）
+- **APK 已重新出包（HEAD 667bffd）——用户必须 `adb install -r` 才能看到缩放/hero/main/音量全部修复**
