@@ -120,3 +120,32 @@
 ### 本轮出包状态
 
 新 APK（含音量补强+专题页字幕）已构建：`frontend/android/app/build/outputs/apk/debug/app-debug.apk`，**手机一连 USB 直接 `adb install -r` 即可**（`android:sync`+gradle 已跑过）。
+
+---
+
+## 🌙 晚间追加：App hero 布局调整 + 双指缩放重写（用户真机反馈五项，HEAD `fdd897e`）
+
+### 1. 🔴→✅ 双指缩放"抖动且无法缩放"根因修复（真机问题闭环）
+
+**根因是两个叠加的 bug**：
+
+1. **`CubismMatrix44.scale(x, y)` 是绝对赋值（`_tr[0]=x`）不是乘法**——原实现把"增量系数 ≈1.0x"直接赋给整个模型矩阵，模型被瞬间打到 ~1 倍刻度、下帧又被覆盖 → 抖动。相对缩放必须用 **`scaleRelative(x, y)`**（Framework 源码 cubismmatrix44.ts:222，乘法且保持平移）。
+2. **React 17+ 的合成 touch 事件在 root 上是 passive 的**，`e.preventDefault()` 无效——WebView 的页面缩放手势不被阻止，且 touchend 后浏览器合成 mousedown/mousemove/mouseup，捏合松手瞬间触发一次拖动 = 松手抖动。
+
+**重写方案**（use-live2d-model.ts）：触摸改**原生监听**（`{passive:false}` 可 preventDefault，经 ref 分发到最新闭包避免旧 isDragging 状态）；缩放目标 = 捏合起始 scale × 手指距离系数，钳制 [0.35×, 3×]；双指会话压制单指拖动、捏合结束后等全部手指抬起才恢复拖动；**补 touchcancel 处理**（深度定制 ROM 手势接管必发，原实现完全不处理 → 残留状态错乱）。
+
+### 2. App hero 布局（用户四项要求，全走 base 断点，桌面 md/lg 未动）
+
+- **背景去分屏白**：background.tsx 的"左侧虚化遮罩"（左 45% 白渐变，web 分屏设计遗留）手机端隐藏
+- **标题上移置底**："以人为本，全面发展"+副标题移出对话卡，成为导航栏下方独立层（top 84px），`zIndex 0` 低于 Live2D 层(1) → 人物从标题上方经过；对话卡内原标题块手机端隐藏
+- **设置进导航栏**：悬浮齿轮手机端隐藏；导航栏抽屉键左侧新增设置键（ghost 图标钮）；校名/设置/抽屉统一垂直居中（图标钮 boxSize 32px 对齐）
+
+### 3. 管理后台账号密码（用户询问，已实测可登录）
+
+- 用户名 `admin`，密码在服务器 `~/ai_school/data/auth/initial_admin_password.txt`（= `pN7As2YmrIpc1Js5`），POST /api/auth/login 实测返回 JWT ✅
+- 入口：App 内 hero 导航栏（桌面端）"登录"按钮 → `#/main`；或浏览器 `http://183.36.243.124:12393/?token=<门禁值>#/main`
+
+### 4. 服务器同步（本轮末）
+
+- Web bundle 已部署（tar 解到 `~/ai_school/frontend`）并重启，回归 `rag_e2e_probe.py` PASS（RAG 命中+TTS 音频正常）。浏览器端同步获得：音量补强、专题页字幕条、缩放修复、hero 布局调整
+- 新 APK 已构建（含本轮全部改动），待真机安装验证
