@@ -114,7 +114,7 @@ const Background = memo(({ children }: { children?: React.ReactNode }) => {
         )
       )}
 
-      {/* 左侧虚化遮罩 - 右侧清晰，左侧渐变虚化 */}
+      {/* 左侧虚化遮罩 - web 端左右分屏设计的一部分；App 手机端无分屏布局，隐藏 */}
       <Box
         position="absolute"
         top={0}
@@ -123,6 +123,7 @@ const Background = memo(({ children }: { children?: React.ReactNode }) => {
         height="100%"
         bg="linear-gradient(to right, rgba(245, 247, 250, 0.95) 0%, rgba(245, 247, 250, 0.7) 50%, rgba(245, 247, 250, 0.2) 100%)"
         zIndex={1}
+        display={{ base: 'none', md: 'block' }}
       />
 
       {/* 右侧保持清晰 */}
@@ -133,6 +134,7 @@ const Background = memo(({ children }: { children?: React.ReactNode }) => {
         width="55%"
         height="100%"
         zIndex={1}
+        display={{ base: 'none', md: 'block' }}
       />
 
       {children}

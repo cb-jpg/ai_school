@@ -5,7 +5,7 @@
 
 import { memo } from 'react';
 import { Flex, Text, Button, HStack, IconButton } from '@chakra-ui/react';
-import { FiMenu, FiHome, FiBook, FiClock, FiAward, FiUsers } from 'react-icons/fi';
+import { FiMenu, FiSettings, FiHome, FiBook, FiClock, FiAward, FiUsers } from 'react-icons/fi';
 import { useInterrupt } from '@/hooks/utils/use-interrupt';
 
 interface NavItem {
@@ -28,6 +28,7 @@ interface NavbarProps {
   navigation: NavItem[];
   onMobileMenuToggle: () => void;
   mobileMenuOpen: boolean;
+  onSettingsToggle?: () => void;
 }
 
 const handleNavClick = (itemId: string, onInterrupt?: () => void) => {
@@ -61,6 +62,7 @@ const Navbar = memo(({
   schoolName,
   navigation,
   onMobileMenuToggle,
+  onSettingsToggle,
 }: NavbarProps) => {
   const { interrupt } = useInterrupt();
 
@@ -88,14 +90,15 @@ const Navbar = memo(({
       borderColor="gray.200"
       boxShadow="sm"
     >
-      {/* Left Side: Logo */}
-      <HStack gap={4}>
+      {/* Left Side: Logo（与右侧按钮同一行内垂直居中） */}
+      <HStack gap={4} alignItems="center">
         <Text
           fontSize={{ base: 'lg', sm: 'xl' }}
           fontWeight="bold"
           letterSpacing="tight"
           color="#1E5494"
           cursor="pointer"
+          lineHeight="1.2"
           onClick={() => handleNavClick('home', interrupt)}
         >
           {schoolName}
@@ -128,8 +131,25 @@ const Navbar = memo(({
         })}
       </HStack>
 
-      {/* Right Side: CTA Button (Desktop) */}
-      <HStack gap={4}>
+      {/* Right Side: 设置（手机端，原悬浮齿轮移入导航栏）+ CTA Button (Desktop) + 抽屉键 */}
+      <HStack gap={2} alignItems="center">
+        {/* 设置按钮（手机端）：打开右侧设置侧栏 */}
+        {onSettingsToggle && (
+          <IconButton
+            display={{ base: 'flex', md: 'none' }}
+            aria-label="设置"
+            onClick={onSettingsToggle}
+            size="sm"
+            boxSize="32px"
+            bg="transparent"
+            color="#1E5494"
+            _hover={{ bg: 'gray.100' }}
+            _active={{ scale: 0.9 }}
+          >
+            <FiSettings size={18} />
+          </IconButton>
+        )}
+
         <Button
           display={{ base: 'none', md: 'inline-flex' }}
           bg="#1E5494"
@@ -151,6 +171,8 @@ const Navbar = memo(({
           display={{ base: 'flex', md: 'none' }}
           aria-label="Toggle menu"
           onClick={onMobileMenuToggle}
+          size="sm"
+          boxSize="32px"
           bg="transparent"
           color="gray.700"
           _hover={{ bg: 'gray.100' }}

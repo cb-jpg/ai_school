@@ -431,15 +431,34 @@ export const useLive2DModel = ({
   }, [isPet, isDragging, electronApi, handleMouseUp]);
 
   // --- 触摸支持（手机端）：单指拖动/点按复用鼠标逻辑，双指捏合缩放 ---
+  // 用原生 touch 监听（非 React 合成事件）：React 17+ 在 root 上以 passive
+  // 方式注册 touchstart/touchmove，合成事件里 preventDefault 无效，无法阻止
+  // WebView 的页面缩放手势和 touchend 后的合成鼠标事件（后者会在捏合结束时
+  // 触发一次拖动，表现为"人物抖动"）。
   const pinchStartDistRef = useRef(0);
-  const pinchAppliedFactorRef = useRef(1);
+  const pinchBaseScaleRef = useRef(1);
+  const isPinchingRef = useRef(false); // 双指会话中：压制单指拖动/点按
+  const waitAllUpRef = useRef(false); // 缩放已结束但仍有手指未抬起：抬起前不进入拖动
+
+  // 缩放范围（相对捏合开始时的缩放倍数）
+  const PINCH_MIN_FACTOR = 0.35;
+  const PINCH_MAX_FACTOR = 3.0;
+
+  const getModelScale = useCallback(() => {
+    const model = (window as any).getLAppAdapter?.()?.getModel?.();
+    return model?._modelMatrix?.getScaleX?.() || 1;
+  }, []);
 
   /**
-   * 缩放增量必须走与拖动一致的取模型路径（getLAppAdapter）。
-   * WebSDK 存在多实例包装：LAppLive2DManager.getInstance() 可能拿到
-   * 未挂载模型的另一实例，缩放会静默失效（2026-09-01 真机踩坑）。
+   * 捏合缩放：把缩放设为 捏合起始scale × 手指距离系数（带钳制）。
+   * 必须走与拖动一致的取模型路径（getLAppAdapter）。WebSDK 存在多实例包装：
+   * LAppLive2DManager.getInstance() 可能拿到未挂载模型的另一实例，缩放会
+   * 静默失效（2026-09-01 真机踩坑）。
+   * ⚠️ CubismMatrix44.scale(x,y) 是"绝对赋值 _tr[0]=x"而非乘法，直接传
+   * 增量系数会把模型瞬间打到约 1 倍刻度再被覆盖——这就是此前双指缩放
+   * 抖动且无法缩放的根因。相对缩放必须用 scaleRelative。
    */
-  const applyScaleDelta = useCallback((delta: number) => {
+  const applyPinchScale = useCallback((factor: number) => {
     const adapter = (window as any).getLAppAdapter?.();
     let model = adapter?.getModel?.();
     if (!model) {
@@ -449,62 +468,123 @@ export const useLive2DModel = ({
         model = null;
       }
     }
-    if (model && model._modelMatrix) {
-      model._modelMatrix.scale(delta, delta);
+    const matrix = model?._modelMatrix;
+    if (!matrix) return;
+
+    const base = pinchBaseScaleRef.current || 1;
+    const clamped = Math.min(
+      base * PINCH_MAX_FACTOR,
+      Math.max(base * PINCH_MIN_FACTOR, base * factor),
+    );
+    const current = matrix.getScaleX?.() || 1;
+    const ratio = clamped / current;
+    if (Math.abs(ratio - 1) > 0.001) {
+      matrix.scaleRelative(ratio, ratio);
     }
   }, []);
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 1) {
-      const t = e.touches[0];
-      handleMouseDown({ clientX: t.clientX, clientY: t.clientY } as React.MouseEvent);
-    } else if (e.touches.length >= 2) {
-      // 进入双指缩放：取消进行中的单指点按/拖动
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      pinchStartDistRef.current = Math.sqrt(dx * dx + dy * dy);
-      pinchAppliedFactorRef.current = 1;
+  // 原生 touch 事件分发器：通过 ref 调用最新的处理闭包（避免旧 isDragging 状态）
+  const touchNativeRef = useRef<{
+    start: (x: number, y: number) => void
+    move: (x: number, y: number) => void
+    end: (x: number, y: number) => void
+    cancel: () => void
+  }>({ start: () => {}, move: () => {}, end: () => {}, cancel: () => {} });
+
+  useEffect(() => {
+    touchNativeRef.current = {
+      start: (x, y) => handleMouseDown({ clientX: x, clientY: y } as React.MouseEvent),
+      move: (x, y) => handleMouseMove({ clientX: x, clientY: y } as React.MouseEvent),
+      end: (x, y) => handleMouseUp({ clientX: x, clientY: y } as React.MouseEvent),
+      cancel: () => handleMouseLeave(),
+    };
+  });
+
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return undefined;
+
+    const distBetween = (touches: TouchList) => {
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    };
+
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length >= 2) {
+        // 进入双指缩放：取消单指点按/拖动，开启缩放会话
+        pinchStartDistRef.current = Math.max(1, distBetween(e.touches));
+        pinchBaseScaleRef.current = getModelScale();
+        isPinchingRef.current = true;
+        waitAllUpRef.current = false;
+        isPotentialTapRef.current = false;
+        setIsDragging(false);
+        e.preventDefault(); // 阻止 WebView 页面缩放手势
+        return;
+      }
+      // 缩放会话收尾阶段（还有手指没抬起）不进入拖动，防止误触
+      if (isPinchingRef.current || waitAllUpRef.current) return;
+      touchNativeRef.current.start(e.touches[0].clientX, e.touches[0].clientY);
+    };
+
+    const onMove = (e: TouchEvent) => {
+      if (isPinchingRef.current && e.touches.length >= 2) {
+        e.preventDefault(); // 阻止页面缩放/滚动与 touchend 后的合成鼠标事件
+        applyPinchScale(distBetween(e.touches) / pinchStartDistRef.current);
+        return;
+      }
+      if (isPinchingRef.current || waitAllUpRef.current) return;
+      if (e.touches.length === 1) {
+        touchNativeRef.current.move(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    };
+
+    const onEnd = (e: TouchEvent) => {
+      e.preventDefault(); // 阻止触摸结束后浏览器合成 mousedown/mousemove/mouseup
+      if (isPinchingRef.current) {
+        if (e.touches.length < 2) {
+          // 双指缩放结束；若仍有手指留在屏幕上，等全部抬起前不进入拖动
+          isPinchingRef.current = false;
+          pinchStartDistRef.current = 0;
+          isPotentialTapRef.current = false;
+          setIsDragging(false);
+          waitAllUpRef.current = e.touches.length > 0;
+        }
+        return;
+      }
+      if (waitAllUpRef.current) {
+        if (e.touches.length === 0) waitAllUpRef.current = false;
+        return;
+      }
+      const t = e.changedTouches[0];
+      if (t) {
+        touchNativeRef.current.end(t.clientX, t.clientY);
+      } else {
+        touchNativeRef.current.cancel();
+      }
+    };
+
+    const onCancel = () => {
+      // WebView 可能随时接管手势并下发 touchcancel（深度定制 ROM 常见），
+      // 必须完整复位，否则残留状态会让后续手势错乱
+      isPinchingRef.current = false;
+      waitAllUpRef.current = false;
+      pinchStartDistRef.current = 0;
       isPotentialTapRef.current = false;
       setIsDragging(false);
-    }
-  }, [handleMouseDown]);
+    };
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (pinchStartDistRef.current > 0 && e.touches.length >= 2) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      // 累计目标系数与已应用系数之差即为本次增量（Cubism 的 scale 是乘法）
-      const targetFactor = dist / pinchStartDistRef.current;
-      const delta = targetFactor / (pinchAppliedFactorRef.current || 1);
-      if (delta !== 1) {
-        applyScaleDelta(delta);
-        pinchAppliedFactorRef.current = targetFactor;
-      }
-      return;
-    }
-    if (e.touches.length === 1) {
-      const t = e.touches[0];
-      handleMouseMove({ clientX: t.clientX, clientY: t.clientY } as React.MouseEvent);
-    }
-  }, [handleMouseMove, applyScaleDelta]);
-
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (pinchStartDistRef.current > 0) {
-      // 双指未完全抬起时不结束缩放会话
-      if (e.touches.length < 2) {
-        pinchStartDistRef.current = 0;
-        pinchAppliedFactorRef.current = 1;
-      }
-      return;
-    }
-    const t = e.changedTouches[0];
-    if (t) {
-      handleMouseUp({ clientX: t.clientX, clientY: t.clientY } as React.MouseEvent);
-    } else {
-      handleMouseLeave();
-    }
-  }, [handleMouseUp, handleMouseLeave]);
+    el.addEventListener('touchstart', onStart, { passive: false });
+    el.addEventListener('touchmove', onMove, { passive: false });
+    el.addEventListener('touchend', onEnd, { passive: false });
+    el.addEventListener('touchcancel', onCancel, { passive: false });
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onEnd);
+      el.removeEventListener('touchcancel', onCancel);
+    };
+  }, [canvasRef, getModelScale, applyPinchScale, setIsDragging]);
 
   useEffect(() => {
     if (!isPet && electronApi && isHoveringModelRef.current) {
@@ -520,9 +600,7 @@ export const useLive2DModel = ({
       onMouseMove: handleMouseMove,
       onMouseUp: handleMouseUp,
       onMouseLeave: handleMouseLeave,
-      onTouchStart: handleTouchStart,
-      onTouchMove: handleTouchMove,
-      onTouchEnd: handleTouchEnd,
+      // 触摸（拖动/捏合）改由组件内原生 touch 监听处理，见上方 useEffect
     },
   };
 };

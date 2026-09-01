@@ -202,8 +202,8 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
           </HStack>
         </HStack>
 
-        {/* 标题块：手机端移到最上方并缩小，为聊天卡片腾出空间 */}
-        <Box order={{ base: 0, md: 1 }}>
+        {/* 标题块：手机端已上移到导航栏下方独立层（见 hero-landing），这里仅桌面端显示 */}
+        <Box order={{ base: 0, md: 1 }} display={{ base: 'none', md: 'block' }}>
           <Text
             fontSize={{ base: 'lg', sm: '4xl', md: '5xl' }}
             fontWeight="bold"

@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react';
-import { Box, Flex, IconButton } from '@chakra-ui/react';
+import { Box, Flex, IconButton, Text } from '@chakra-ui/react';
 import { FiSettings } from 'react-icons/fi';
 import { FiHome, FiBook, FiClock, FiAward, FiUsers } from 'react-icons/fi';
 import Navbar from './navbar';
@@ -80,15 +80,40 @@ export default function HeroLanding({
         navigation={SCHOOL_CONFIG.navigation}
         onMobileMenuToggle={handleMobileMenuToggle}
         mobileMenuOpen={mobileMenuOpen}
+        onSettingsToggle={toggleSidebar}
       />
 
-      {/* 设置按钮 - 打开右侧侧栏（专题页打开时隐藏，避免浮在专题页上） */}
+      {/* 手机端标题层：紧贴导航栏下方，zIndex 低于 Live2D 层(1)，
+          人物可从标题上方经过（App 端人物区即上半屏） */}
+      {!activeCampusTopic && (
+        <Box
+          display={{ base: 'block', md: 'none' }}
+          position="absolute"
+          top="84px"
+          left={0}
+          right={0}
+          zIndex={0}
+          textAlign="center"
+          pointerEvents="none"
+          px={4}
+        >
+          <Text fontSize="xl" fontWeight="bold" color="#1E5494" lineHeight="1.3">
+            {SCHOOL_CONFIG.tagline}
+          </Text>
+          <Text fontSize="xs" color={schoolColors.textSecondary} mt={1} lineHeight="1.5">
+            {SCHOOL_CONFIG.description}
+          </Text>
+        </Box>
+      )}
+
+      {/* 设置按钮 - 打开右侧侧栏（手机端已移入导航栏；专题页打开时隐藏，避免浮在专题页上） */}
       {!activeCampusTopic && (
         <Box
           position="absolute"
           top={{ base: 20, md: 24 }}
           right={{ base: 4, md: 8, lg: 12 }}
           zIndex={20}
+          display={{ base: 'none', md: 'block' }}
         >
           <IconButton
             aria-label="设置"
