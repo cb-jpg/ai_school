@@ -4,7 +4,7 @@
  */
 
 import { FC, useState } from 'react';
-import { Box, HStack, VStack, Text, Button, Badge } from '@chakra-ui/react';
+import { Box, HStack, VStack, Text, Button, Badge, IconButton } from '@chakra-ui/react';
 import { Avatar } from '@/components/ui/avatar';
 import { useAuth } from '@/context/auth-context';
 import {
@@ -20,6 +20,7 @@ import {
   FiChevronLeft,
   FiChevronDown,
   FiChevronRight,
+  FiMenu,
 } from 'react-icons/fi';
 import '@/styles/school-theme.css';
 
@@ -289,6 +290,7 @@ export const SchoolAdminLayout: FC<{
 }> = ({ children }) => {
   const { user, logout } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [activeItem, setActiveItem] = useState<string | null>('dashboard');
   const [openGroups, setOpenGroups] = useState<Set<string>>(
     new Set(menuGroups.filter(g => g.defaultOpen).map(g => g.id))
@@ -311,6 +313,7 @@ export const SchoolAdminLayout: FC<{
 
   const handleItemClick = (itemId: string) => {
     setActiveItem(itemId);
+    setMobileOpen(false); // 手机端抽屉：选中菜单后收起
 
     // 路由映射
     const routeMap: Record<string, string> = {
@@ -341,22 +344,39 @@ export const SchoolAdminLayout: FC<{
       className="school-background"
       fontFamily="Microsoft YaHei, SimHei, sans-serif"
     >
-      {/* 左侧边栏 */}
+      {/* 手机端抽屉遮罩（侧栏 z=30 之下、内容之上） */}
+      {mobileOpen && (
+        <Box
+          position="fixed"
+          top={0}
+          left={0}
+          right={0}
+          bottom={0}
+          bg="rgba(15, 23, 42, 0.45)"
+          zIndex={29}
+          display={{ base: 'block', md: 'none' }}
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* 左侧边栏：桌面端固定/可折叠；手机端为抽屉（默认移出屏幕，汉堡键呼出） */}
       <Box
         as="aside"
-        width={isCollapsed ? '80px' : '280px'}
+        width={{ base: '280px', md: isCollapsed ? '80px' : '280px' }}
         height="100vh"
         bg="white"
         borderRight="1px solid"
         borderColor={schoolColors.gray200}
         display="flex"
         flexDirection="column"
-        transition="width 0.3s ease"
+        transition="transform 0.3s ease, width 0.3s ease"
         position="fixed"
         left={0}
         top={0}
         zIndex={30}
         className="school-sidebar-menu"
+        transform={{ base: mobileOpen ? 'translateX(0)' : 'translateX(-100%)', md: 'none' }}
+        boxShadow={{ base: mobileOpen ? 'lg' : 'none', md: 'none' }}
       >
         {/* 学校Logo区域 */}
         <Box
@@ -497,13 +517,14 @@ export const SchoolAdminLayout: FC<{
                   </Button>
                 </>
               )}
-              {/* 折叠按钮 */}
+              {/* 折叠按钮（仅桌面端；手机端抽屉固定宽度） */}
               <Button
                 variant="ghost"
                 size="sm"
                 width="full"
                 onClick={() => setIsCollapsed(!isCollapsed)}
                 color={schoolColors.gray600}
+                display={{ base: 'none', md: 'inline-flex' }}
               >
                 <HStack justify="center" gap="2">
                   {isCollapsed ? (
@@ -521,10 +542,9 @@ export const SchoolAdminLayout: FC<{
         </Box>
       </Box>
 
-      {/* 右侧主内容区 */}
+      {/* 右侧主内容区：手机端全宽（侧栏为抽屉不占位）；桌面端留出侧栏宽度 */}
       <Box
-        ml={isCollapsed ? '80px' : '280px'}
-        width="calc(100% - (var(--sidebar-width, 280px)))"
+        ml={{ base: '0', md: isCollapsed ? '80px' : '280px' }}
         height="100vh"
         transition="margin-left 0.3s ease"
         display="flex"
@@ -539,12 +559,22 @@ export const SchoolAdminLayout: FC<{
           display="flex"
           alignItems="center"
           justifyContent="space-between"
-          px="6"
+          px={{ base: '3', md: '6' }}
           className="school-header"
         >
-          <HStack gap="4">
+          <HStack gap="3">
+            <IconButton
+              display={{ base: 'inline-flex', md: 'none' }}
+              aria-label="打开菜单"
+              variant="ghost"
+              size="sm"
+              color={schoolColors.gray600}
+              onClick={() => setMobileOpen(true)}
+            >
+              <FiMenu size={18} />
+            </IconButton>
             <Text
-              fontSize="lg"
+              fontSize={{ base: 'sm', md: 'lg' }}
               fontWeight="semibold"
               color={schoolColors.primary}
               className="school-title"
@@ -555,6 +585,7 @@ export const SchoolAdminLayout: FC<{
 
           <HStack gap="4">
             <Badge
+              display={{ base: 'none', md: 'inline-flex' }}
               bg={schoolColors.accent}
               color="white"
               px="3"
@@ -570,7 +601,12 @@ export const SchoolAdminLayout: FC<{
               color="white"
               name={user?.username || '未登录'}
             />
-            <Text fontSize="sm" color={schoolColors.gray600} fontWeight="medium">
+            <Text
+              display={{ base: 'none', md: 'block' }}
+              fontSize="sm"
+              color={schoolColors.gray600}
+              fontWeight="medium"
+            >
               {user?.username || '未登录'}
             </Text>
           </HStack>
@@ -580,7 +616,7 @@ export const SchoolAdminLayout: FC<{
         <Box
           flex="1"
           overflowY="auto"
-          p="6"
+          p={{ base: '3', md: '6' }}
           bg={schoolColors.gray50}
           css={{
             '&::-webkit-scrollbar': {

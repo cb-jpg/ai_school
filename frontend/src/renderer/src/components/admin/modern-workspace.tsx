@@ -341,7 +341,7 @@ export const ModernMainWorkspace: FC = () => {
       fontFamily="Inter, sans-serif"
     >
       {/* 顶部欢迎区域 */}
-      <Box bg="white" borderBottom="1px solid" borderColor="gray.200" py="8" px="8">
+      <Box bg="white" borderBottom="1px solid" borderColor="gray.200" py={{ base: '4', md: '8' }} px={{ base: '4', md: '8' }}>
         <VStack align="start" gap="2" maxW="6xl">
           <Text
             fontSize="3xl"
@@ -370,7 +370,7 @@ export const ModernMainWorkspace: FC = () => {
       </Box>
 
       {/* 主要内容区域 */}
-      <Box p="8" maxW="6xl" mx="auto">
+      <Box p={{ base: '4', md: '8' }} maxW="6xl" mx="auto">
         <VStack gap="8" align="stretch">
           {/* 统计卡片 */}
           <Box>
