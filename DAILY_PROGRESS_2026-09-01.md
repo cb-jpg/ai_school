@@ -215,3 +215,17 @@
 - App 状态核验：WS 已连、模型已加载、音量 key `ttsVolume` 待用户首次拖动后落 localStorage
 
 **用户手上待人工确认**：双指缩放手感、hero 布局四项（背景/标题/导航栏设置键）、main 后台布局、音量滑块、专题页讲解字幕条。
+
+---
+
+## 📱 09-02 凌晨追加：真机反馈五项修复 + 全后台页面巡检（`ff50e5d`，已装回手机）
+
+用户装上新 APK 后反馈五项，逐项处理（全部已构建、部署、装机）：
+
+1. **hero 导航栏"被状态栏遮挡"**：CDP 实测并未真遮挡（Capacitor 已把 WebView 排在状态栏下方；`env(safe-area-inset-top)` 在此 WebView=0，Capacitor 8 SystemBars 注入的 `--safe-area-inset-*` 也=0），属视觉偏紧 → 导航栏手机端 pt 加到 28px，标题层 top 96px。若用户仍见遮挡需其截图再查
+2. **下拉菜单底部露出一条**：根因有趣——Android WebView 布局视口 793px，屏幕实际 830px，多出的 37px（底部手势条区）由**窗口背景**绘制；DayNight 深色模式下是黑色。styles.xml `AppTheme.NoActionBar` 加 `windowBackground=#FFFFFF` 兜底（页面无法画进那 37px，只能让窗口背景变白）
+3. **角色形象设置异常**：右列固定 300px + 左列 flex=1，手机端左列被挤成 ~28px 细条。改上下堆叠（base: column + auto 高度）。已真机验证：全宽可用，hash 不再异常跳 hero（之前那次弹回是用户恰好在操作手机）
+4. **知识库管理无退出键 + 未适配**：路由直开时不传 onClose → 关闭键不渲染。按钮改常驻（无 onClose 跳 #/main/dashboard，"返回工作台"）；tabs 窄屏横滑不换行。真机验证：概览/知识库/上传/未回答问题四 tab 一行放下，统计卡单列，灌库的 15 条正常显示
+5. **子页面适配**：真机逐页巡检（dashboard/workspace/test-conversation/character-config/knowledge-admin/unanswered-questions/document-knowledge/user-management/system-logs 共 9 页截图）。发现并修：系统日志统计卡第三张溢出屏幕（flex=1+文字 min-content → 改 flexWrap+1 1 40% 两列换行）；待补充问题库/文档知识库/用户管理/仪表盘/主工作台实测本来就可用。另加：管理后台抽屉在 hashchange 时自动收起
+
+**坑**：修复过程中曾因管道 `typecheck | tail && build` 掩盖 TS 报错（重复 JSX 属性）构建出坏包又重修——验证类命令勿接管道后依赖退出码。
