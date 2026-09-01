@@ -75,3 +75,48 @@
 3. 弱网重连、杀进程重开实测
 4. 服务器 SSH 改密（用户暂缓中）
 5. VAD 灵敏度调参（ambient 噪声易触发"聆听中"，设置面板有阈值提示文案可引导）
+
+---
+
+## 🌙 下午追加：缺失功能点清理（真机未连，代码侧先行）
+
+**HEAD**：`7ae96c2` → `459bf24`（前端修复）→ `d2448f9`（脚本），均已 push。
+
+对照 `数字人缺失功能点.txt` 逐条核实，**清单本身已部分过时**：
+
+| 清单项 | 实际状态 |
+|---|---|
+| hero 页字幕同步显示 | ✅ 早已实现（桌面端字幕条 + 手机端对话卡内字幕气泡），清单过时 |
+| 音量调节无效 | ⚠️ 主链路其实是通的；本次补强 3 处薄弱点（见下） |
+| 知识库网页资料（URL）添加 | ✅ 前后端早已实现（`/api/knowledge/add-url` + 管理端"网页抓取"tab），待联测 |
+| 摄像头画面作为背景 | ✅ bgurl-context 已有 `useCameraBackground` 全链路，待联测 |
+| RAG 回答→Live2D 播报字幕联动 | 🔴 **真问题：RAG 检索恒 0 命中**（见下），已修复 |
+
+### 1. 音量链路补强（`459bf24`）
+
+- 浏览器 speechSynthesis 回退路径此前完全没接音量（`utterance.volume` 缺失）——补上
+- `audio.volume` 改读 `stateRef.current.volume`（防闭包旧值）
+- **音量持久化到 localStorage**（key `ttsVolume`）——此前每次启动重置回 80，是"调了没效果"观感的来源之一
+- 待真机复测：拖动滑块 → 下一句播报音量变化；播放中拖动 → 立即变化
+
+### 2. 专题页讲解字幕条（`459bf24`）
+
+功能点要求"讲解过程中显示字幕和当前状态"，campus 专题页此前只在点按钮瞬间 set 一次文案，讲解中无字幕。新增：讲解进行中（`isSpeaking`）在专题页底部显示字幕条（`data-testid=campus-narration-caption`，当前播报句 + "正在讲解"状态点，`pointerEvents:none` 不挡滚动，最多 3 行截断）。hero/工作台两种模式都生效。
+
+### 3. 🔴→✅ RAG 检索 0 命中修复（今日最重要发现）
+
+**现象**：公网 e2e 问"学校是什么时候创办的？"→ `rag-status: has_context=False doc_count=0`，回答全靠人设兜底。
+
+**根因**：对话 RAG 检索的是**新知识库 `data/knowledge`**，而它**本地和服务器都是空的**（index.json 只有 `{}`）。`school_rag/models/*.json` 只是专题页数据源，且内容还是占位演示数据（"XX中学""张三""北京市海淀区"）；真实校情在 `frontend/src/renderer/src/data/campus-knowledge.ts`。
+
+**修复**：新增 `scripts/seed_knowledge.py`，把 campus-knowledge.ts 的真实校情整理成 **15 条知识条目**（概况/理念/位置/教学特色/校史三节点/防震减灾荣誉/信息学清北/教师成长/阅读美育/学习标兵三人/FAQ速查），走与后台 `/create` 相同的 切分→向量化→索引 流程，按标题幂等。服务器已执行并重启：
+
+- 灌库自检：4 个典型问题全部命中，分数 0.51-0.66（MIN_SCORE=0.3）
+- **公网 e2e 复测：`has_context=True doc_count=3`，回答明确引用"始建于1999年"** ✅
+- 新增 `scripts/rag_e2e_probe.py`：在 e2e 基础上检查 rag-status/full-text/audio 三段，专测"检索→生成→TTS"链路
+
+**新知识库以后这样维护**：管理后台增删改查即生效；批量灌内容改 `seed_knowledge.py` 的 ENTRIES 后服务器重跑（幂等）。
+
+### 本轮出包状态
+
+新 APK（含音量补强+专题页字幕）已构建：`frontend/android/app/build/outputs/apk/debug/app-debug.apk`，**手机一连 USB 直接 `adb install -r` 即可**（`android:sync`+gradle 已跑过）。
