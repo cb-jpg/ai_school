@@ -204,3 +204,14 @@
 
 - 服务器：web bundle + server.py 已部署并重启；`/libs` 200；待办回归 PASS（rag_e2e_probe 已跑过两轮 PASS）
 - **APK 已重新出包（HEAD 667bffd）——用户必须 `adb install -r` 才能看到缩放/hero/main/音量全部修复**
+
+---
+
+## 🌙 深夜三轮：真机安装 + 真机缩放实测 PASS（收尾）
+
+- 手机重连后 adb 不可见：**复合设备接口布局又变了（这次 ADB 在 MI_02，08-31 修的是 MI_01）**——修复脚本 `D:\SRP\android-tools\fix_adb_guid_mi02.ps1`（写 DeviceInterfaceGUIDs 后**必须物理重插拔**才生效，软重启设备无效）。两份脚本都留着，哪个 MI 是 ADB 就用哪份；重插后 MI 序号可能再变，按 PnP 列表现查
+- `adb install -r` 新 APK Success（含今天全部修复），预授权 RECORD_AUDIO/CAMERA，冷启动
+- **真机 CDP 捏合实测 PASS**（pid 3954，webview forward 9222）：scale 1 → 1.68 → 2.36 → 3.0（钳制），比例精确无抖动——真机全输入管线验证，与 headless 结论一致
+- App 状态核验：WS 已连、模型已加载、音量 key `ttsVolume` 待用户首次拖动后落 localStorage
+
+**用户手上待人工确认**：双指缩放手感、hero 布局四项（背景/标题/导航栏设置键）、main 后台布局、音量滑块、专题页讲解字幕条。
