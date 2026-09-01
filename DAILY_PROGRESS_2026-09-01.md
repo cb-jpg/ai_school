@@ -149,3 +149,21 @@
 
 - Web bundle 已部署（tar 解到 `~/ai_school/frontend`）并重启，回归 `rag_e2e_probe.py` PASS（RAG 命中+TTS 音频正常）。浏览器端同步获得：音量补强、专题页字幕条、缩放修复、hero 布局调整
 - 新 APK 已构建（含本轮全部改动），待真机安装验证
+
+---
+
+## 🌙 深夜追加：管理后台 main 布局手机端适配（`723ed96`，已部署）
+
+**用户反馈**：登录后台看 main 界面，左右侧压缩得诡异。
+
+**根因**（`school-admin-layout.tsx`，桌面优先设计从未适配过手机）：
+- 侧栏 `position:fixed` 固定 280px → 手机屏内容区只剩 ~110px
+- 内容区 `width=calc(100% - var(--sidebar-width, 280px))`——**该 CSS 变量从未被设置**，且折叠时宽度不跟随（桌面收起态右侧本就有 200px 空档的隐藏 bug）
+
+**修复**（桌面端行为不变）：
+- 侧栏手机端改**抽屉**：默认移出屏幕，顶栏汉堡键（FiMenu）呼出 + 半透明遮罩，点菜单项即收起；"收起"折叠按钮仅桌面端显示
+- 内容区去掉坏的 width calc，`ml` 改响应式（base: 0 / md: 80|280px），折叠态对齐 bug 一并修复
+- 顶栏手机端：汉堡键+标题缩小，徽章/用户名隐藏；内容区 padding `base:3 / md:6`
+- 工作台页（modern-workspace）欢迎区/主内容 padding 响应式
+
+**状态**：typecheck ✅ → Web bundle 已部署服务器并重启 → APK 已重新出包。刷新浏览器即可看到（无需重装 APK 也能在浏览器验证，APK 端待下次安装生效）。
