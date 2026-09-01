@@ -32,19 +32,24 @@ if (typeof window !== 'undefined') {
 
   // Dynamically load the Live2D Core script
   const loadLive2DCore = () => {
-    return new Promise<void>((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = './libs/live2dcubismcore.js'; // Path to the copied script
-      script.onload = () => {
-        console.log('Live2D Cubism Core loaded successfully.');
-        resolve();
-      };
-      script.onerror = (error) => {
-        console.error('Failed to load Live2D Cubism Core:', error);
-        reject(error);
-      };
-      document.head.appendChild(script);
-    });
+    const tryLoad = (src: string) =>
+      new Promise<void>((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = () => {
+          console.log(`Live2D Cubism Core loaded successfully: ${src}`);
+          resolve();
+        };
+        script.onerror = (error) => {
+          console.error(`Failed to load Live2D Cubism Core: ${src}`, error);
+          reject(error);
+        };
+        document.head.appendChild(script);
+      });
+    // 主路径失败（文件缺失/被网关拦截）时回退到 min 版，避免整个应用起不来
+    return tryLoad('./libs/live2dcubismcore.js').catch(() =>
+      tryLoad('./libs/live2dcubismcore.min.js'),
+    );
   };
 
   // Load the script and then render the app

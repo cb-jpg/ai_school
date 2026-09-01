@@ -35,7 +35,7 @@ class AccessTokenMiddleware:
     令牌来源（任一即可）：?token= 查询参数 / X-Access-Token 头 / Bearer 头。
     """
 
-    PUBLIC_PREFIXES = ("/assets/", "/live2d-models", "/bg", "/avatars", "/web-tool")
+    PUBLIC_PREFIXES = ("/assets/", "/live2d-models", "/bg", "/avatars", "/web-tool", "/libs")
     PUBLIC_PATHS = ("/", "/favicon.ico", "/vite.svg", "/robots.txt")
 
     def __init__(self, app, access_token: str):

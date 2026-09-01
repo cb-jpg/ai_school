@@ -542,13 +542,16 @@ export const SchoolAdminLayout: FC<{
         </Box>
       </Box>
 
-      {/* 右侧主内容区：手机端全宽（侧栏为抽屉不占位）；桌面端留出侧栏宽度 */}
+      {/* 右侧主内容区：手机端全宽（侧栏为抽屉不占位）；桌面端留出侧栏宽度。
+          flex:1 使其撑满剩余宽度（此前宽度塌成内容固有宽度，右侧大片空白） */}
       <Box
         ml={{ base: '0', md: isCollapsed ? '80px' : '280px' }}
         height="100vh"
         transition="margin-left 0.3s ease"
         display="flex"
         flexDirection="column"
+        flex="1"
+        minW="0"
       >
         {/* 顶部导航栏 */}
         <Box
