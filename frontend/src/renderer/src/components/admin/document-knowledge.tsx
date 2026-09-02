@@ -190,11 +190,12 @@ export const DocumentKnowledge: FC = () => {
       p={{ base: '4', md: '6' }}
       overflow={{ base: 'auto', md: 'hidden' }}
     >
-      {/* 左侧：文档列表（手机端在上、限高可滚，详情在其下方） */}
+      {/* 左侧：文档列表（手机端固定高度让内部滚动生效；maxHeight 不约束
+          flex 子项高度，会被内容撑开导致 overflow:hidden 裁切且无法滚动） */}
       <Box
         width={{ base: 'full', md: '360px' }}
         flexShrink={0}
-        maxHeight={{ base: '55%', md: 'none' }}
+        height={{ base: '60vh', md: 'auto' }}
         bg="white"
         rounded="xl"
         border="1px solid"

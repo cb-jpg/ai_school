@@ -15,10 +15,12 @@ import { useMode } from "@/context/mode-context";
 
 interface Live2DProps {
   showSidebar?: boolean;
+  /** 全屏穿透模式（hero 页）：画布不拦截触摸，交互由 window 级 hitTest 处理 */
+  touchThrough?: boolean;
 }
 
 export const Live2D = memo(
-  ({ showSidebar }: Live2DProps): JSX.Element => {
+  ({ showSidebar, touchThrough }: Live2DProps): JSX.Element => {
     const { forceIgnoreMouse } = useForceIgnoreMouse();
     const { modelInfo } = useLive2DConfig();
     const { mode } = useMode();
@@ -38,6 +40,7 @@ export const Live2D = memo(
     const { isDragging, handlers } = useLive2DModel({
       modelInfo,
       canvasRef,
+      touchThrough,
     });
 
     // Setup hooks
@@ -93,6 +96,9 @@ export const Live2D = memo(
       window.api?.showContextMenu?.();
     };
 
+    const elemPointerEvents =
+      isPet && forceIgnoreMouse ? "none" : touchThrough ? "none" : "auto";
+
     return (
       <div
         ref={internalContainerRef} // Ref for useLive2DResize if it observes this element
@@ -100,12 +106,13 @@ export const Live2D = memo(
         style={{
           width: "100%",
           height: "100%",
-          pointerEvents: isPet && forceIgnoreMouse ? "none" : "auto",
+          pointerEvents: elemPointerEvents,
           overflow: "hidden",
           position: "relative",
           cursor: isDragging ? "grabbing" : "default",
-          // 手机端手势（拖动/捏合缩放）由组件处理，屏蔽浏览器默认的页面滚动/缩放
-          touchAction: "none",
+          // 手机端手势（拖动/捏合缩放）由组件处理，屏蔽浏览器默认的页面滚动/缩放；
+          // 穿透模式下触摸走 window 监听（hitTest 放行/拦截），此处不屏蔽页面行为
+          touchAction: touchThrough ? "auto" : "none",
         }}
         onPointerDown={handlePointerDown}
         onContextMenu={handleContextMenu}
@@ -117,7 +124,7 @@ export const Live2D = memo(
           style={{
             width: "100%",
             height: "100%",
-            pointerEvents: isPet && forceIgnoreMouse ? "none" : "auto",
+            pointerEvents: elemPointerEvents,
             display: "block",
             cursor: isDragging ? "grabbing" : "default",
           }}

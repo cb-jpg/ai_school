@@ -171,8 +171,8 @@ export class LAppDelegate {
     // 主循环
     const loop = (): void => {
       // インスタンスの有無の確認
-      // 检查实例是否存在
-      if (s_instance == null) {
+      // 检查实例是否存在；实例已被重建时旧循环自灭（否则会踩到已释放的 _view）
+      if (s_instance == null || s_instance !== this) {
         return;
       }
 

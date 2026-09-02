@@ -219,24 +219,24 @@ function AppContent(): JSX.Element {
         {/* Background layer for hero route */}
         <Background />
 
-        {/* Live2D layer for hero route - 手机端占上半屏，桌面端右侧 55% */}
+        {/* Live2D layer for hero route - 手机端全屏穿透画布，桌面端右侧 55% */}
         <Box
           position="absolute"
           top={0}
           right={0}
           width={{ base: "100%", md: "55%" }}
           height={{
-            base: "56vh",
+            base: "100vh",
             md: isElectron ? "calc(100vh - 30px)" : "100vh",
           }}
           zIndex={{ base: 15, md: 1 }}
-          /* 手机端人物区可交互（拖动/缩放/点按动作）；桌面端保持不拦截左侧 UI。
-             手机端 zIndex 15：人物可盖住对话卡片的状态行（卡片 5）与标题层，
-             但低于输入框区（20），输入/麦克风/发送始终可点。
-             高度 56vh：人物可被拖进对话卡片区，可移动范围更大。 */
-          pointerEvents={{ base: "auto", md: "none" }}
+          /* 手机端：全屏穿透画布（pointerEvents none + window 级 hitTest 触摸）。
+             人物可被拖到屏幕任意位置（包括对话框中间），且只有摸到模型本体
+             才拦截触摸，其余区域完全放行——消息滚动/按钮/输入框全部正常。
+             桌面端：画布不拦截鼠标（与历史行为一致）。 */
+          pointerEvents="none"
         >
-          <Live2D showSidebar={false} />
+          <Live2D showSidebar={false} touchThrough />
         </Box>
 
         {/* CampusKnowledge overlay for topic pages */}

@@ -95,11 +95,16 @@ export const SchoolTestConversation: FC = () => {
       width="full"
       height="full"
       display="flex"
-      gap="6"
+      flexDirection={{ base: 'column', md: 'row' }}
+      gap={{ base: '4', md: '6' }}
+      overflowY={{ base: 'auto', md: 'visible' }}
+      p={{ base: '4', md: '0' }}
     >
-      {/* 左侧：数字人展示区 */}
+      {/* 左侧：数字人展示区（手机端固定高度，避免被聊天列挤扁） */}
       <Box
         flex="1"
+        height={{ base: '40vh', md: 'auto' }}
+        flexShrink={0}
         bg="white"
         rounded="xl"
         border="1px solid"
@@ -197,16 +202,18 @@ export const SchoolTestConversation: FC = () => {
         </Box>
       </Box>
 
-      {/* 右侧：聊天面板 */}
+      {/* 右侧：聊天面板（手机端固定 400px 宽会把人物列挤成 0，改全宽堆叠） */}
       <Box
-        width="400px"
+        width={{ base: 'full', md: '400px' }}
+        flexShrink={0}
         bg="white"
         rounded="xl"
         border="1px solid"
         borderColor={colors.gray200}
         display="flex"
         flexDirection="column"
-        height="full"
+        height={{ base: 'auto', md: 'full' }}
+        minHeight={{ base: '50vh', md: 'auto' }}
       >
         {/* 聊天标题 */}
         <Box

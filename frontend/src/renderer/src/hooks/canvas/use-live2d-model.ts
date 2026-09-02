@@ -16,6 +16,10 @@ import { useMode } from '@/context/mode-context';
 interface UseLive2DModelProps {
   modelInfo: ModelInfo | undefined;
   canvasRef: RefObject<HTMLCanvasElement>;
+  /** 全屏穿透模式（hero 页）：画布 pointerEvents:none，触摸监听挂 window，
+   *  仅当触点命中模型（anyhitTest/isHitOnModel）才 preventDefault 拦截处理，
+   *  其余触摸完全放行给下层 UI（消息滚动/按钮/输入框均可正常操作） */
+  touchThrough?: boolean;
 }
 
 interface Position {
@@ -26,6 +30,12 @@ interface Position {
 // Thresholds for tap vs drag detection
 const TAP_DURATION_THRESHOLD_MS = 200; // Max duration for a tap
 const DRAG_DISTANCE_THRESHOLD_PX = 5; // Min distance to be considered a drag
+
+// hero 全屏穿透模式的模型初始适配参数（真机校准值，Hiyori/荣耀X60Pro）：
+// 绝对 scale（投影归一后）0.30 ≈ 人物占约 17% 屏高、中心约 24% 屏高站立，
+// 与全屏改造前用户认可的观感一致。世界坐标 Y∈[-1,1] 对应画布全高。
+const HERO_FIT_FACTOR = 0.3;
+const HERO_CENTER_Y = 0.56;
 
 function parseModelUrl(url: string): { baseUrl: string; modelDir: string; modelFileName: string } {
   try {
@@ -103,6 +113,7 @@ export const playAudioWithLipSync = (audioPath: string, modelIndex = 0): Promise
 export const useLive2DModel = ({
   modelInfo,
   canvasRef,
+  touchThrough = false,
 }: UseLive2DModelProps) => {
   const { mode } = useMode();
   const isPet = mode === 'pet';
@@ -159,6 +170,9 @@ export const useLive2DModel = ({
             console.log('[useLive2DModel] Reinitializing Live2D');
             try {
               initializeLive2D();
+              // SPA 路由往返时组件重挂载，本 effect 重建 GL 链并重新绑定 canvas；
+              // 通知 hero 适配逻辑重新执行初始站位
+              window.dispatchEvent(new Event('live2d-rebound'));
             } catch (error) {
               console.error('[useLive2DModel] Error during Live2D initialization:', error);
             }
@@ -211,6 +225,69 @@ export const useLive2DModel = ({
 
     return () => clearTimeout(timer);
   }, [modelInfo?.url, getModelPosition]);
+
+  // --- hero 全屏穿透：模型就绪后适配上半屏初始站位（缩放+上移），用户仍可拖/捏 ---
+  useEffect(() => {
+    if (!touchThrough) return undefined;
+    // 仅手机宽度适配；桌面端保持右侧全高布局不缩放
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) return undefined;
+    let cancelled = false;
+    let outerStop: (() => void) | null = null;
+
+    // 模型初始化是异步的（initializeLive2D 在 500ms 后启动，模型加载还要更久），轮询就绪
+    const startPoll = () => {
+      const poll = setInterval(() => {
+        if (cancelled) {
+          clearInterval(poll);
+          return;
+        }
+        const model = (window as any).getLAppAdapter?.()?.getModel?.();
+        const matrix = model?._modelMatrix;
+        if (!matrix) return;
+        // canvas 位图未初始化（默认 300x150）时投影会按小画布计算，等 resize 完成
+        const canvasEl = document.getElementById('canvas') as HTMLCanvasElement | null;
+        if (!canvasEl || canvasEl.width <= canvasEl.clientWidth) return;
+        clearInterval(poll);
+        clearTimeout(stop);
+        try {
+          // 先按当前实际画布尺寸重算投影（重建后可能按过渡尺寸建过投影），再适配站位
+          LAppDelegate.getInstance()?.onResize?.();
+          const current = matrix.getScaleX?.() || matrix.getArray()[0] || 1;
+          const ratio = HERO_FIT_FACTOR / current;
+          if (Math.abs(ratio - 1) > 0.001) {
+            matrix.scaleRelative(ratio, ratio);
+          }
+          const arr = matrix.getArray();
+          arr[12] = 0;
+          arr[13] = HERO_CENTER_Y;
+          matrix.setMatrix(arr);
+          modelPositionRef.current = { x: 0, y: HERO_CENTER_Y };
+        } catch (err) {
+          console.error('[useLive2DModel] hero fit failed:', err);
+        }
+      }, 300);
+      const stop = setTimeout(() => clearInterval(poll), 20000);
+      return () => {
+        clearInterval(poll);
+        clearTimeout(stop);
+      };
+    };
+
+    let cleanup = startPoll();
+    // 路由往返（管理后台 → hero）触发 Live2D 链重建后，重新适配初始站位
+    const onRebound = () => {
+      cleanup();
+      cancelled = false;
+      cleanup = startPoll();
+    };
+    window.addEventListener('live2d-rebound', onRebound);
+    return () => {
+      cancelled = true;
+      cleanup();
+      outerStop?.();
+      window.removeEventListener('live2d-rebound', onRebound);
+    };
+  }, [touchThrough, modelInfo?.url]);
 
   const getCanvasScale = useCallback(() => {
     const canvas = document.getElementById('canvas') as HTMLCanvasElement;
@@ -501,8 +578,31 @@ export const useLive2DModel = ({
   });
 
   useEffect(() => {
-    const el = canvasRef.current;
+    // 穿透模式监听 window（画布 pointerEvents:none 收不到触摸）；
+    // 普通模式维持原状挂 canvas
+    const el: HTMLElement | Window | null = touchThrough ? window : canvasRef.current;
     if (!el) return undefined;
+    const target = el as HTMLElement;
+
+    // 穿透模式的触摸会话标记：命中模型后 start→end 之间的 move/end 才拦截
+    const touchActiveRef = { current: false };
+    // 首指是否命中模型（决定双指缩放会话是否启动）
+    const startHitRef = { current: false };
+
+    /** 触点是否落在模型上（与 handleMouseDown 同一套换算） */
+    const hitTestAt = (clientX: number, clientY: number): boolean => {
+      const canvas = canvasRef.current;
+      if (!canvas) return false;
+      const adapter = (window as any).getLAppAdapter?.();
+      const view = LAppDelegate.getInstance().getView();
+      const model = adapter?.getModel();
+      if (!view || !model) return false;
+      const rect = canvas.getBoundingClientRect();
+      const scale = canvas.width / canvas.clientWidth;
+      const modelX = view._deviceToScreen.transformX((clientX - rect.left) * scale);
+      const modelY = view._deviceToScreen.transformY((clientY - rect.top) * scale);
+      return model.anyhitTest(modelX, modelY) !== null || model.isHitOnModel(modelX, modelY);
+    };
 
     const distBetween = (touches: TouchList) => {
       const dx = touches[0].clientX - touches[1].clientX;
@@ -510,7 +610,29 @@ export const useLive2DModel = ({
       return Math.sqrt(dx * dx + dy * dy);
     };
 
+    // 暴露给 CDP 测试脚本定位人物（cdp_pinch_test.py 等）
+    (window as any).__live2dHitTest = hitTestAt;
+
     const onStart = (e: TouchEvent) => {
+      if (touchThrough) {
+        // 穿透模式：首指未命中模型 → 完全放行给下层 UI
+        if (e.touches.length === 1) {
+          startHitRef.current = hitTestAt(e.touches[0].clientX, e.touches[0].clientY);
+          if (!startHitRef.current) return;
+          e.preventDefault(); // 命中模型：阻止下层滚动/合成点击
+          touchActiveRef.current = true;
+        } else if (e.touches.length >= 2) {
+          // 双指：首指已命中（正在操作人物）则继续；否则任一新指命中也启动
+          //（覆盖真实捏合手势中两指几乎同时落下的情形）
+          if (!startHitRef.current && !touchActiveRef.current) {
+            startHitRef.current =
+              hitTestAt(e.touches[0].clientX, e.touches[0].clientY) ||
+              hitTestAt(e.touches[1].clientX, e.touches[1].clientY);
+            if (!startHitRef.current) return;
+          }
+          e.preventDefault();
+        }
+      }
       if (e.touches.length >= 2) {
         // 进入双指缩放：取消单指点按/拖动，开启缩放会话
         pinchStartDistRef.current = Math.max(1, distBetween(e.touches));
@@ -533,13 +655,21 @@ export const useLive2DModel = ({
         applyPinchScale(distBetween(e.touches) / pinchStartDistRef.current);
         return;
       }
-      if (isPinchingRef.current || waitAllUpRef.current) return;
+      if (touchThrough && !touchActiveRef.current && !isPinchingRef.current && !waitAllUpRef.current) {
+        return; // 无会话：放行（页面滚动等默认行为不受影响）
+      }
+      if (touchActiveRef.current || isPinchingRef.current || waitAllUpRef.current) {
+        e.preventDefault();
+      }
       if (e.touches.length === 1) {
         touchNativeRef.current.move(e.touches[0].clientX, e.touches[0].clientY);
       }
     };
 
     const onEnd = (e: TouchEvent) => {
+      if (touchThrough && !touchActiveRef.current && !isPinchingRef.current && !waitAllUpRef.current) {
+        return; // 无会话：放行（下层按钮/输入框正常接收 click/focus）
+      }
       e.preventDefault(); // 阻止触摸结束后浏览器合成 mousedown/mousemove/mouseup
       if (isPinchingRef.current) {
         if (e.touches.length < 2) {
@@ -562,6 +692,10 @@ export const useLive2DModel = ({
       } else {
         touchNativeRef.current.cancel();
       }
+      if (e.touches.length === 0) {
+        touchActiveRef.current = false;
+        startHitRef.current = false;
+      }
     };
 
     const onCancel = () => {
@@ -572,19 +706,21 @@ export const useLive2DModel = ({
       pinchStartDistRef.current = 0;
       isPotentialTapRef.current = false;
       setIsDragging(false);
+      touchActiveRef.current = false;
+      startHitRef.current = false;
     };
 
-    el.addEventListener('touchstart', onStart, { passive: false });
-    el.addEventListener('touchmove', onMove, { passive: false });
-    el.addEventListener('touchend', onEnd, { passive: false });
-    el.addEventListener('touchcancel', onCancel, { passive: false });
+    target.addEventListener('touchstart', onStart, { passive: false });
+    target.addEventListener('touchmove', onMove, { passive: false });
+    target.addEventListener('touchend', onEnd, { passive: false });
+    target.addEventListener('touchcancel', onCancel, { passive: false });
     return () => {
-      el.removeEventListener('touchstart', onStart);
-      el.removeEventListener('touchmove', onMove);
-      el.removeEventListener('touchend', onEnd);
-      el.removeEventListener('touchcancel', onCancel);
+      target.removeEventListener('touchstart', onStart);
+      target.removeEventListener('touchmove', onMove);
+      target.removeEventListener('touchend', onEnd);
+      target.removeEventListener('touchcancel', onCancel);
     };
-  }, [canvasRef, getModelScale, applyPinchScale, setIsDragging]);
+  }, [canvasRef, getModelScale, applyPinchScale, setIsDragging, touchThrough]);
 
   useEffect(() => {
     if (!isPet && electronApi && isHoveringModelRef.current) {
