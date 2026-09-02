@@ -321,16 +321,17 @@ export const DocumentKnowledge: FC = () => {
         </Box>
       </Box>
 
-      {/* 右侧：向量化状态 + 切分结果 */}
+      {/* 右侧：向量化状态 + 切分结果（手机端自然高度、随外层整页滚动；
+          flex=1+overflow:hidden 会把切分结果压没且无法滑动） */}
       <Box
-        flex="1"
+        flex={{ base: 'none', md: '1' }}
         bg="white"
         rounded="xl"
         border="1px solid"
         borderColor={colors.gray200}
         display="flex"
         flexDirection="column"
-        overflow="hidden"
+        overflow={{ base: 'visible', md: 'hidden' }}
       >
         {detailLoading && !detail && (
           <Text fontSize="sm" color={colors.gray600} p="6">
@@ -419,7 +420,11 @@ export const DocumentKnowledge: FC = () => {
             </Box>
 
             {/* 切分结果 */}
-            <Box flex="1" overflowY="auto" p="5">
+            <Box
+              flex={{ base: 'none', md: '1' }}
+              overflowY={{ base: 'visible', md: 'auto' }}
+              p={{ base: '4', md: '5' }}
+            >
               <Text fontSize="sm" fontWeight="semibold" color={colors.gray800} mb="3">
                 切分结果（{detail.chunks.length} 块）
               </Text>
@@ -455,8 +460,8 @@ export const DocumentKnowledge: FC = () => {
                           p="2"
                           bg={colors.gray50}
                           rounded="md"
-                          maxHeight="300px"
-                          overflowY="auto"
+                          maxHeight={{ base: 'none', md: '300px' }}
+                          overflowY={{ base: 'visible', md: 'auto' }}
                         >
                           {chunk.content}
                         </Box>
