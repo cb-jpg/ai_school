@@ -226,11 +226,14 @@ function AppContent(): JSX.Element {
           right={0}
           width={{ base: "100%", md: "55%" }}
           height={{
-            base: "42vh",
+            base: "56vh",
             md: isElectron ? "calc(100vh - 30px)" : "100vh",
           }}
-          zIndex={1}
-          /* 手机端人物区可交互（拖动/缩放/点按动作）；桌面端保持不拦截左侧 UI */
+          zIndex={{ base: 15, md: 1 }}
+          /* 手机端人物区可交互（拖动/缩放/点按动作）；桌面端保持不拦截左侧 UI。
+             手机端 zIndex 15：人物可盖住对话卡片的状态行（卡片 5）与标题层，
+             但低于输入框区（20），输入/麦克风/发送始终可点。
+             高度 56vh：人物可被拖进对话卡片区，可移动范围更大。 */
           pointerEvents={{ base: "auto", md: "none" }}
         >
           <Live2D showSidebar={false} />

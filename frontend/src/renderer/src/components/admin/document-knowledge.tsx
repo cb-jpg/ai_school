@@ -181,11 +181,20 @@ export const DocumentKnowledge: FC = () => {
   };
 
   return (
-    <Box width="full" height="full" display="flex" gap="6" p="6" overflow="hidden">
-      {/* 左侧：文档列表 */}
+    <Box
+      width="full"
+      height="full"
+      display="flex"
+      flexDirection={{ base: 'column', md: 'row' }}
+      gap="6"
+      p={{ base: '4', md: '6' }}
+      overflow={{ base: 'auto', md: 'hidden' }}
+    >
+      {/* 左侧：文档列表（手机端在上、限高可滚，详情在其下方） */}
       <Box
-        width="360px"
+        width={{ base: 'full', md: '360px' }}
         flexShrink={0}
+        maxHeight={{ base: '55%', md: 'none' }}
         bg="white"
         rounded="xl"
         border="1px solid"
@@ -195,12 +204,26 @@ export const DocumentKnowledge: FC = () => {
         overflow="hidden"
       >
         <Box p="4" borderBottom="1px solid" borderColor={colors.gray200}>
-          <HStack justify="space-between" mb="3">
-            <Text fontSize="sm" fontWeight="semibold" color={colors.gray800}>
-              文档列表（{filteredEntries.length}）
-            </Text>
-            <Button size="xs" variant="ghost" onClick={() => void loadList()}>
+          <HStack justify="space-between" mb="3" flexWrap="wrap" rowGap="2">
+            <HStack gap="2">
+              <Box
+                width="26px"
+                height="26px"
+                bg={colors.accent}
+                color={colors.primary}
+                display="grid"
+                placeItems="center"
+                rounded="md"
+              >
+                <FiDatabase size="14" />
+              </Box>
+              <Text fontSize="sm" fontWeight="semibold" color={colors.gray800}>
+                文档列表（{filteredEntries.length}）
+              </Text>
+            </HStack>
+            <Button size="xs" variant="ghost" flexShrink={0} onClick={() => void loadList()}>
               <FiRefreshCw />
+              刷新
             </Button>
           </HStack>
           <VStack gap="2" align="stretch">
@@ -315,10 +338,10 @@ export const DocumentKnowledge: FC = () => {
         )}
 
         {!detailLoading && !detail && (
-          <VStack flex="1" align="center" justify="center" gap="2">
+          <VStack flex="1" align="center" justify="center" gap="2" p="6">
             <FiDatabase size="28" color={colors.gray400} />
-            <Text fontSize="sm" color={colors.gray600}>
-              从左侧选择一个文档查看切分结果与向量化状态
+            <Text fontSize="sm" color={colors.gray600} textAlign="center">
+              选择一个文档查看切分结果与向量化状态
             </Text>
           </VStack>
         )}
@@ -326,13 +349,13 @@ export const DocumentKnowledge: FC = () => {
         {detail && (
           <>
             <Box p="5" borderBottom="1px solid" borderColor={colors.gray200}>
-              <HStack justify="space-between" mb="4">
-                <VStack align="start" gap="0">
+              <HStack justify="space-between" mb="4" flexWrap="wrap" rowGap="2" align="flex-start">
+                <VStack align="start" gap="0" maxWidth="100%">
                   <Text fontSize="lg" fontWeight="semibold" color={colors.gray800}>
                     {detail.title}
                   </Text>
                   {(detail.file_name || detail.source_url) && (
-                    <Text fontSize="2xs" color={colors.gray400} overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
+                    <Text fontSize="2xs" color={colors.gray400} overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" maxW="full">
                       {detail.file_name || detail.source_url}
                     </Text>
                   )}
@@ -345,6 +368,7 @@ export const DocumentKnowledge: FC = () => {
                   disabled={reindexing}
                   loading={reindexing}
                   loadingText="重建中…"
+                  flexShrink={0}
                   onClick={() => void handleReindex()}
                 >
                   <FiRefreshCw />
@@ -354,7 +378,7 @@ export const DocumentKnowledge: FC = () => {
 
               {/* 向量化状态 */}
               <VStack align="stretch" gap="3">
-                <HStack gap="6">
+                <HStack gap="6" flexWrap="wrap" rowGap="2">
                   <StatBlock label="向量化状态">
                     <Badge bg={`${STATUS_META[detail.status]?.color ?? '#d97706'}1a`} color={STATUS_META[detail.status]?.color ?? '#d97706'} px="2" py="0.5" rounded="md" fontSize="11px">
                       {STATUS_META[detail.status]?.label ?? detail.status}

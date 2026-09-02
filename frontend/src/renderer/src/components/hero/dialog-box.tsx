@@ -224,16 +224,16 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
           </Text>
         </Box>
 
-        {/* Messages Container */}
+        {/* Messages Container —— 手机端顶部渐变：与上方人物区融合，人物仿佛站进卡片 */}
         <Box
           flex={1}
           overflowY="auto"
-          bg={schoolColors.white}
-          rounded="xl"
+          bg={{ base: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.9) 64px, #FFFFFF 112px)', md: schoolColors.white }}
+          rounded={{ base: '2xl', md: 'xl' }}
           p={4}
           border="1px solid"
-          borderColor={schoolColors.border}
-          boxShadow="sm"
+          borderColor={{ base: 'transparent', md: schoolColors.border }}
+          boxShadow={{ base: 'sm', md: 'sm' }}
           order={2}
         >
           <VStack gap={3} align="stretch">
@@ -312,8 +312,14 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
           )}
         </Box>
 
-        {/* Input Area */}
-        <HStack gap={3} alignItems="center" order={3}>
+        {/* Input Area —— zIndex 20：浮于 Live2D 层(15)之上，人物再怎么下移也不挡输入 */}
+        <HStack
+          gap={3}
+          alignItems="center"
+          order={3}
+          position="relative"
+          zIndex={20}
+        >
           <Textarea
             value={textInput.inputText}
             onChange={(e) => textInput.setInputText({ target: { value: e.target.value } } as React.ChangeEvent<HTMLInputElement>)}
@@ -403,8 +409,15 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
           </Box>
         </HStack>
 
-        {/* 麦克风自动停止设置 */}
-        <HStack gap={3} fontSize="xs" color={schoolColors.textSecondary} order={4}>
+        {/* 麦克风自动停止设置 —— 同输入区，保持可点 */}
+        <HStack
+          gap={3}
+          fontSize="xs"
+          color={schoolColors.textSecondary}
+          order={4}
+          position="relative"
+          zIndex={20}
+        >
           <Switch
             checked={autoStopMic}
             onCheckedChange={(e) => setAutoStopMic(e.checked)}

@@ -23,6 +23,7 @@ import {
   FiRefreshCw,
   FiAlertTriangle,
   FiCheck,
+  FiFileText,
 } from 'react-icons/fi';
 import { toaster } from '@/components/ui/toaster';
 import {
@@ -128,23 +129,37 @@ export const SystemLogs: FC = () => {
     serviceLog.length > 0 && serviceLog[0].startsWith('[读取失败]');
 
   return (
-    <Box width="full" height="full" p="6" overflowY="auto">
-      <HStack justify="space-between" mb="5">
-        <VStack align="start" gap="0">
-          <Text fontSize="lg" fontWeight="semibold" color={colors.gray800}>
-            系统日志
-          </Text>
-          <Text fontSize="xs" color={colors.gray600}>
-            知识库更新记录、问答概况与服务运行日志
-          </Text>
-        </VStack>
-        <Button size="sm" variant="outline" onClick={() => void loadAll()}>
+    <Box width="full" height="full" p={{ base: '4', md: '6' }} overflowY="auto">
+      <HStack justify="space-between" mb="5" flexWrap="wrap" rowGap="2">
+        <HStack gap="3">
+          <Box
+            width="34px"
+            height="34px"
+            bg={colors.primary}
+            color="white"
+            display="grid"
+            placeItems="center"
+            rounded="lg"
+            flexShrink={0}
+          >
+            <FiFileText size="16" />
+          </Box>
+          <VStack align="start" gap="0">
+            <Text fontSize="lg" fontWeight="semibold" color={colors.gray800}>
+              系统日志
+            </Text>
+            <Text fontSize="xs" color={colors.gray600}>
+              知识库更新记录、问答概况与服务运行日志
+            </Text>
+          </VStack>
+        </HStack>
+        <Button size="sm" variant="outline" flexShrink={0} onClick={() => void loadAll()}>
           <FiRefreshCw />
           全部刷新
         </Button>
       </HStack>
 
-      {/* 概况卡片（问答统计 / 知识库状态） */}
+      {/* 概况卡片（问答统计 / 知识库状态）—— 手机端 2 列网格全部可见 */}
       <Box mb="5">
         {statsError && (
           <Text fontSize="xs" color="#C53030">
@@ -152,7 +167,11 @@ export const SystemLogs: FC = () => {
           </Text>
         )}
         {!statsError && stats && (
-          <HStack gap="3" flexWrap="wrap" rowGap="3">
+          <Box
+            display="grid"
+            gridTemplateColumns={{ base: 'repeat(2, 1fr)', md: 'repeat(5, 1fr)' }}
+            gap="3"
+          >
             <StatCard icon={<FiDatabase />} label="知识条目总数" value={stats.total_entries} />
             <StatCard
               icon={<FiCheck />}
@@ -170,7 +189,7 @@ export const SystemLogs: FC = () => {
               label="处理出错"
               value={stats.status_counts?.error ?? 0}
             />
-          </HStack>
+          </Box>
         )}
       </Box>
 
@@ -352,17 +371,26 @@ function StatCard({
 }) {
   return (
     <Box
-      flex="1 1 40%"
-      minWidth="40%"
       bg="white"
       border="1px solid"
       borderColor={colors.gray200}
       rounded="lg"
       p="3.5"
     >
-      <HStack gap="2" mb="1">
-        {icon}
-        <Text fontSize="2xs" color={colors.gray600}>
+      <HStack gap="2" mb="1.5">
+        <Box
+          width="24px"
+          height="24px"
+          bg={colors.accent}
+          color={colors.primary}
+          display="grid"
+          placeItems="center"
+          rounded="md"
+          flexShrink={0}
+        >
+          {icon}
+        </Box>
+        <Text fontSize="2xs" color={colors.gray600} lineClamp={2}>
           {label}
         </Text>
       </HStack>

@@ -144,28 +144,12 @@ const menuGroups: MenuGroupConfig[] = [
     defaultOpen: false,
     items: [
       {
-        id: 'voice-settings',
-        label: '播报语音设置',
-        icon: FiMic,
-        onClick: () => {},
-        description: '无',
-        disabled: true,
-      },
-      {
         id: 'user-management',
         label: '用户管理',
         icon: FiUsers,
         onClick: () => {},
         description: '管理员账号管理',
         adminOnly: true,
-      },
-      {
-        id: 'model-settings',
-        label: '语音&模型参数设置',
-        icon: FiSettings,
-        onClick: () => {},
-        description: '无',
-        disabled: true,
       },
       {
         id: 'system-logs',

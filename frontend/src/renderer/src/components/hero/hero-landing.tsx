@@ -156,7 +156,9 @@ export default function HeroLanding({
           <Box
             flex="1"
             maxWidth="600px"
-            zIndex={10}
+            /* 手机端 zIndex 5：低于 Live2D 层(15)，人物可盖住卡片的状态行与
+               消息区顶部；输入框区在 dialog-box 内部单独提升到 20 保证可点 */
+            zIndex={{ base: 5, md: 10 }}
             h={{ base: 'full', md: 'auto' }}
           >
             <Box height={{ base: 'full', md: '75vh' }}>
