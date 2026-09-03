@@ -48,6 +48,7 @@ class HumeAIAgent(AgentInterface):
         self._idle_timer = None
         self._current_conf_uid = None
         self._current_history_uid = None
+        self._current_username = None
 
         # Create cache directory if it doesn't exist
         self.cache_dir = Path("./cache")
@@ -91,6 +92,7 @@ class HumeAIAgent(AgentInterface):
                         self._current_conf_uid,
                         self._current_history_uid,
                         {"resume_id": new_chat_group_id, "agent_type": self.AGENT_TYPE},
+                        username=self._current_username,
                     )
 
                 self._chat_group_id = new_chat_group_id
@@ -119,18 +121,22 @@ class HumeAIAgent(AgentInterface):
         if not self._connected or not self._ws or self._ws.closed:
             await self.connect(self._chat_group_id)
 
-    def set_memory_from_history(self, conf_uid: str, history_uid: str) -> None:
+    def set_memory_from_history(
+        self, conf_uid: str, history_uid: str, username: str | None = None
+    ) -> None:
         """
         Set chat group ID based on history
 
         Args:
             conf_uid: Configuration ID
             history_uid: History ID
+            username: Logged-in user scope (None = shared legacy directory)
         """
         self._current_conf_uid = conf_uid
         self._current_history_uid = history_uid
+        self._current_username = username
 
-        metadata = get_metadata(conf_uid, history_uid)
+        metadata = get_metadata(conf_uid, history_uid, username=username)
 
         agent_type = metadata.get("agent_type")
         if agent_type and agent_type != self.AGENT_TYPE:

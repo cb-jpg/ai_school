@@ -99,6 +99,7 @@ async def process_group_conversation(
                     role="human",
                     content=input_text,
                     name=human_name,
+                    username=member_context.username,
                 )
         else:
             logger.debug("Skipping storing proactive speak input to group history")
@@ -298,6 +299,7 @@ async def handle_group_member_turn(
                 content=full_response,
                 name=context.character_config.character_name,
                 avatar=context.character_config.avatar,
+                username=member_context.username,
             )
         else:
             logger.debug("Skipping storing AI response to history (proactive speak)")

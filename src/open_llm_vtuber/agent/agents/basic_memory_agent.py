@@ -173,9 +173,11 @@ class BasicMemoryAgent(AgentInterface):
 
         self._memory.append(message_data)
 
-    def set_memory_from_history(self, conf_uid: str, history_uid: str) -> None:
+    def set_memory_from_history(
+        self, conf_uid: str, history_uid: str, username: str | None = None
+    ) -> None:
         """Load memory from chat history."""
-        messages = get_history(conf_uid, history_uid)
+        messages = get_history(conf_uid, history_uid, username=username)
 
         self._memory = []
         for msg in messages:

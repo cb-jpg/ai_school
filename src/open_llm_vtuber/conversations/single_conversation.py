@@ -109,6 +109,7 @@ async def process_single_conversation(
                 role="human",
                 content=input_text,
                 name=context.character_config.human_name,
+                username=context.username,
             )
 
         try:
@@ -182,6 +183,7 @@ async def process_single_conversation(
                 content=full_response,
                 name=context.character_config.character_name,
                 avatar=context.character_config.avatar,
+                username=context.username,
             )
             logger.info(f"AI response: {full_response}")
 

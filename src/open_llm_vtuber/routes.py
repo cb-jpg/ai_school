@@ -16,6 +16,7 @@ from .asr.audio_preprocessor import (
 )
 from verification.asr_config import build_asr_config, public_browser_config
 from .knowledge.routes import init_knowledge_routes
+from .knowledge.auth import USERNAME_PATTERN, get_token_manager
 
 
 def _load_model_dict(path: str = "model_dict.json") -> dict:
@@ -69,11 +70,25 @@ def init_client_ws_route(default_context_cache: ServiceContext) -> APIRouter:
     @router.websocket("/client-ws")
     async def websocket_endpoint(websocket: WebSocket):
         """WebSocket endpoint for client connections"""
+        # 握手阶段验证用户身份（App 登录后的 JWT）。
+        # - 无 user_token：匿名/旧客户端，聊天历史走共享目录（旧行为）
+        # - user_token 无效或过期：拒绝连接（不静默降级，防止串到他人历史）
+        user_token = websocket.query_params.get("user_token")
+        username: str | None = None
+        if user_token:
+            payload = get_token_manager().verify(user_token)
+            candidate = str(payload.get("username") or "") if payload else ""
+            if not payload or not USERNAME_PATTERN.match(candidate):
+                logger.warning("Rejected /client-ws: invalid or expired user_token")
+                await websocket.close(code=1008)
+                return
+            username = candidate
+
         await websocket.accept()
         client_uid = str(uuid4())
 
         try:
-            await ws_handler.handle_new_connection(websocket, client_uid)
+            await ws_handler.handle_new_connection(websocket, client_uid, username=username)
             await ws_handler.handle_websocket_communication(websocket, client_uid)
         except WebSocketDisconnect:
             await ws_handler.handle_disconnect(client_uid)

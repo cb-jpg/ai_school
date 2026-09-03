@@ -32,10 +32,15 @@ const TAP_DURATION_THRESHOLD_MS = 200; // Max duration for a tap
 const DRAG_DISTANCE_THRESHOLD_PX = 5; // Min distance to be considered a drag
 
 // hero 全屏穿透模式的模型初始适配参数（真机校准值，Hiyori/荣耀X60Pro）：
-// 绝对 scale（投影归一后）0.30 ≈ 人物占约 17% 屏高、中心约 24% 屏高站立，
-// 与全屏改造前用户认可的观感一致。世界坐标 Y∈[-1,1] 对应画布全高。
-const HERO_FIT_FACTOR = 0.3;
-const HERO_CENTER_Y = 0.56;
+// ⚠️ 竖屏画布下 Live2D 视图空间按【高度】等比映射（视图 X 只覆盖 ±0.475 屏宽），
+//    不是 ±1 对应全宽！换算：屏宽比例 f 处的 x_view = (2f-1)×0.475。
+// 绝对 scale（投影归一后）0.52 ≈ 人物占约 26~30% 屏高（2026-09-03 调大）；
+// HERO_CENTER_Y 0.46 → 模型中心约 27% 屏高（头顶刚好在导航栏下方）；
+// HERO_OFFSET_X 0.24 → 模型中心约 75% 屏宽（站在画面右侧，对话框让到左边）。
+// 验证用 scripts/cdp_fb_dump.py 抓帧缓冲（CDP 整页截图拍不到 GL 图层！）。换角色如大小不合适改这三个常量。
+const HERO_FIT_FACTOR = 0.52;
+const HERO_CENTER_Y = 0.46;
+const HERO_OFFSET_X = 0.24;
 
 function parseModelUrl(url: string): { baseUrl: string; modelDir: string; modelFileName: string } {
   try {
@@ -258,10 +263,10 @@ export const useLive2DModel = ({
             matrix.scaleRelative(ratio, ratio);
           }
           const arr = matrix.getArray();
-          arr[12] = 0;
+          arr[12] = HERO_OFFSET_X;
           arr[13] = HERO_CENTER_Y;
           matrix.setMatrix(arr);
-          modelPositionRef.current = { x: 0, y: HERO_CENTER_Y };
+          modelPositionRef.current = { x: HERO_OFFSET_X, y: HERO_CENTER_Y };
         } catch (err) {
           console.error('[useLive2DModel] hero fit failed:', err);
         }

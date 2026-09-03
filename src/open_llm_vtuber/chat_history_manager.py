@@ -12,8 +12,8 @@ class HistoryMessage(TypedDict):
     timestamp: str
     content: str
     # Optional display information for the message
-    name: Optional[str]
-    avatar: Optional[str]
+    name: str | None
+    avatar: str | None
 
 
 def _is_safe_filename(filename: str) -> bool:
@@ -38,29 +38,48 @@ def _sanitize_path_component(component: str) -> str:
     return sanitized
 
 
-def _ensure_conf_dir(conf_uid: str) -> str:
+def _ensure_conf_dir(conf_uid: str, username: str | None = None) -> str:
     """Ensure the directory for a specific conf exists and return its path"""
     if not conf_uid:
         raise ValueError("conf_uid cannot be empty")
 
-    safe_conf_uid = _sanitize_path_component(conf_uid)
-    base_dir = os.path.join("chat_history", safe_conf_uid)
+    base_dir = _scope_dir(conf_uid, username)
     os.makedirs(base_dir, exist_ok=True)
     return base_dir
 
 
-def _get_safe_history_path(conf_uid: str, history_uid: str) -> str:
-    """Get sanitized path for history file"""
+# 与 knowledge.auth.USERNAME_PATTERN 保持一致（用户名用作目录名，必须文件系统安全）
+_HISTORY_USERNAME_PATTERN = re.compile(r"^[a-zA-Z0-9_-]{2,32}$")
+
+
+def _scope_dir(conf_uid: str, username: str | None) -> str:
+    """按 conf_uid（及可选的用户名）解析历史目录。
+
+    - username 为 None：共享目录 chat_history/<conf_uid>（旧版行为）
+    - username 存在：用户隔离目录 chat_history/<conf_uid>/users/<username>
+    """
     safe_conf_uid = _sanitize_path_component(conf_uid)
-    safe_history_uid = _sanitize_path_component(history_uid)
     base_dir = os.path.join("chat_history", safe_conf_uid)
+    if username:
+        if not _HISTORY_USERNAME_PATTERN.match(username):
+            raise ValueError(f"Invalid username for history scope: {username!r}")
+        base_dir = os.path.join(base_dir, "users", username)
+    return base_dir
+
+
+def _get_safe_history_path(
+    conf_uid: str, history_uid: str, username: str | None = None
+) -> str:
+    """Get sanitized path for history file"""
+    safe_history_uid = _sanitize_path_component(history_uid)
+    base_dir = _scope_dir(conf_uid, username)
     full_path = os.path.normpath(os.path.join(base_dir, f"{safe_history_uid}.json"))
-    if not full_path.startswith(base_dir):
+    if not full_path.startswith(base_dir + os.sep):
         raise ValueError("Invalid path: Path traversal detected")
     return full_path
 
 
-def create_new_history(conf_uid: str) -> str:
+def create_new_history(conf_uid: str, username: str | None = None) -> str:
     """Create a new history file with a unique ID and return the history_uid"""
     if not conf_uid:
         logger.warning("No conf_uid provided")
@@ -69,7 +88,7 @@ def create_new_history(conf_uid: str) -> str:
     # Use uuid.uuid4().hex to generate a UUID without hyphens
     # New format: UUID_YYYY-MM-DD_HH-MM-SS
     history_uid = f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_{uuid.uuid4().hex}"
-    conf_dir = _ensure_conf_dir(conf_uid)  # conf_uid is sanitized here
+    conf_dir = _ensure_conf_dir(conf_uid, username)  # conf_uid is sanitized here
 
     # Create history file with empty metadata
     try:
@@ -97,6 +116,7 @@ def store_message(
     content: str,
     name: str | None = None,
     avatar: str | None = None,
+    username: str | None = None,
 ):
     """Store a message in a specific history file
 
@@ -107,6 +127,7 @@ def store_message(
         content: Message content
         name: Optional display name (default None)
         avatar: Optional avatar URL (default None)
+        username: Optional user scope (None = shared legacy directory)
     """
     if not conf_uid or not history_uid:
         if not conf_uid:
@@ -115,7 +136,7 @@ def store_message(
             logger.warning("Missing history_uid")
         return
 
-    filepath = _get_safe_history_path(conf_uid, history_uid)
+    filepath = _get_safe_history_path(conf_uid, history_uid, username)
     logger.debug(f"Storing {role} message to {filepath}")
 
     history_data = []
@@ -147,12 +168,14 @@ def store_message(
     logger.debug(f"Successfully stored {role} message")
 
 
-def get_metadata(conf_uid: str, history_uid: str) -> dict:
+def get_metadata(
+    conf_uid: str, history_uid: str, username: str | None = None
+) -> dict:
     """Get metadata from history file"""
     if not conf_uid or not history_uid:
         return {}
 
-    filepath = _get_safe_history_path(conf_uid, history_uid)
+    filepath = _get_safe_history_path(conf_uid, history_uid, username)
     if not os.path.exists(filepath):
         return {}
 
@@ -167,7 +190,12 @@ def get_metadata(conf_uid: str, history_uid: str) -> dict:
     return {}
 
 
-def update_metadate(conf_uid: str, history_uid: str, metadata: dict) -> bool:
+def update_metadate(
+    conf_uid: str,
+    history_uid: str,
+    metadata: dict,
+    username: str | None = None,
+) -> bool:
     """Set metadata in history file
 
     Updates existing metadata with new fields, preserving existing ones.
@@ -176,7 +204,7 @@ def update_metadate(conf_uid: str, history_uid: str, metadata: dict) -> bool:
     if not conf_uid or not history_uid:
         return False
 
-    filepath = _get_safe_history_path(conf_uid, history_uid)
+    filepath = _get_safe_history_path(conf_uid, history_uid, username)
     if not os.path.exists(filepath):
         return False
 
@@ -206,7 +234,9 @@ def update_metadate(conf_uid: str, history_uid: str, metadata: dict) -> bool:
     return False
 
 
-def get_history(conf_uid: str, history_uid: str) -> List[HistoryMessage]:
+def get_history(
+    conf_uid: str, history_uid: str, username: str | None = None
+) -> List[HistoryMessage]:
     """Read chat history for the given conf_uid and history_uid"""
     if not conf_uid or not history_uid:
         if not conf_uid:
@@ -215,7 +245,7 @@ def get_history(conf_uid: str, history_uid: str) -> List[HistoryMessage]:
             logger.warning("Missing history_uid")
         return []
 
-    filepath = _get_safe_history_path(conf_uid, history_uid)
+    filepath = _get_safe_history_path(conf_uid, history_uid, username)
 
     if not os.path.exists(filepath):
         logger.warning(f"History file not found: {filepath}")
@@ -230,13 +260,15 @@ def get_history(conf_uid: str, history_uid: str) -> List[HistoryMessage]:
         return []
 
 
-def delete_history(conf_uid: str, history_uid: str) -> bool:
+def delete_history(
+    conf_uid: str, history_uid: str, username: str | None = None
+) -> bool:
     """Delete a specific history file"""
     if not conf_uid or not history_uid:
         logger.warning("Missing conf_uid or history_uid")
         return False
 
-    filepath = _get_safe_history_path(conf_uid, history_uid)
+    filepath = _get_safe_history_path(conf_uid, history_uid, username)
     try:
         if os.path.exists(filepath):
             os.remove(filepath)
@@ -247,13 +279,13 @@ def delete_history(conf_uid: str, history_uid: str) -> bool:
     return False
 
 
-def get_history_list(conf_uid: str) -> List[dict]:
+def get_history_list(conf_uid: str, username: str | None = None) -> List[dict]:
     """Get list of histories with their latest messages"""
     if not conf_uid:
         return []
 
     histories = []
-    conf_dir = _ensure_conf_dir(conf_uid)
+    conf_dir = _ensure_conf_dir(conf_uid, username)
     empty_history_uids = []
 
     try:
@@ -313,13 +345,14 @@ def modify_latest_message(
     history_uid: str,
     role: Literal["human", "ai", "system"],
     new_content: str,
+    username: str | None = None,
 ) -> bool:
     """Modify the latest message in a specific history file if it matches the given role"""
     if not conf_uid or not history_uid:
         logger.warning("Missing conf_uid or history_uid")
         return False
 
-    filepath = _get_safe_history_path(conf_uid, history_uid)
+    filepath = _get_safe_history_path(conf_uid, history_uid, username)
     if not os.path.exists(filepath):
         logger.warning(f"History file not found: {filepath}")
         return False
@@ -352,15 +385,18 @@ def modify_latest_message(
 
 
 def rename_history_file(
-    conf_uid: str, old_history_uid: str, new_history_uid: str
+    conf_uid: str,
+    old_history_uid: str,
+    new_history_uid: str,
+    username: str | None = None,
 ) -> bool:
     """Rename a history file with a new history_uid"""
     if not conf_uid or not old_history_uid or not new_history_uid:
         logger.warning("Missing required parameters for rename")
         return False
 
-    old_filepath = _get_safe_history_path(conf_uid, old_history_uid)
-    new_filepath = _get_safe_history_path(conf_uid, new_history_uid)
+    old_filepath = _get_safe_history_path(conf_uid, old_history_uid, username)
+    new_filepath = _get_safe_history_path(conf_uid, new_history_uid, username)
 
     try:
         if os.path.exists(old_filepath):

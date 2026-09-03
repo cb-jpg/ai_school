@@ -12,6 +12,7 @@
 """
 
 import asyncio
+import faulthandler
 import json
 import os
 import sys
@@ -20,6 +21,10 @@ from pathlib import Path
 
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+
+# 共享服务器负载高时 transformers 懒加载 import 可能要数分钟；
+# 常驻栈转储便于区分"慢"与"真卡死"
+faulthandler.dump_traceback_later(120, repeat=True)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))

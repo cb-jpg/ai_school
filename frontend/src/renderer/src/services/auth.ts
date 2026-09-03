@@ -11,7 +11,7 @@ const USER_KEY = 'kb_user';
 
 export interface AuthUser {
   username: string;
-  role: 'admin' | 'editor';
+  role: 'admin' | 'editor' | 'user';
 }
 
 export function getStoredToken(): string | null {

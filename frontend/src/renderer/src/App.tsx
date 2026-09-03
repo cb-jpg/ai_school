@@ -57,7 +57,7 @@ import { SchoolAdminLayout } from "./components/admin/school-admin-layout";
 import { SchoolDashboard } from "./components/admin/school-dashboard";
 import { SchoolTestConversation } from "./components/admin/school-test-conversation";
 import { ModernMainWorkspace } from "./components/admin/modern-workspace";
-import LoginPage from "./components/admin/login-page";
+import AppLoginPage from "./components/auth/app-login-page";
 import UnansweredQuestions from "./components/admin/unanswered-questions";
 import UserManagement from "./components/admin/user-management";
 import { CharacterConfig } from "./components/admin/character-config";
@@ -212,6 +212,11 @@ function AppContent(): JSX.Element {
     zIndex: 15,
   };
 
+  // 全局登录门禁：未登录一律先进登录页（管理员/普通使用者同入口，账号由管理员派发）
+  if (!authUser) {
+    return <AppLoginPage />;
+  }
+
   // Show Hero Landing page on hero route (still wrapped in all providers)
   if (currentRoute === 'hero') {
     return (
@@ -307,9 +312,9 @@ function AppContent(): JSX.Element {
 
   // Admin workspace page - school themed management dashboard
   if (currentRoute === 'main-admin') {
-    // 登录守卫：管理后台所有页面要求先登录
-    if (!authUser) {
-      return <LoginPage />;
+    // 登录守卫：管理后台仅 admin / editor 可进入；普通使用者（user）无权限
+    if (!authUser || authUser.role === 'user') {
+      return <AppLoginPage />;
     }
 
     let content;

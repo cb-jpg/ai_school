@@ -22,6 +22,7 @@ import { useLocalStorage } from '@/hooks/utils/use-local-storage';
 import { useGroup } from '@/context/group-context';
 import { useInterrupt } from '@/hooks/utils/use-interrupt';
 import { useBrowser } from '@/context/browser-context';
+import { getStoredUser } from '@/services/auth';
 
 function WebSocketHandler({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
@@ -319,9 +320,25 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
     }
   }, [aiState, addAudioTask, appendHumanMessage, baseUrl, bgUrlContext, setAiState, setConfName, setConfUid, setConfigFiles, setCurrentHistoryUid, setHistoryList, setMessages, setModelInfo, setSubtitleText, startMic, stopMic, setSelfUid, setGroupMembers, setIsOwner, backendSynthComplete, setBackendSynthComplete, clearResponse, handleControlMessage, appendOrUpdateToolCallMessage, interrupt, setBrowserViewData, t]);
 
+  // 登录门禁：未登录不连 WebSocket；登录/切换账号后以新身份（user_token）重连
+  const authUsername = getStoredUser()?.username ?? null;
+  const prevUsernameRef = useRef<string | null>(null);
   useEffect(() => {
+    if (!authUsername) {
+      // 登出：断开并阻止自动重连
+      if (prevUsernameRef.current !== null) {
+        wsService.disconnect();
+      }
+      prevUsernameRef.current = null;
+      return;
+    }
+    if (prevUsernameRef.current !== null && prevUsernameRef.current !== authUsername) {
+      // 账号切换：先断开旧连接，connect 内部会带新 user_token 重开
+      wsService.disconnect();
+    }
+    prevUsernameRef.current = authUsername;
     wsService.connect(wsUrl);
-  }, [wsUrl]);
+  }, [wsUrl, authUsername]);
 
   useEffect(() => {
     const stateSubscription = wsService.onStateChange(setWsState);

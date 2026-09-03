@@ -153,14 +153,24 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
       )}
 
       <VStack gap={{ base: 3, md: 6 }} align="stretch" flex={1} overflow="hidden">
-        {/* Status Indicator（手机端排在标题下方，order 见各块） */}
+        {/* Status Indicator（手机端排在标题下方，order 见各块；胶囊底衬提升在人物/渐变上的可读性） */}
         <HStack
           gap={2}
           mb={{ base: 2, md: 4 }}
           justify="space-between"
           order={{ base: 1, md: 0 }}
         >
-          <HStack gap={2}>
+          <HStack
+            gap={2}
+            bg="rgba(255, 255, 255, 0.82)"
+            backdropFilter="blur(6px)"
+            borderRadius="full"
+            px={3}
+            py={1.5}
+            boxShadow="sm"
+            border="1px solid"
+            borderColor="rgba(226, 232, 240, 0.8)"
+          >
             <Box
               w={2}
               h={2}
@@ -171,12 +181,22 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
               {getStatusText()}
             </Text>
             {wsState === 'OPEN' && !modelInfo && (
-              <Text fontSize="xs" color="orange.600" ml={2}>
+              <Text fontSize="xs" color="orange.600" ml={1}>
                 (模型未配置)
               </Text>
             )}
           </HStack>
-          <HStack gap={2}>
+          <HStack
+            gap={1}
+            bg="rgba(255, 255, 255, 0.82)"
+            backdropFilter="blur(6px)"
+            borderRadius="full"
+            px={2}
+            py={1}
+            boxShadow="sm"
+            border="1px solid"
+            borderColor="rgba(226, 232, 240, 0.8)"
+          >
             <IconButton
               aria-label="新对话"
               size="sm"
@@ -243,10 +263,16 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
                 bg={msg.role === 'human' ? schoolColors.userBubble : schoolColors.assistantBubble}
                 color={msg.role === 'human' ? 'white' : schoolColors.text}
                 p={3}
-                rounded="lg"
+                rounded="2xl"
+                /* 内角收小形成气泡尾巴方向感 */
+                borderBottomRightRadius={msg.role === 'human' ? 'sm' : '2xl'}
+                borderBottomLeftRadius={msg.role === 'human' ? '2xl' : 'sm'}
                 alignSelf={msg.role === 'human' ? 'flex-end' : 'flex-start'}
-                maxWidth="80%"
+                maxWidth="84%"
                 fontSize="sm"
+                lineHeight="1.6"
+                wordBreak="break-word"
+                boxShadow={msg.role === 'human' ? 'none' : 'sm'}
               >
                 {removeEmojiTags(msg.content)}
               </Box>
@@ -258,10 +284,14 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
                 bg={schoolColors.assistantBubble}
                 color={schoolColors.text}
                 p={3}
-                rounded="lg"
+                rounded="2xl"
+                borderBottomLeftRadius="sm"
                 alignSelf="flex-start"
-                maxWidth="80%"
+                maxWidth="84%"
                 fontSize="sm"
+                lineHeight="1.6"
+                wordBreak="break-word"
+                boxShadow="sm"
               >
                 {removeEmojiTags(subtitleText)}
               </Box>
@@ -276,7 +306,9 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
               borderTop="1px solid"
               borderColor={schoolColors.border}
               p={3}
+              mt={2}
               bg={schoolColors.accent}
+              rounded="xl"
               maxHeight="120px"
               overflowY="auto"
             >
@@ -329,13 +361,14 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
             color={schoolColors.text}
             border="1px solid"
             borderColor={schoolColors.border}
-            rounded="lg"
+            rounded="2xl"
             p={3}
             flex={1}
             resize="none"
             height="auto"
             minHeight="48px"
             maxHeight="120px"
+            boxShadow="sm"
             _placeholder={{ color: 'gray.400' }}
             _focus={{
               borderColor: schoolColors.primary,

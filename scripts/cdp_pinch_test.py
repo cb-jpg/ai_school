@@ -85,10 +85,36 @@ async def main():
             await asyncio.sleep(0.08)
 
         cx, cy = 206, 190
-        await touch("touchStart", [
-            {"x": cx - 50, "y": cy, "id": 1},
-            {"x": cx + 50, "y": cy, "id": 2},
+        # 穿透模式下自动定位人物：扫描网格找命中点，两指落在命中点两侧
+        located = await cdp.evaluate(
+            "(()=>{const ht=window.__live2dHitTest;if(!ht)return null;"
+            "for(let y=60;y<760;y+=25){for(let x=60;x<360;x+=25){"
+            "if(ht(x,y))return JSON.stringify({x,y})}}return null})()",
+            timeout=15,
+        )
+        if located:
+            import json as _json
+            hit = _json.loads(located)
+            cx, cy = hit["x"], hit["y"]
+            print(f"定位到人物: ({cx},{cy})")
+        else:
+            print("未定位到人物(__live2dHitTest 不可用或未命中)，回退默认中心")
+
+        # 先单指落下(命中人物)再补第二指，贴近真实捏合手势
+        await touch("touchStart", [{"x": cx - 40, "y": cy, "id": 1}])
+        await asyncio.sleep(0.1)
+        await touch("touchMove", [
+            {"x": cx - 40, "y": cy, "id": 1},
+            {"x": cx + 40, "y": cy, "id": 2},
         ])
+        for i in range(1, 6):
+            half = 40 + i * 34
+            await touch("touchMove", [
+                {"x": cx - half, "y": cy, "id": 1},
+                {"x": cx + half, "y": cy, "id": 2},
+            ])
+            cur = await cdp.evaluate(scale_expr())
+            print(f"  张开 step{i}: 间距={half * 2} scale={cur}")
         for i in range(1, 6):
             half = 50 + i * 34
             await touch("touchMove", [

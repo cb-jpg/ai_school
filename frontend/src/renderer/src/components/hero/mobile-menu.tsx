@@ -5,8 +5,9 @@
 
 import { memo } from 'react';
 import { Box, Flex, Button, Text, IconButton, HStack } from '@chakra-ui/react';
-import { FiX, FiHome, FiBook, FiClock, FiAward, FiUsers } from 'react-icons/fi';
+import { FiX, FiHome, FiBook, FiClock, FiAward, FiUsers, FiLogOut } from 'react-icons/fi';
 import { useInterrupt } from '@/hooks/utils/use-interrupt';
+import { useAuth } from '@/context/auth-context';
 
 interface NavItem {
   id: string;
@@ -61,8 +62,10 @@ const handleNavClick = (itemId: string, onClose: () => void, onInterrupt?: () =>
 
 const MobileMenu = memo(({ isOpen, onClose, navigation }: MobileMenuProps) => {
   const { interrupt } = useInterrupt();
+  const { user, logout } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
-  const handleLogin = () => {
+  const handleAdminConsole = () => {
     // 切换界面时打断语音播报
     interrupt();
     // 关闭菜单
@@ -132,22 +135,45 @@ const MobileMenu = memo(({ isOpen, onClose, navigation }: MobileMenuProps) => {
           );
         })}
 
-        {/* CTA Button - 登录按钮 */}
-        <Button
-          mt={6}
-          rounded="full"
-          bg="#002FA7"
-          color="white"
-          px={8}
-          py={3.5}
-          fontSize="base"
-          fontWeight="medium"
-          _hover={{ bg: 'blue.800', transform: 'scale(1.05)' }}
-          transition="all 0.2s"
-          onClick={handleLogin}
-        >
-          登录
-        </Button>
+        {/* 管理后台入口：仅管理员可见（普通使用者无任何后台入口） */}
+        {isAdmin && (
+          <Button
+            mt={6}
+            rounded="full"
+            bg="#002FA7"
+            color="white"
+            px={8}
+            py={3.5}
+            fontSize="base"
+            fontWeight="medium"
+            _hover={{ bg: 'blue.800', transform: 'scale(1.05)' }}
+            transition="all 0.2s"
+            onClick={handleAdminConsole}
+          >
+            管理后台
+          </Button>
+        )}
+
+        {/* 登录用户标识 + 退出登录 */}
+        {user && (
+          <HStack mt={isAdmin ? 4 : 6} gap={3} alignItems="center">
+            <Text fontSize="sm" color="gray.500">
+              {user.username}
+            </Text>
+            <IconButton
+              aria-label="退出登录"
+              title="退出登录"
+              onClick={logout}
+              size="sm"
+              boxSize="34px"
+              bg="transparent"
+              color="gray.500"
+              _hover={{ bg: 'gray.100', color: '#c41e3a' }}
+            >
+              <FiLogOut size={16} />
+            </IconButton>
+          </HStack>
+        )}
       </Flex>
     </Box>
   );

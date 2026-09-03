@@ -83,21 +83,29 @@ export default function HeroLanding({
         onSettingsToggle={toggleSidebar}
       />
 
-      {/* 手机端标题层：紧贴导航栏下方，zIndex 低于 Live2D 层(1)，
-          人物可从标题上方经过（App 端人物区即上半屏） */}
+      {/* 手机端标题层：紧贴导航栏下方、靠左排布（人物初始站位在右侧），
+          zIndex 低于 Live2D 层，人物可从标题上方经过 */}
       {!activeCampusTopic && (
         <Box
           display={{ base: 'block', md: 'none' }}
           position="absolute"
           top="96px"
           left={0}
-          right={0}
+          width="62%"
           zIndex={0}
-          textAlign="center"
+          textAlign="left"
           pointerEvents="none"
           px={4}
         >
-          <Text fontSize="xl" fontWeight="bold" color="#1E5494" lineHeight="1.3">
+          <Text
+            fontSize="xl"
+            fontWeight="bold"
+            color="#1E5494"
+            lineHeight="1.3"
+            css={{
+              textShadow: '0 1px 2px rgba(255, 255, 255, 0.8)',
+            }}
+          >
             {SCHOOL_CONFIG.tagline}
           </Text>
           <Text fontSize="xs" color={schoolColors.textSecondary} mt={1} lineHeight="1.5">
@@ -155,7 +163,8 @@ export default function HeroLanding({
         {!activeCampusTopic && (
           <Box
             flex="1"
-            maxWidth="600px"
+            /* 手机端靠左收窄（92%），右侧留出人物空间；桌面端维持 600px 设计 */
+            maxWidth={{ base: '92%', md: '600px' }}
             /* 手机端 zIndex 5：低于 Live2D 层(15)，人物可盖住卡片的状态行与
                消息区顶部；输入框区在 dialog-box 内部单独提升到 20 保证可点 */
             zIndex={{ base: 5, md: 10 }}

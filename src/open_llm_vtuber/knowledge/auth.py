@@ -1,18 +1,20 @@
 """
-知识库后台认证模块 - 多用户 + 角色（admin/editor）
+知识库后台认证模块 - 多用户 + 角色（admin/editor/user）
 
 设计约束：不引入数据库与新依赖。
 - 账号存储：data/auth/users.json（密码使用标准库 scrypt 哈希）
 - 令牌：HMAC-SHA256 签名（标准库 hmac），有效期 12 小时
 - 角色权限：
-    admin  : 全部知识库操作 + 用户管理
+    admin  : 全部知识库操作 + 用户管理；可进入管理后台
     editor : 知识库操作（增删改查/上传/URL/重建索引），不能管理用户
+    user   : 普通 App 使用者，仅对话（聊天历史按用户名目录隔离）
 """
 
 import base64
 import hashlib
 import hmac
 import json
+import re
 import secrets
 import time
 from pathlib import Path
@@ -28,7 +30,11 @@ USERS_FILE = AUTH_DIR / "users.json"
 INITIAL_PASSWORD_FILE = AUTH_DIR / "initial_admin_password.txt"
 
 TOKEN_TTL_SECONDS = 12 * 3600
-VALID_ROLES = {"admin", "editor"}
+VALID_ROLES = {"admin", "editor", "user"}
+
+# 用户名同时用作聊天历史目录名（chat_history/<conf>/users/<username>/），
+# 必须限制为文件系统安全字符，防路径穿越
+USERNAME_PATTERN = re.compile(r"^[a-zA-Z0-9_-]{2,32}$")
 
 
 # ============== 密码哈希（scrypt，标准库） ==============
@@ -90,7 +96,7 @@ class UserStore:
             json.dumps(self.users, ensure_ascii=False, indent=2), encoding="utf-8"
         )
 
-    def authenticate(self, username: str, password: str) -> Optional[dict]:
+    def authenticate(self, username: str, password: str) -> dict | None:
         record = self.users.get(username)
         if record and verify_password(password, record["password"]):
             return {"username": username, "role": record["role"]}
@@ -99,6 +105,8 @@ class UserStore:
     def create_user(self, username: str, password: str, role: str) -> dict:
         if username in self.users:
             raise ValueError(f"用户已存在：{username}")
+        if not USERNAME_PATTERN.match(username):
+            raise ValueError("用户名需为 2-32 位字母、数字、下划线或短横线")
         if role not in VALID_ROLES:
             raise ValueError(f"无效角色：{role}（可选 {sorted(VALID_ROLES)}）")
         self.users[username] = {
@@ -134,7 +142,7 @@ class UserStore:
         ]
 
 
-_user_store: Optional[UserStore] = None
+_user_store: UserStore | None = None
 
 
 def get_user_store() -> UserStore:
@@ -147,7 +155,7 @@ def get_user_store() -> UserStore:
 # ============== 令牌（HMAC 签名） ==============
 
 class TokenManager:
-    def __init__(self, secret: Optional[bytes] = None):
+    def __init__(self, secret: bytes | None = None):
         self.secret = secret or self._load_or_create_secret()
 
     def _load_or_create_secret(self) -> bytes:
@@ -167,7 +175,7 @@ class TokenManager:
         sig = hmac.new(self.secret, body, hashlib.sha256).digest()
         return f"{body.decode()}.{base64.urlsafe_b64encode(sig).decode()}"
 
-    def verify(self, token: str) -> Optional[dict]:
+    def verify(self, token: str) -> dict | None:
         try:
             body_b64, sig_b64 = token.split(".")
             body = body_b64.encode("ascii")
@@ -182,7 +190,7 @@ class TokenManager:
             return None
 
 
-_token_manager: Optional[TokenManager] = None
+_token_manager: TokenManager | None = None
 
 
 def get_token_manager() -> TokenManager:
@@ -205,8 +213,15 @@ def _extract_user(request: Request) -> dict:
 
 
 async def require_user(request: Request) -> dict:
-    """所有知识库管理接口要求登录（admin 或 editor）"""
+    """要求登录（admin / editor / user 任意角色）"""
     return _extract_user(request)
+
+
+async def require_staff(user: dict = Depends(require_user)) -> dict:
+    """知识库管理接口要求后台角色（admin 或 editor），普通 App 用户（user）不可用"""
+    if user["role"] not in ("admin", "editor"):
+        raise HTTPException(status_code=403, detail="需要后台管理权限")
+    return user
 
 
 async def require_admin(user: dict = Depends(require_user)) -> dict:
@@ -226,7 +241,7 @@ class LoginRequest(BaseModel):
 class CreateUserRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=64)
     password: str = Field(..., min_length=8, max_length=128)
-    role: str = Field(..., pattern="^(admin|editor)$")
+    role: str = Field(..., pattern="^(admin|editor|user)$")
 
 
 class ChangePasswordRequest(BaseModel):
@@ -242,7 +257,7 @@ def init_auth_routes() -> APIRouter:
         if user is None:
             raise HTTPException(status_code=401, detail="用户名或密码错误")
         token = get_token_manager().issue(user["username"], user["role"])
-        logger.info(f"管理员登录成功：{user['username']}（{user['role']}）")
+        logger.info(f"用户登录成功：{user['username']}（{user['role']}）")
         return {"token": token, "user": user}
 
     @router.get("/me")

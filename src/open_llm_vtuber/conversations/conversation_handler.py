@@ -134,12 +134,14 @@ async def handle_individual_interrupt(
                 content=heard_response,
                 name=context.character_config.character_name,
                 avatar=context.character_config.avatar,
+                username=context.username,
             )
             store_message(
                 conf_uid=context.character_config.conf_uid,
                 history_uid=context.history_uid,
                 role="system",
                 content="[Interrupted by user]",
+                username=context.username,
             )
 
 
@@ -194,12 +196,14 @@ async def handle_group_interrupt(
                         content=heard_response,
                         name=context.character_config.character_name,
                         avatar=context.character_config.avatar,
+                        username=member_ctx.username,
                     )
                     store_message(
                         conf_uid=member_ctx.character_config.conf_uid,
                         history_uid=member_ctx.history_uid,
                         role="system",
                         content="[Interrupted by user]",
+                        username=member_ctx.username,
                     )
                 except Exception as e:
                     logger.error(f"Error handling interrupt for {member_uid}: {e}")

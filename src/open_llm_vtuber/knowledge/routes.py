@@ -7,7 +7,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from loguru import logger
 
-from .auth import require_user
+from .auth import require_staff
 from .audit import record as audit_record
 from .audit import bump_counter
 from .audit import list_entries as audit_list_entries
@@ -31,7 +31,7 @@ from .rag_service import get_question_log, get_rag_service
 
 # Create router（全部知识库管理接口要求登录）
 router = APIRouter(
-    prefix="/api/knowledge", tags=["knowledge"], dependencies=[Depends(require_user)]
+    prefix="/api/knowledge", tags=["knowledge"], dependencies=[Depends(require_staff)]
 )
 
 # Initialize components
@@ -131,7 +131,7 @@ async def get_knowledge_stats():
 # 若放在 /unanswered、/low-confidence 之前会把它们当作 entry_id 吞掉。
 
 @router.post("/create", response_model=KnowledgeListItem)
-async def create_knowledge(request: KnowledgeCreateRequest, _user: dict = Depends(require_user)):
+async def create_knowledge(request: KnowledgeCreateRequest, _user: dict = Depends(require_staff)):
     """Create a new manual knowledge entry"""
     try:
         entry, chunks = await processor.create_manual_entry(
@@ -163,7 +163,7 @@ async def create_knowledge(request: KnowledgeCreateRequest, _user: dict = Depend
 
 @router.put("/{entry_id}", response_model=KnowledgeListItem)
 async def update_knowledge(
-    entry_id: str, request: KnowledgeUpdateRequest, _user: dict = Depends(require_user)
+    entry_id: str, request: KnowledgeUpdateRequest, _user: dict = Depends(require_staff)
 ):
     """Update a knowledge entry"""
     try:
@@ -199,7 +199,7 @@ async def update_knowledge(
 
 
 @router.delete("/{entry_id}")
-async def delete_knowledge(entry_id: str, _user: dict = Depends(require_user)):
+async def delete_knowledge(entry_id: str, _user: dict = Depends(require_staff)):
     """Delete a knowledge entry"""
     try:
         existing = crud.get(entry_id)
@@ -224,7 +224,7 @@ async def delete_knowledge(entry_id: str, _user: dict = Depends(require_user)):
 
 
 @router.post("/bulk-operation")
-async def bulk_operation(request: BulkOperationRequest, _user: dict = Depends(require_user)):
+async def bulk_operation(request: BulkOperationRequest, _user: dict = Depends(require_staff)):
     """Perform bulk operations on multiple entries"""
     try:
         if request.operation == "delete":
@@ -283,7 +283,7 @@ async def upload_file(
     category: str = Form(...),
     tags: str = Form(""),
     summary: Optional[str] = Form(None),
-    _user: dict = Depends(require_user),
+    _user: dict = Depends(require_staff),
 ):
     """Upload a file and process it into the knowledge base"""
     import uuid
@@ -364,7 +364,7 @@ async def upload_file(
 # ============== URL Processing ==============
 
 @router.post("/add-url", response_model=UploadProgressResponse)
-async def add_url(request: UrlAddRequest, _user: dict = Depends(require_user)):
+async def add_url(request: UrlAddRequest, _user: dict = Depends(require_staff)):
     """Add knowledge from a URL"""
     import uuid
     upload_id = str(uuid.uuid4())
@@ -421,7 +421,7 @@ async def add_url(request: UrlAddRequest, _user: dict = Depends(require_user)):
 # ============== Reindex Entry ==============
 
 @router.post("/{entry_id}/reindex")
-async def reindex_entry(entry_id: str, _user: dict = Depends(require_user)):
+async def reindex_entry(entry_id: str, _user: dict = Depends(require_staff)):
     """Reindex a knowledge entry"""
     try:
         entry = crud.get(entry_id)

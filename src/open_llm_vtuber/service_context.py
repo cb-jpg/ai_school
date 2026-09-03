@@ -68,6 +68,8 @@ class ServiceContext:
         self.mcp_prompt: str = ""
 
         self.history_uid: str = ""  # Add history_uid field
+        # 登录用户名（WS 握手时由 user_token 解出）；None = 匿名/共享历史目录
+        self.username: str | None = None
 
         self.send_text: Callable = None
         self.client_uid: str = None
@@ -208,6 +210,7 @@ class ServiceContext:
         tool_adapter: ToolAdapter | None = None,
         send_text: Callable = None,
         client_uid: str = None,
+        username: str | None = None,
     ) -> None:
         """
         Load the ServiceContext with the reference of the provided instances.
@@ -232,6 +235,7 @@ class ServiceContext:
         self.tool_adapter = tool_adapter
         self.send_text = send_text
         self.client_uid = client_uid
+        self.username = username
 
         # Initialize session-specific MCP components
         await self._init_mcp_components(

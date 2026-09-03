@@ -16,9 +16,23 @@ const gray800 = '#1e293b';
 
 interface UserRow {
   username: string;
-  role: 'admin' | 'editor';
+  role: 'admin' | 'editor' | 'user';
   created_at: number;
 }
+
+type CreateRole = 'user' | 'editor' | 'admin';
+
+const ROLE_LABELS: Record<CreateRole, string> = {
+  user: '普通用户',
+  editor: '编辑者',
+  admin: '管理员',
+};
+
+const ROLE_BADGE_COLORS: Record<string, string> = {
+  admin: schoolBlue,
+  editor: gray600,
+  user: '#2e8b57',
+};
 
 export default function UserManagement() {
   const { user } = useAuth();
@@ -29,7 +43,7 @@ export default function UserManagement() {
   // 创建表单
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [newRole, setNewRole] = useState<'admin' | 'editor'>('editor');
+  const [newRole, setNewRole] = useState<CreateRole>('user');
   const [creating, setCreating] = useState(false);
 
   const loadUsers = useCallback(async () => {
@@ -73,7 +87,7 @@ export default function UserManagement() {
       }
       setNewUsername('');
       setNewPassword('');
-      setNewRole('editor');
+      setNewRole('user');
       await loadUsers();
     } catch (e) {
       setError(e instanceof Error ? e.message : '创建失败');
@@ -106,7 +120,8 @@ export default function UserManagement() {
       <VStack gap="1" alignItems="start" mb="6">
         <Text fontSize="lg" fontWeight="bold" color={gray800}>用户管理</Text>
         <Text fontSize="xs" color={gray600}>
-          admin 拥有全部权限；editor 仅可管理知识库（当前登录：{user?.username}）
+          管理员拥有全部权限；编辑者仅可管理知识库；普通用户用于 App 登录（每人独立聊天记录）。
+          当前登录：{user?.username}
         </Text>
       </VStack>
 
@@ -129,20 +144,16 @@ export default function UserManagement() {
             value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
           />
           <HStack gap="1">
-            <Button
-              size="sm" variant={newRole === 'editor' ? 'solid' : 'outline'}
-              colorScheme={newRole === 'editor' ? 'blue' : 'gray'}
-              onClick={() => setNewRole('editor')}
-            >
-              editor
-            </Button>
-            <Button
-              size="sm" variant={newRole === 'admin' ? 'solid' : 'outline'}
-              colorScheme={newRole === 'admin' ? 'blue' : 'gray'}
-              onClick={() => setNewRole('admin')}
-            >
-              admin
-            </Button>
+            {(['user', 'editor', 'admin'] as CreateRole[]).map((role) => (
+              <Button
+                key={role}
+                size="sm" variant={newRole === role ? 'solid' : 'outline'}
+                colorScheme={newRole === role ? 'blue' : 'gray'}
+                onClick={() => setNewRole(role)}
+              >
+                {ROLE_LABELS[role]}
+              </Button>
+            ))}
           </HStack>
           <Button
             size="sm" background={schoolBlue} color="white"
@@ -173,10 +184,10 @@ export default function UserManagement() {
               <HStack gap="3">
                 <Text fontSize="sm" fontWeight="medium" color={gray800}>{u.username}</Text>
                 <Badge
-                  bg={u.role === 'admin' ? schoolBlue : gray600}
+                  bg={ROLE_BADGE_COLORS[u.role] || gray600}
                   color="white" fontSize="9px" px="2" rounded="full"
                 >
-                  {u.role}
+                  {ROLE_LABELS[u.role as CreateRole] || u.role}
                 </Badge>
                 {u.username === user?.username && (
                   <Text fontSize="10px" color={gray600}>（当前登录）</Text>

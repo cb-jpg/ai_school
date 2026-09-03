@@ -76,6 +76,29 @@ export function withToken(url: string): string {
   }
 }
 
+/**
+ * 给 WebSocket URL 附加登录用户令牌（kb_token，见 services/auth.ts）。
+ * 服务端在 /client-ws 握手时据此把聊天历史隔离到用户目录；直接读 localStorage
+ * 以避免 api-base ↔ auth 循环导入。仅 WS 连接使用，勿放进通用 apiUrl()。
+ */
+export function withUserToken(url: string): string {
+  let token: string | null = null;
+  try {
+    token = localStorage.getItem('kb_token');
+  } catch {
+    return url;
+  }
+  if (!token || !url) return url;
+  try {
+    const parsed = new URL(url, resolveApiBaseUrl());
+    if (parsed.searchParams.has('user_token')) return url;
+    parsed.searchParams.set('user_token', token);
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 export function getDefaultUrls(): { wsUrl: string; baseUrl: string } {
   if (typeof window !== 'undefined' && ['http:', 'https:'].includes(window.location.protocol)) {
     // Capacitor 原生环境：origin 是 https://localhost（无 :12393），走远程后端
