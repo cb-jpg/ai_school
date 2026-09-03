@@ -92,4 +92,30 @@
 
 ---
 
-**当前版本对应**: 服务器 Web bundle 与手机 APK = `2a60f46`（登录门禁+历史隔离+hero 站位/菜单/输入区修复）
+# 📌 09-03 深夜增补二（第三段会话）：X 键修复 + 交付包就绪（commit `e3e4fa1` 已推）
+
+## ✅ 修复
+
+- **菜单 X 关闭键点击无响应**（用户反馈"叉号无法正常退出"）：菜单内容 Flex 带开合动画 `transform`→形成层叠上下文，把同菜单内绝对定位的 X 键压在下面，真实触摸落在透明内容层上。此键其实从未生效过（旧版菜单在导航栏下面，大家用汉堡键）。修复= X 加 `zIndex=1` 提层
+- 真机闭环验证：新增 `scripts/cdp_menu_x_test.py`（真实 dispatchTouchEvent 点 X → 确认命中"Close menu" → 菜单 opacity 变 0）**PASS**
+
+## ✅ 交付包（对外测试用，已就绪）
+
+- `D:\SRP\AI_school\APK导出\`：
+  - **`AI数字人-体验版-v1.1-20260903.apk`** = 最新构建（md5 与 app-debug.apk 一致核对过）
+  - **`AI数字人-安卓体验包-20260903.zip`**（21.6MB，含上述 APK + 试玩说明，完整性已验）——**对外就发这个 zip**（微信直发 .apk 会被拦）
+  - `试玩说明.txt` 已更新 v1.1 内容（登录流程/一人一号/退出切换账号）
+- 测试者账号派发流程：admin 登录 → 导航栏管理后台 → 用户管理 → 创建普通用户 → 把账号密码发给对方
+- 注意 zip 时序坑：本轮 APK 覆盖更新过 3 次，**发包前务必核对 zip 内 APK 与 app-debug.apk 的 md5**
+
+## ⏳ 明日工作（用户指定，下一会话从这里接手）
+
+**主题：把数据都整好**（用户原话，细节待与用户确认，已知线索）：
+- 素材源：`D:\SRP\AI_school\数据清单\`（及 数据清单.zip 876MB）
+- 现有灌库链路：`scripts/seed_knowledge_v2.py`（`scripts/knowledge_data/` 有未入库数据）、旧版 `seed_knowledge.py` 已灌 15 条（内容源自 campus-knowledge.ts）
+- 目标：把学校真实数据系统整理进 RAG 知识库（`data/knowledge`），对话检索命中率提升；可能涉及分类/切分/图片 OCR/网页录入（URL 录入 API=`POST /api/knowledge/add-url` 待联测）
+- 铁律：共用服务器灌库前先查 `available` 内存、控制批量大小（见 [[shared-server-heavy-job-rules]]）
+
+---
+
+**当前版本对应**: 服务器 Web bundle 与手机 APK = `e3e4fa1`（已推送 GitHub）
