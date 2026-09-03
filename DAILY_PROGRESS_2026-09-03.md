@@ -65,4 +65,31 @@
 
 ---
 
-**当前版本对应**: 服务器 Web bundle 与手机 APK = 本次提交（登录门禁+历史隔离+hero 站位修复）
+# 📌 09-03 深夜增补（第二段会话）：用户四项反馈全修复（commit `2a60f46`）
+
+用户反馈：①人物应在右侧中间、再放大；②左侧聊天框可以拉上去；③输入框拉通宽+麦克风居右+输入后发送键替换麦克风；④（普通用户）点导航栏后下拉菜单"无法完全覆盖"。
+
+## ✅ 修复与实现
+
+| 反馈 | 实现 |
+|---|---|
+| ① 人物右中放大 | HERO_FIT_FACTOR 0.52→0.62（约40%屏高）、HERO_CENTER_Y 0.46→0（垂直正中）、OFFSET_X 0.24 不变；fb_dump 真机验证人物中心≈75%屏宽/50%屏高 |
+| ② 聊天卡上移 | hero-landing pt 42vh→88px（贴导航栏下方）；撤独立标题层，标题改在对话卡头部（dialog-box 移动端启用），描述文字手机端隐藏 |
+| ③ 输入区重做 | 输入框与卡片同宽（pr 预留按键位）；右缘悬浮 40px 圆键：输入为空=麦克风（蓝/橙按录音态），有输入=发送键原地替换；切交换算 `hasInputText` |
+| ④ 菜单覆盖不全 | 双重根因：a) 菜单 z20 与输入行 z20 同层且 DOM 靠后→输入行浮在菜单上；b) 菜单 absolute 受容器偏移（本机型 hero 容器 top≈-80）只到 762，屏底漏 32px 背景。修复=菜单改 `position:fixed` 铺满视口 + zIndex 40（盖导航栏30） |
+
+## 🔑 新增坑（接编号）
+
+19. **本机型 WebView absolute+100vh 的容器偏移**：hero 容器实测 top≈-80（背景图是 fixed 所以能铺满全屏，absolute 层到不了物理底）。全屏覆盖层一律用 `position:fixed`（真机 screencap 验证覆盖完整）
+20. **Capacitor Activity 主题终身=manifest 的 Launch 主题**：窗口背景一直是启动图（不是 styles.xml 里 NoActionBar 的白！），WebView 表面以下的物理区露启动图。修复=MainActivity.onCreate `setTheme(R.style.AppTheme_NoActionBar)`（super.onCreate 前）。启动画面不受影响（starting window 用 manifest 主题）
+21. **CDP 整页截图与 adb screencap 差异**：CDP 截图高 2581px(794 CSS)但物理屏 2700px(832 CSS)——看覆盖类问题必须 screencap
+22. **React 受控 textarea 注入**：原生 value setter + dispatchEvent('input')（直接改 value 不触发 onChange）
+
+## ⏳ 待办补充
+
+- 用户复检：人物大小/位置手感、菜单覆盖、输入区切换是否满意
+- 其余待办同上（admin 密码进仓库历史、VAD、句级气泡合并等）
+
+---
+
+**当前版本对应**: 服务器 Web bundle 与手机 APK = `2a60f46`（登录门禁+历史隔离+hero 站位/菜单/输入区修复）
