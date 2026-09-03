@@ -94,11 +94,13 @@ const MobileMenu = memo(({ isOpen, onClose, navigation }: MobileMenuProps) => {
       transitionTimingFunction="cubic-bezier(0.16, 1, 0.3, 1)"
       boxShadow="xl"
     >
-      {/* Close Button */}
+      {/* Close Button —— zIndex 必须给：下方内容 Flex 带 transform（层叠上下文），
+          不给 z 的话 Flex 会盖住绝对定位的 X，点了没反应 */}
       <IconButton
         position="absolute"
         top={5}
         right={6}
+        zIndex={1}
         aria-label="Close menu"
         onClick={onClose}
         bg="transparent"
