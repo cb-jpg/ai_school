@@ -18,6 +18,10 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // 从 Launch(启动图)主题切到正式主题（白窗口背景）：
+        // WebView 表面只有布局视口高(~793px)，其下的物理底部手势条区由窗口背景绘制；
+        // 不切的话那里永远显示启动图，全屏白色图层(下拉菜单)会被衬出"覆盖不全"
+        setTheme(R.style.AppTheme_NoActionBar);
         super.onCreate(savedInstanceState);
         // 展示场景常亮，避免讲解中息屏
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);

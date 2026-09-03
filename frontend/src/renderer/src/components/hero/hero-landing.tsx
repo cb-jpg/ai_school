@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react';
-import { Box, Flex, IconButton, Text } from '@chakra-ui/react';
+import { Box, Flex, IconButton } from '@chakra-ui/react';
 import { FiSettings } from 'react-icons/fi';
 import { FiHome, FiBook, FiClock, FiAward, FiUsers } from 'react-icons/fi';
 import Navbar from './navbar';
@@ -83,37 +83,6 @@ export default function HeroLanding({
         onSettingsToggle={toggleSidebar}
       />
 
-      {/* 手机端标题层：紧贴导航栏下方、靠左排布（人物初始站位在右侧），
-          zIndex 低于 Live2D 层，人物可从标题上方经过 */}
-      {!activeCampusTopic && (
-        <Box
-          display={{ base: 'block', md: 'none' }}
-          position="absolute"
-          top="96px"
-          left={0}
-          width="62%"
-          zIndex={0}
-          textAlign="left"
-          pointerEvents="none"
-          px={4}
-        >
-          <Text
-            fontSize="xl"
-            fontWeight="bold"
-            color="#1E5494"
-            lineHeight="1.3"
-            css={{
-              textShadow: '0 1px 2px rgba(255, 255, 255, 0.8)',
-            }}
-          >
-            {SCHOOL_CONFIG.tagline}
-          </Text>
-          <Text fontSize="xs" color={schoolColors.textSecondary} mt={1} lineHeight="1.5">
-            {SCHOOL_CONFIG.description}
-          </Text>
-        </Box>
-      )}
-
       {/* 设置按钮 - 打开右侧侧栏（手机端已移入导航栏；专题页打开时隐藏，避免浮在专题页上） */}
       {!activeCampusTopic && (
         <Box
@@ -154,8 +123,9 @@ export default function HeroLanding({
         alignItems="center"
         justifyContent="space-between"
         px={{ base: 6, md: 12, lg: 16 }}
-        /* 手机端：上半屏 (42vh) 是 Live2D 人物区，对话区从其下方开始，避免重叠 */
-        pt={{ base: '42vh', md: 24 }}
+        /* 手机端：人物在右侧居中站立（Live2D 全屏穿透层），对话卡贴导航栏下方、
+           占据左侧整高（人物本体压在卡片右缘上方，输入行 z20 保持可点） */
+        pt={{ base: '88px', md: 24 }}
         pb={{ base: 4, md: 16 }}
         gap={8}
       >

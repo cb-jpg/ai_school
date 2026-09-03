@@ -113,6 +113,9 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
     }
   };
 
+  // 是否已输入内容：决定输入框右侧显示发送键（有内容）还是麦克风（空）
+  const hasInputText = textInput.inputText.trim().length > 0;
+
   const getStatusText = () => {
     if (wsState !== 'OPEN' && wsState !== 'CONNECTING') return '等待连接...';
     if (modelLoading) return '加载模型中...';
@@ -222,8 +225,8 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
           </HStack>
         </HStack>
 
-        {/* 标题块：手机端已上移到导航栏下方独立层（见 hero-landing），这里仅桌面端显示 */}
-        <Box order={{ base: 0, md: 1 }} display={{ base: 'none', md: 'block' }}>
+        {/* 标题块：手机端作为对话卡头部（紧贴导航栏下方），桌面端维持原设计 */}
+        <Box order={{ base: 0, md: 1 }} px={{ base: 1, md: 0 }}>
           <Text
             fontSize={{ base: 'lg', sm: '4xl', md: '5xl' }}
             fontWeight="bold"
@@ -238,7 +241,8 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
             fontSize={{ base: 'xs', sm: 'base', md: 'lg' }}
             color={schoolColors.textSecondary}
             maxW={{ base: 'sm', sm: 'lg', md: 'xl' }}
-            mb={{ base: 1, sm: 5 }}
+            mb={{ base: 2, sm: 5 }}
+            display={{ base: 'none', sm: 'block' }}
           >
             {description}
           </Text>
@@ -344,10 +348,9 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
           )}
         </Box>
 
-        {/* Input Area —— zIndex 20：浮于 Live2D 层(15)之上，人物再怎么下移也不挡输入 */}
-        <HStack
-          gap={3}
-          alignItems="center"
+        {/* Input Area —— zIndex 20：浮于 Live2D 层(15)之上，人物再怎么下移也不挡输入。
+            输入框与对话卡同宽；右侧悬浮麦克风，开始输入时原地切换为发送键 */}
+        <Box
           order={3}
           position="relative"
           zIndex={20}
@@ -363,7 +366,8 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
             borderColor={schoolColors.border}
             rounded="2xl"
             p={3}
-            flex={1}
+            pr={16}
+            width="full"
             resize="none"
             height="auto"
             minHeight="48px"
@@ -377,70 +381,67 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
             }}
           />
 
-          {/* 精美的动画麦克风按钮 */}
-          {/* 麦克风按钮 */}
-          <Box
-            as="button"
-            onClick={async () => {
-              console.log('麦克风点击前状态:', micOn);
-              try {
-                if (micOn) {
-                  stopMic();
-                  console.log('调用 stopMic');
-                } else {
-                  await startMic();
-                  console.log('调用 startMic');
+          {/* 麦克风 / 发送 切换键（悬浮于输入框右缘居中） */}
+          {hasInputText ? (
+            <Box
+              as="button"
+              onClick={handleSendMessage}
+              aria-label="发送"
+              position="absolute"
+              right={2}
+              top="50%"
+              transform="translateY(-50%)"
+              width="40px"
+              height="40px"
+              rounded="full"
+              bg={schoolColors.primary}
+              color="white"
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              transition="all 0.2s ease"
+              _hover={{ bg: '#1A4280' }}
+              _active={{ transform: 'translateY(-50%) scale(0.92)' }}
+              style={{ cursor: 'pointer' }}
+            >
+              <IoSend size={18} />
+            </Box>
+          ) : (
+            <Box
+              as="button"
+              onClick={async () => {
+                try {
+                  if (micOn) {
+                    stopMic();
+                  } else {
+                    await startMic();
+                  }
+                } catch (error) {
+                  console.error('麦克风切换失败:', error);
                 }
-              } catch (error) {
-                console.error('麦克风切换失败:', error);
-              }
-            }}
-            width="48px"
-            height="48px"
-            rounded="full"
-            bg={micOn ? schoolColors.secondary : schoolColors.primary}
-            color="white"
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            transition="all 0.3s ease"
-            _hover={{
-              bg: micOn ? '#E55A2D' : '#1A4280',
-              transform: 'scale(1.05)',
-            }}
-            _active={{
-              transform: 'scale(0.95)',
-            }}
-            style={{ cursor: 'pointer' }}
-          >
-            {micOn ? <BsMicFill size={20} /> : <BsMic size={20} />}
-          </Box>
-
-          {/* 发送按钮 */}
-          <Box
-            as="button"
-            onClick={handleSendMessage}
-            width="48px"
-            height="48px"
-            rounded="full"
-            bg={schoolColors.primary}
-            color="white"
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            transition="all 0.3s ease"
-            _hover={{
-              bg: '#1A4280',
-              transform: 'scale(1.05)',
-            }}
-            _active={{
-              transform: 'scale(0.95)',
-            }}
-            style={{ cursor: 'pointer' }}
-          >
-            <IoSend size={20} />
-          </Box>
-        </HStack>
+              }}
+              aria-label={micOn ? '停止录音' : '开始录音'}
+              position="absolute"
+              right={2}
+              top="50%"
+              transform="translateY(-50%)"
+              width="40px"
+              height="40px"
+              rounded="full"
+              bg={micOn ? schoolColors.secondary : schoolColors.primary}
+              color="white"
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              transition="all 0.2s ease"
+              _hover={{ bg: micOn ? '#E55A2D' : '#1A4280' }}
+              _active={{ transform: 'translateY(-50%) scale(0.92)' }}
+              style={{ cursor: 'pointer' }}
+            >
+              {micOn ? <BsMicFill size={18} /> : <BsMic size={18} />}
+            </Box>
+          )}
+        </Box>
 
         {/* 麦克风自动停止设置 —— 同输入区，保持可点 */}
         <HStack

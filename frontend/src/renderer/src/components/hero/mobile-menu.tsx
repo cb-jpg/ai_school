@@ -79,12 +79,15 @@ const MobileMenu = memo(({ isOpen, onClose, navigation }: MobileMenuProps) => {
 
   return (
     <Box
-      position="absolute"
+      /* fixed 铺满视口：本机型 WebView 里 absolute+100vh 受容器偏移影响
+         会在屏底漏一条背景（背景图是 fixed 所以能铺满，菜单必须同样 fixed）；
+         40：盖过导航栏(30)与对话输入区(20)，打开时完整覆盖 */
+      position="fixed"
       insetX={0}
       top={0}
-      zIndex={20}
+      zIndex={40}
       bg="white"
-      height={isOpen ? '100vh' : '0'}
+      height={isOpen ? '100%' : '0'}
       opacity={isOpen ? 1 : 0}
       pointerEvents={isOpen ? 'auto' : 'none'}
       transition="all 0.5s ease"
