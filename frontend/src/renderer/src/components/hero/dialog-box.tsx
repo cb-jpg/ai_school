@@ -282,11 +282,14 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
               </Box>
             ))}
 
-            {/* Show current AI response */}
-            {subtitleText && (
+            {/* 思考占位：仅等首句期间显示（服务端 full-text 先发 "Thinking..."）。
+                句子文本会流式并入上方最后一个 AI 气泡（use-audio-task 的 appendAI），
+                若再渲染 subtitle 气泡，当前句会同时出现两遍（句级气泡重叠），
+                播完后字幕停在最后一句还会留下永久重复气泡——故只在思考阶段占位 */}
+            {aiState === AiStateEnum.THINKING_SPEAKING && subtitleText === 'Thinking...' && (
               <Box
                 bg={schoolColors.assistantBubble}
-                color={schoolColors.text}
+                color={schoolColors.textSecondary}
                 p={3}
                 rounded="2xl"
                 borderBottomLeftRadius="sm"
@@ -297,7 +300,7 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
                 wordBreak="break-word"
                 boxShadow="sm"
               >
-                {removeEmojiTags(subtitleText)}
+                思考中…
               </Box>
             )}
 
