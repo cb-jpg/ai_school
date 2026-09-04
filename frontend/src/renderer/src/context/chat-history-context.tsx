@@ -55,9 +55,27 @@ export function ChatHistoryProvider({ children }: { children: React.ReactNode })
   const [historyList, setHistoryList] = useState<HistoryInfo[]>(
     DEFAULT_HISTORY.historyList,
   );
-  const [currentHistoryUid, setCurrentHistoryUid] = useState<string | null>(
-    DEFAULT_HISTORY.currentHistoryUid,
-  );
+  // 当前对话 uid 持久化到 localStorage：App 退后台被系统杀进程后冷启动，
+  // WebSocketHandler 依据它恢复上次对话（否则每次重进都是新对话）
+  const [currentHistoryUid, setCurrentHistoryUidState] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('chatHistoryUid');
+    } catch {
+      return null;
+    }
+  });
+  const setCurrentHistoryUid = useCallback((uid: string | null) => {
+    try {
+      if (uid) {
+        localStorage.setItem('chatHistoryUid', uid);
+      } else {
+        localStorage.removeItem('chatHistoryUid');
+      }
+    } catch {
+      // localStorage 不可用时退化为纯内存行为
+    }
+    setCurrentHistoryUidState(uid);
+  }, []);
   const [fullResponse, setFullResponse] = useState(DEFAULT_HISTORY.fullResponse);
   const [forceNewMessage, setForceNewMessage] = useState<boolean>(false);
 

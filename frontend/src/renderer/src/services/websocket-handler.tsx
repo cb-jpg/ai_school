@@ -72,6 +72,8 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
   const {
     setCurrentHistoryUid, setMessages, setHistoryList,
   } = useChatHistory();
+  // 连接建立后待执行的"恢复上次对话"标志（首连和每次重连都要恢复一次）
+  const pendingRestoreRef = useRef(false);
 
   const handleControlMessage = useCallback((controlText: string) => {
     switch (controlText) {
@@ -200,11 +202,6 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
         if (message.messages) {
           setMessages(message.messages);
         }
-        toaster.create({
-          title: t('notification.historyLoaded'),
-          type: 'success',
-          duration: 2000,
-        });
         break;
       case 'new-history-created':
         setAiState('idle');
@@ -238,8 +235,26 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
       case 'history-list':
         if (message.histories) {
           setHistoryList(message.histories);
-          if (message.histories.length > 0) {
-            setCurrentHistoryUid(message.histories[0].uid);
+          // 每次连接建立后的首次 history-list：恢复上次对话而非开新对话。
+          // 重连也要恢复——服务端每个连接的 context.history_uid 从 None 起步，
+          // 不 fetch-and-set 回去的话，后续对话不会存盘、LLM 也没有之前记忆。
+          if (pendingRestoreRef.current) {
+            pendingRestoreRef.current = false;
+            let savedUid: string | null = null;
+            try {
+              savedUid = localStorage.getItem('chatHistoryUid');
+            } catch {
+              // localStorage 不可用时视为无存档
+            }
+            const target = message.histories.find((h) => h.uid === savedUid)?.uid
+              ?? message.histories[0]?.uid
+              ?? null;
+            if (target) {
+              setCurrentHistoryUid(target);
+              wsService.sendMessage({ type: 'fetch-and-set-history', history_uid: target });
+            } else {
+              wsService.sendMessage({ type: 'create-new-history' });
+            }
           }
         }
         break;
@@ -328,23 +343,39 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
   const prevUsernameRef = useRef<string | null>(null);
   useEffect(() => {
     if (!authUsername) {
-      // 登出：断开并阻止自动重连
+      // 登出：断开并阻止自动重连；对话存档属上个账号，一并清除
       if (prevUsernameRef.current !== null) {
         wsService.disconnect();
+      }
+      try {
+        localStorage.removeItem('chatHistoryUid');
+      } catch {
+        // ignore
       }
       prevUsernameRef.current = null;
       return;
     }
     if (prevUsernameRef.current !== null && prevUsernameRef.current !== authUsername) {
-      // 账号切换：先断开旧连接，connect 内部会带新 user_token 重开
+      // 账号切换：先断开旧连接，connect 内部会带新 user_token 重开；
+      // 旧账号的对话存档不再适用，交给恢复逻辑回退到新账号最新对话
       wsService.disconnect();
+      try {
+        localStorage.removeItem('chatHistoryUid');
+      } catch {
+        // ignore
+      }
     }
     prevUsernameRef.current = authUsername;
     wsService.connect(wsUrl);
   }, [wsUrl, authUsername]);
 
   useEffect(() => {
-    const stateSubscription = wsService.onStateChange(setWsState);
+    const stateSubscription = wsService.onStateChange((state) => {
+      setWsState(state);
+      if (state === 'OPEN') {
+        pendingRestoreRef.current = true;
+      }
+    });
     const messageSubscription = wsService.onMessage(handleWebSocketMessage);
     return () => {
       stateSubscription.unsubscribe();

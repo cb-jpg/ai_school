@@ -146,9 +146,9 @@ class WebSocketService {
     this.sendMessage({
       type: 'fetch-history-list',
     });
-    this.sendMessage({
-      type: 'create-new-history',
-    });
+    // 不在这里发 create-new-history：它会在每次自动重连时把对话清空成新会话
+    // （App 退后台被系统断网 → 回前台重连 → 又开新对话）。恢复/新建由
+    // WebSocketHandler 收到 history-list 后按存档 uid 决定，见 websocket-handler.tsx。
   }
 
   connect(url: string) {
