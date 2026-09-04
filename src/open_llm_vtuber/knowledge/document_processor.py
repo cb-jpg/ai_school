@@ -358,9 +358,33 @@ class DocumentProcessor:
         lines = [line.strip() for line in text.split('\n') if line.strip()]
         return '\n'.join(lines)
 
+    def _split_long_line(self, line: str) -> list[str]:
+        """超长行按句读切分。断点只落在 start+overlap 之后，
+        且每次前进至少 1 字符（防 start 停滞/倒退导致死循环）。
+        尾部余量若已包含在前一片的 overlap 里（句读贴近行尾时）则不再单出一片。"""
+        parts = []
+        start = 0
+        while start < len(line):
+            end = min(start + self.chunk_size, len(line))
+            if end < len(line):
+                for delimiter in ['。', '！', '？', '.', '!', '?', '；', ';']:
+                    last = line.rfind(delimiter, start + self.chunk_overlap, end)
+                    if last != -1:
+                        end = last + 1
+                        break
+            piece = line[start:end].strip()
+            if piece and not (parts and piece in parts[-1]):
+                parts.append(piece)
+            start = max(end - self.chunk_overlap, start + 1)
+        return parts
+
     def _chunk_text(self, text: str) -> List[Chunk]:
         """
         Split text into chunks for vectorization.
+
+        按行聚合到 chunk_size：表格类内容（获奖登记等）一行即一条记录，
+        不能把换行压成空格后整篇按句读切（会切碎记录且产生大量重复块）。
+        单行超 chunk_size 时再按句读切分（见 _split_long_line）。
 
         Args:
             text: Text to chunk
@@ -368,37 +392,37 @@ class DocumentProcessor:
         Returns:
             List of Chunk objects
         """
-        # Clean text
-        text = re.sub(r'\s+', ' ', text)
+        chunks: list[Chunk] = []
+        buf = ""
 
-        chunks = []
-        start = 0
-        chunk_index = 0
-
-        while start < len(text):
-            end = start + self.chunk_size
-
-            # Try to break at sentence boundary
-            if end < len(text):
-                # Look for sentence endings
-                for delimiter in ['。', '！', '？', '.', '!', '?', '\n']:
-                    last_delimiter = text.rfind(delimiter, start, end)
-                    if last_delimiter != -1:
-                        end = last_delimiter + 1
-                        break
-
-            chunk_text = text[start:end].strip()
-            if chunk_text:
+        def flush() -> None:
+            nonlocal buf
+            if buf:
                 chunks.append(Chunk(
-                    content=chunk_text,
+                    content=buf,
                     source_id="",  # Will be set when entry is created
-                    chunk_index=chunk_index,
-                    metadata={"start": start, "end": end}
+                    chunk_index=len(chunks),
                 ))
-                chunk_index += 1
+                buf = ""
 
-            start = end - self.chunk_overlap
-
+        for line in text.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            if len(line) > self.chunk_size:
+                for piece in self._split_long_line(line):
+                    flush()
+                    chunks.append(Chunk(
+                        content=piece,
+                        source_id="",  # Will be set when entry is created
+                        chunk_index=len(chunks),
+                    ))
+            elif buf and len(buf) + 1 + len(line) > self.chunk_size:
+                flush()
+                buf = line
+            else:
+                buf = f"{buf} {line}" if buf else line
+        flush()
         return chunks
 
     def _generate_summary(self, text: str, max_length: int = 200) -> str:
