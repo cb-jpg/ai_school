@@ -111,25 +111,91 @@
 31. **CDP 注入的页面探针（如包一层 WebSocket）会被 location.reload() 清掉**——重载后
     `wslog=[]` 是假象，判断"有没有尝试连接"以服务器日志为准。
 
-## ⏳ 剩余待办
+## ⏳ 剩余待办（09-04 深夜收尾时点）
 
-1. **admin 密码进公开仓库 git 历史的改密待办仍未做**（09-03 遗留，本轮日志已不再写明文）
-2. run_server 配 systemd 自拉起（本轮再次验证后端"消失"风险，仍未做）
-3. 登录 JWT TTL 仅 12h（auth.py `TOKEN_TTL_SECONDS`）：前端死路已修（过期自动回登录页），
-   但学校演示场景若嫌一天一登麻烦可酌情调长
+1. **admin 密码进公开仓库 git 历史的改密待办仍未做**（09-03 遗留，**建议最优先**）
+2. run_server 配 systemd 自拉起（后端"消失"风险仍在，均属共用服务器被杀/OOM）
+3. 登录 JWT TTL 仅 12h（auth.py `TOKEN_TTL_SECONDS`）：前端死路已修，学校演示嫌一天一登可酌情调长
 4. 图片存档类条目（相机命名照片）是占位文本，需要人工整理或 OCR 后补充
 5. URL 网页抓取录入联测（`POST /api/knowledge/add-url` 仍待测）
-6. 摄像头作背景联测；VAD 灵敏度调参；句级气泡重叠合并显示
-7. 用户复检：App 登录→对话问校情（现应有真实数据支撑），观察检索命中率
+6. 摄像头作背景联测；VAD 灵敏度调参
+7. **用户复检 v1.4**：①回复不再出现重复段 ②退后台/杀进程重进续接上次对话 ③"+"新对话正常
 8. 功能点.md 项目二（数智化成长平台）未开始
+
+**今日已清**：句级气泡重叠（v1.3）、退后台变新对话（v1.4）——两个都是上线即有、
+日常使用必踩的 App 体验 bug，均已真机验证。
+
+## 📌 09-04 晚间增补：回复"句级气泡重叠"修复（v1.3，commit `6c8547a` 已推送）
+
+**用户反馈**：每次回复的第一段都重复显示。
+
+**根因**：`dialog-box.tsx` 把 `subtitleText` 渲染成独立气泡，而每句音频到达时
+`use-audio-task.ts` 既 `appendAI(句子)` 并入上方整段气泡、又 `updateSubtitle(句子)`
+替换字幕 → 正在播的句子恒显示两遍；且回复结束后无人清空 subtitleText，字幕停在
+最后一句 = 底部永久多出重复气泡。即 09-02 起挂账的"句级气泡重叠"待办。
+
+**修复**：字幕气泡只在 `subtitleText === 'Thinking...'` 且 thinking-speaking 时
+显示"思考中…"占位（与 `use-interrupt.ts` 同款字面量判断）；句子文本只随整段气泡
+流式生长。`subtitle-context` 本身不动——桌面端 hero 右下字幕浮层、打断逻辑不受影响。
+
+**验证**（`scripts/cdp_bubble_dup_test.py`，真机 CDP 全链路，可回归）：
+注入问题→点发送→1s 采样气泡快照。v1.3 实测三轮问答：每回复均为**单个完整气泡**、
+播报全程无句级重复气泡、"思考中"占位正常、RAG toast 现场确认"已检索到 3 条相关学校资料"。
+
+**交付**：Web bundle `main-BAj0-6p9.js` 已同步服务器（纯前端改动未重启）；
+APK versionCode 4 / versionName **1.3** 已构建并 `adb install -r` 装回手机；
+分享包 `APK导出/AI数字人-安卓体验包-20260904v13.zip`。
+
+**顺手结论（用户问"知识库检索为什么每次都是三条"）**：`rag_service.py:46 TOP_K=3`、
+`single_conversation.py:79 top_k=3` 写死，toast 数字即检索返回块数（相似度≥0.3 的前 3 块）。
+设计行为非 bug；库中现 105 条/1800+ 块，校情问题几乎总有 ≥3 块过线故恒为 3。
+要改就调这两个常量（或做同条目去重/提高 MIN_SCORE），当前维持 3 与"两三句口语化回答"的提示词匹配。
+
+## 📌 09-04 深夜增补：退后台重进变新对话修复（v1.4，commit `ef13a9e` 已推送）
+
+**用户反馈**：每次把 App 放后台重进就变成新对话。
+
+**根因**：`websocket-service.tsx` 的 `initializeConnection()` 在**每次** `ws.onopen`
+（首连+每次自动重连）都发 `create-new-history`——上游默认行为（每次启动全新会话），
+对学校 App 是 bug：退后台被系统断网 → 回前台重连 → 对话被清空成新会话；
+进程被杀冷启动同样丢。另外服务端每个连接的 `context.history_uid` 从 None 起步，
+重连后若不重新指回，后续对话**不会存盘**、LLM 也失去之前记忆。
+
+**修复**（纯前端三处）：①连接初始化只发 fetch（backgrounds/configs/history-list），
+不再新建；②WebSocketHandler 在每次 OPEN 后首次 `history-list` 恢复——localStorage
+存档 uid 优先 → 最新一条 → 实在没有才 create-new-history，恢复用
+`fetch-and-set-history`（服务端重设 history_uid+记忆+回传消息）；③currentHistoryUid
+持久化 localStorage（登出/换账号清除），history-data 的"已加载"toast 移除。
+
+**真机验证**：force-stop 冷启动恢复最近对话 ✓；HOME 退后台 20s（进程被杀重启）
+拉回对话完整、服务器历史文件数不变（无新建）✓；恢复后续聊正常入库同一历史 ✓
+（用户 23:11 自然对话"Okay."落在同一 json，链路被真实使用验证）。
+注意 `get_history_list` 按最后消息时间排序且自动清理空会话——"最近对话"语义正确。
+
+**交付**：Web bundle `main-DSQ1l5ho.js` 已同步服务器；APK versionCode 5 /
+versionName **1.4** 已装回手机；分享包 `APK导出/AI数字人-安卓体验包-20260904v14.zip`
+（v1.3 包已删）。**行为变化**：App 现在冷启动/重进都续接上次对话，"新对话"用 + 按钮手动开。
 
 ## 🧭 下次打开 Claude 的恢复路径
 
-1. 读本文件 + 记忆 `shared-server-heavy-job-rules`（已更新 PSI/死循环教训）、`server-deployment-state`
-2. 灌库/补数据：改 `scripts/knowledge_data/merged.json` → `python seed_via_api.py seed`
-   （幂等续传）；清洗模式 `clean`；检索自检 `search`
-3. 服务器侧如需重建某条：先 `DELETE /api/knowledge/{id}` 再跑 seed（脚本支持 RESET_TITLES 机制）
+1. 读本文件 + 记忆 `android-app-capacitor-plan`（App 铁律/坑全录）、`server-deployment-state`、
+   `shared-server-heavy-job-rules`（PSI/死循环教训）
+2. **App 改动出包标准流程**：改 frontend → `npm run typecheck` → `npm run build:web` →
+   `tar czf /tmp/web-dist.tar.gz dist/web`（frontend/ 下）→ scp → 服务器 `cd ~/ai_school/frontend
+   && tar xzf`（纯前端不用重启）→ `npm run android:sync` → `JAVA_HOME="D:/SRP/android-tools/
+   jdk-21.0.12.1+1" (cd android && ./gradlew assembleDebug)` → `adb install -r`（adb 在
+   `D:/SRP/android-tools/android-sdk/platform-tools/`，不在 PATH）
+3. **真机 CDP 验证**：启动 App → `adb forward tcp:9222
+   localabstract:webview_devtools_remote_$(adb shell pidof com.shishi.ai)` →
+   `D:\SRP\AI_school\cdp_eval.py "js"` 执行页面 JS；气泡回归 `python
+   scripts/cdp_bubble_dup_test.py "问题"`（需 PYTHONIOENCODING=utf-8）
+4. 灌库/补数据：改 `scripts/knowledge_data/merged.json` → `python seed_via_api.py seed`
+   （幂等续传）；清洗模式 `clean`；检索自检 `search`；重建单条先
+   `DELETE /api/knowledge/{id}` 再 seed（RESET_TITLES 机制）
 
 ---
 
-**当前版本对应**: 服务器 = 仓库 `031bd95`（document_processor.py 已同步；其余 .py 无改动）
+**当前版本对应（09-04 深夜收尾）**: 仓库 HEAD = `ef13a9e`（今日前端五连修全在这条线上）；
+服务器后端 .py 仍 = `031bd95`（今日无后端改动，无需重启）；服务器 Web bundle =
+`main-DSQ1l5ho.js`（=v1.4）；手机 APK = v1.4（versionCode 5）已装 test 账号；
+对外分享包 = `APK导出/AI数字人-安卓体验包-20260904v14.zip`（md5=33d0d40c8d070bbaa3f8e3de32f3ecc6）
