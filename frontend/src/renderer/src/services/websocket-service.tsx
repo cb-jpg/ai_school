@@ -6,6 +6,7 @@ import { ModelInfo } from '@/context/live2d-config-context';
 import { HistoryInfo } from '@/context/websocket-context';
 import { ConfigFile } from '@/context/character-config-context';
 import { withToken, withUserToken } from '@/services/api-base';
+import { authFetch } from '@/services/auth';
 import { toaster } from '@/components/ui/toaster';
 
 export interface DisplayText {
@@ -190,6 +191,7 @@ class WebSocketService {
         this.stateSubject.next('CLOSED');
         // 非人为断开（网络抖动、心跳超时等）时自动重连
         if (!this.manualClose) {
+          this.probeAuthOnRepeatedFailure();
           this.scheduleReconnect();
         }
       };
@@ -220,6 +222,28 @@ class WebSocketService {
         this.connect(this.lastUrl);
       }
     }, delay);
+  }
+
+  // 登录态探活：user_token 有 12h TTL，过期后服务端在 /client-ws 握手层 403 拒绝，
+  // 但浏览器 WS API 不暴露 HTTP 状态码，表现为 onclose(1006) 与网络故障无异——
+  // 若不处理，App 会永远卡在"正在连接服务器"。用轻量 HTTP 探测区分：
+  // authFetch 收到 401 会自动清凭证并广播 kb-unauthorized（AuthProvider 监听后回登录页）。
+  private lastAuthProbeAt = 0;
+
+  private probeAuthOnRepeatedFailure() {
+    let token: string | null = null;
+    try {
+      token = localStorage.getItem('kb_token');
+    } catch {
+      return;
+    }
+    if (!token) return; // 未登录模式（浏览器 ?token= 直连）不做登录探活
+    const now = Date.now();
+    if (now - this.lastAuthProbeAt < 30_000) return; // 30s 内最多探一次，重连循环不叠加
+    this.lastAuthProbeAt = now;
+    authFetch('/api/auth/me').catch(() => {
+      // 网络不通或已按 401 清凭证，均交给既有重连/登录门禁处理
+    });
   }
 
   private clearReconnectTimer() {
