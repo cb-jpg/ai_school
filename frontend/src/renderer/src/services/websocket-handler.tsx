@@ -22,7 +22,7 @@ import { useLocalStorage } from '@/hooks/utils/use-local-storage';
 import { useGroup } from '@/context/group-context';
 import { useInterrupt } from '@/hooks/utils/use-interrupt';
 import { useBrowser } from '@/context/browser-context';
-import { getStoredUser } from '@/services/auth';
+import { useAuth } from '@/context/auth-context';
 
 function WebSocketHandler({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
@@ -320,8 +320,11 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
     }
   }, [aiState, addAudioTask, appendHumanMessage, baseUrl, bgUrlContext, setAiState, setConfName, setConfUid, setConfigFiles, setCurrentHistoryUid, setHistoryList, setMessages, setModelInfo, setSubtitleText, startMic, stopMic, setSelfUid, setGroupMembers, setIsOwner, backendSynthComplete, setBackendSynthComplete, clearResponse, handleControlMessage, appendOrUpdateToolCallMessage, interrupt, setBrowserViewData, t]);
 
-  // 登录门禁：未登录不连 WebSocket；登录/切换账号后以新身份（user_token）重连
-  const authUsername = getStoredUser()?.username ?? null;
+  // 登录门禁：未登录不连 WebSocket；登录/切换账号后以新身份（user_token）重连。
+  // 必须消费 AuthContext（而非渲染时读 localStorage）：本组件不是 AuthContext
+  // 消费者时，登录/登出不会引发重渲染，门禁 effect 不跑 → App 内登录后永远不连接。
+  const { user: authUser } = useAuth();
+  const authUsername = authUser?.username ?? null;
   const prevUsernameRef = useRef<string | null>(null);
   useEffect(() => {
     if (!authUsername) {

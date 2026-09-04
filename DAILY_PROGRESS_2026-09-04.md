@@ -73,6 +73,22 @@
 **交付**：Web bundle（`main-DX5-3dH3.js`）已部署服务器；APK 已重构建并装回用户手机
 （重装清了旧登录态，登录页正常，用户重登即恢复）。
 
+## 📌 09-04 午后增补二：登录后仍"等待连接"——App 内登录从不触发连接的真 bug
+
+用户换 `test` 账号登录成功后仍"等待连接"。CDP 诊断手机 WebView + 服务器日志交叉定位：
+
+- **服务器日志显示登录后手机根本没发起 WS 握手**（不是被拒，是没尝试）
+- 根因：`WebSocketHandler` 不消费 AuthContext，只在渲染时读 localStorage（`getStoredUser()`）。
+  登录成功 → AuthProvider 状态变化只重渲染 AuthContext 的消费者 → WebSocketHandler 不在其中
+  → 门禁 effect 永不运行 → 不连接。**App 内登录→连接这条路自 09-03 上线起就不通**，
+  之前"能用"全靠启动时已带登录态（挂载即连）或重启 App。
+- 修复：WebSocketHandler 改为 `useAuth()` 消费登录态（commit 见 git log）。登录/登出/切换
+  账号都会正确触发连接/断开。
+- e2e：`scripts/cdp_login_connect_test.py`（headless 全新档案 → 表单登录 → 页面"已连接/在线"）
+  **PASS**；诊断工具 `scripts/cdp_phone_diag.py`（手机 WebView 状态/控制台捕获）。
+- Web bundle（`main-Ctdkc8Ts.js`）已部署；APK 已重构建装回手机（保留登录态）。
+- 手机 13:42 截图确认：在线 + 对话正常（用户实测发消息得到回复）。
+
 ## 🔑 新增坑与结论（接 09-03 编号）
 
 23. **`/api/auth/login` 本身也过访问令牌门禁**：不带 `X-Access-Token` 的登录请求收到的是
@@ -90,6 +106,10 @@
     "网络故障"只能旁路 HTTP 探测（`/api/auth/me`）。凡是"WS 拒绝后要有动作"的需求都此法。
 29. **headless Edge 自选 target 要按 URL 过滤**：Edge 会开 edge://sync-confirmation-dialog
     等内部页，`/json` 里第一个 page 未必是目标站。
+30. **组件读 localStorage ≠ 响应登录态**：React 只重渲染 Context 消费者。跨 Provider 读
+    认证状态的组件必须消费 AuthContext，否则登录/登出它根本不会重渲染（本次连接门禁即此）。
+31. **CDP 注入的页面探针（如包一层 WebSocket）会被 location.reload() 清掉**——重载后
+    `wslog=[]` 是假象，判断"有没有尝试连接"以服务器日志为准。
 
 ## ⏳ 剩余待办
 
