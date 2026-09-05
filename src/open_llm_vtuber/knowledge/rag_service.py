@@ -43,7 +43,7 @@ SCHOOL_KEYWORDS = [
 ]
 
 # 检索参数
-TOP_K = 3
+TOP_K = 6
 MIN_SCORE = 0.3                 # 相似度低于此分数的块不参与结果
 LOW_CONFIDENCE_THRESHOLD = 0.5  # 命中但最高分低于此值记为低置信问题
 

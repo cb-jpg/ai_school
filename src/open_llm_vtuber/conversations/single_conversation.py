@@ -76,7 +76,7 @@ async def process_single_conversation(
                 logger.info("检测到学校相关问题，执行 RAG 检索...")
                 rag_result = await rag_service.retrieve_and_enrich_input(
                     query=input_text,
-                    top_k=3,
+                    top_k=6,
                 )
 
                 if rag_result.get("has_context"):
