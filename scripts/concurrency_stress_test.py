@@ -300,7 +300,17 @@ async def client_session(idx: int, results: list, connect_delay: float):
 
     try:
         for turn_i, q in ((1, Q_SCHOOL), (2, Q_CASUAL)):
-            tr = await run_turn(ws, client_uid, q)
+            try:
+                tr = await run_turn(ws, client_uid, q)
+            except websockets.exceptions.ConnectionClosed as e:
+                # 连接被服务端/网络掐断（如多进程下某 worker 崩溃）：
+                # 记为该客户端失败，不能让异常炸掉整个 gather
+                rec["turns"].append({
+                    "turn": turn_i, "ok": False, "t_open": None, "t_done": None,
+                    "n_audio": 0, "audio_kb": 0,
+                    "error": f"ConnectionClosed: {type(e).__name__}", "rag": None,
+                })
+                break
             tr_dict = {
                 "turn": turn_i, "ok": tr.ok,
                 "t_open": None if tr.t_first is None else round(tr.t_first, 2),

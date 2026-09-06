@@ -150,8 +150,11 @@ def create_app():
 
 
 # uvicorn 多进程模式通过 import string 在 worker 子进程内加载应用；
-# 该环境变量仅由 run(workers>1) 设置，普通单进程启动不会在 import 期构建应用
-if os.environ.get("OLLV_LOAD_APP") == "1":
+# 该环境变量仅由 run(workers>1) 设置，普通单进程启动不会在 import 期构建应用。
+# __name__ 门卫必须保留：multiprocessing spawn 会把本文件先以 __mp_main__ 再以
+# run_server import 一遍，若无门卫 create_app 会在每个 worker 里完整执行两次
+# （双份引擎内存，且易在二次初始化中崩掉 worker 槽位）
+if os.environ.get("OLLV_LOAD_APP") == "1" and __name__ == "run_server":
     app = create_app()
 else:
     app = None
