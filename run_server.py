@@ -116,11 +116,49 @@ def parse_args():
     parser.add_argument(
         "--hf_mirror", action="store_true", help="Use Hugging Face mirror"
     )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Number of uvicorn worker processes (multi-process mode requires >= 2)",
+    )
     return parser.parse_args()
 
 
+def create_app():
+    """构建 WebSocketServer 应用；uvicorn 多进程模式下每个 worker 子进程在
+    import 应用时各自执行一次（引擎、RAG 索引等随进程独立加载）。"""
+    init_logger(os.environ.get("OLLV_LOG_LEVEL", "INFO"))
+    config: Config = validate_config(read_yaml("conf.yaml"))
+    server = WebSocketServer(config=config)
+    logger.info("Initializing server context (worker)...")
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        # 当前线程没有运行中的事件循环：直接 asyncio.run
+        asyncio.run(server.initialize())
+    else:
+        # uvicorn worker 是在已运行的事件循环内 import 应用的，
+        # asyncio.run 会报 "cannot be called from a running event loop"；
+        # 改在独立线程自己的事件循环里完成异步初始化（引擎对象本身不绑定循环）
+        import concurrent.futures
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            pool.submit(asyncio.run, server.initialize()).result()
+    logger.info("Server context initialized successfully.")
+    return server.app
+
+
+# uvicorn 多进程模式通过 import string 在 worker 子进程内加载应用；
+# 该环境变量仅由 run(workers>1) 设置，普通单进程启动不会在 import 期构建应用
+if os.environ.get("OLLV_LOAD_APP") == "1":
+    app = create_app()
+else:
+    app = None
+
+
 @logger.catch
-def run(console_log_level: str):
+def run(console_log_level: str, workers: int = 1):
     init_logger(console_log_level)
     logger.info(f"Open-LLM-VTuber, version v{get_version()}")
 
@@ -144,6 +182,28 @@ def run(console_log_level: str):
 
     if server_config.enable_proxy:
         logger.info("Proxy mode enabled - /proxy-ws endpoint will be available")
+
+    if workers > 1:
+        # 多进程模式：worker 子进程各自构建应用（OLLV_LOAD_APP=1 → import 期 create_app），
+        # 父进程不做引擎初始化，避免双份内存
+        os.environ["OLLV_LOAD_APP"] = "1"
+        os.environ["OLLV_LOG_LEVEL"] = console_log_level
+        logger.info(
+            f"Starting server on {server_config.host}:{server_config.port} "
+            f"with {workers} workers"
+        )
+        uvicorn.run(
+            "run_server:app",
+            host=server_config.host,
+            port=server_config.port,
+            workers=workers,
+            log_level=console_log_level.lower(),
+            # uvicorn 默认 20s ping/20s pong 超时，移动端弱网下 pong 易丢导致连接被误杀；
+            # 放宽到 60s/60s（死连接清理变慢对本场景无影响）
+            ws_ping_interval=60.0,
+            ws_ping_timeout=60.0,
+        )
+        return
 
     # Initialize the WebSocket server (synchronous part)
     server = WebSocketServer(config=config)
@@ -182,4 +242,4 @@ if __name__ == "__main__":
         )
     if args.hf_mirror:
         os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-    run(console_log_level=console_log_level)
+    run(console_log_level=console_log_level, workers=args.workers)

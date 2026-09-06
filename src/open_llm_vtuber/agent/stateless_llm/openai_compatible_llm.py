@@ -285,3 +285,14 @@ class AsyncLLM(StatelessLLMInterface):
                 logger.debug("Chat completion finished.")
                 await stream.close()
                 logger.debug("Stream closed.")
+
+    async def aclose(self) -> None:
+        """Release the underlying HTTP client.
+
+        每个会话都会创建独立的 AsyncLLM 实例（会话记忆隔离），
+        断开时必须关闭 httpx 连接池，否则长时运行会累积连接与文件句柄。
+        """
+        try:
+            await self.client.close()
+        except Exception as e:
+            logger.warning(f"Error closing LLM client: {e}")

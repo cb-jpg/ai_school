@@ -7,7 +7,7 @@ from fastapi import WebSocket
 from loguru import logger
 
 from ..chat_group import ChatGroupManager
-from ..chat_history_manager import store_message
+from ..chat_history_manager import store_message, store_message_async
 from ..service_context import ServiceContext
 from .group_conversation import process_group_conversation
 from .single_conversation import process_single_conversation
@@ -127,7 +127,7 @@ async def handle_individual_interrupt(
             logger.error(f"Error handling interrupt: {e}")
 
         if context.history_uid:
-            store_message(
+            await store_message_async(
                 conf_uid=context.character_config.conf_uid,
                 history_uid=context.history_uid,
                 role="ai",
@@ -136,7 +136,7 @@ async def handle_individual_interrupt(
                 avatar=context.character_config.avatar,
                 username=context.username,
             )
-            store_message(
+            await store_message_async(
                 conf_uid=context.character_config.conf_uid,
                 history_uid=context.history_uid,
                 role="system",

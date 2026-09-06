@@ -15,7 +15,7 @@ from .conversation_utils import (
 )
 from .types import WebSocketSend
 from .tts_manager import TTSTaskManager
-from ..chat_history_manager import store_message
+from ..chat_history_manager import store_message_async
 from ..service_context import ServiceContext
 
 # Import necessary types from agent outputs
@@ -103,7 +103,7 @@ async def process_single_conversation(
         # Store user message (check if we should skip storing to history)
         skip_history = metadata and metadata.get("skip_history", False)
         if context.history_uid and not skip_history:
-            store_message(
+            await store_message_async(
                 conf_uid=context.character_config.conf_uid,
                 history_uid=context.history_uid,
                 role="human",
@@ -176,7 +176,7 @@ async def process_single_conversation(
         )
 
         if context.history_uid and full_response:  # Check full_response before storing
-            store_message(
+            await store_message_async(
                 conf_uid=context.character_config.conf_uid,
                 history_uid=context.history_uid,
                 role="ai",

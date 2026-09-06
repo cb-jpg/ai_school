@@ -6,6 +6,7 @@ from typing import List, Optional, Dict, Any
 from loguru import logger
 from pathlib import Path
 import json
+import threading
 import numpy as np
 
 try:
@@ -148,6 +149,9 @@ class EmbeddingCache:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.index_file = self.cache_dir / "index.json"
         self._cache: Dict[str, np.ndarray] = {}
+        self._lock = threading.Lock()
+        self._index_dirty = False
+        self._save_timer: Optional[threading.Timer] = None
         self._load_index()
 
     def _load_index(self):
@@ -172,16 +176,23 @@ class EmbeddingCache:
     def get(self, text: str) -> Optional[np.ndarray]:
         """Get cached embedding for text"""
         cache_key = self._get_cache_key(text)
-        if cache_key in self._cache_keys:
-            # Load from disk
-            cache_file = self.cache_dir / f"{cache_key}.npy"
-            if cache_file.exists():
-                try:
-                    embedding = np.load(cache_file)
+        with self._lock:
+            # 内存优先：高并发检索下若每次命中都 np.load 磁盘，线程池会被 IO+GIL 拖满
+            cached = self._cache.get(cache_key)
+            if cached is not None:
+                return cached
+            if cache_key not in self._cache_keys:
+                return None
+
+        cache_file = self.cache_dir / f"{cache_key}.npy"
+        if cache_file.exists():
+            try:
+                embedding = np.load(cache_file)
+                with self._lock:
                     self._cache[cache_key] = embedding
-                    return embedding
-                except Exception as e:
-                    logger.error(f"Error loading cached embedding: {e}")
+                return embedding
+            except Exception as e:
+                logger.error(f"Error loading cached embedding: {e}")
         return None
 
     def set(self, text: str, embedding: np.ndarray):
@@ -191,11 +202,24 @@ class EmbeddingCache:
 
         try:
             np.save(cache_file, embedding)
-            self._cache[cache_key] = embedding
-            self._cache_keys.add(cache_key)
-            self._save_index()
+            with self._lock:
+                self._cache[cache_key] = embedding
+                self._cache_keys.add(cache_key)
+                self._index_dirty = True
+                if self._save_timer is None:
+                    # 防抖落盘：合并高频 set 的 index.json 重写
+                    timer = threading.Timer(2.0, self._flush_index)
+                    timer.daemon = True
+                    self._save_timer = timer
+                    timer.start()
         except Exception as e:
             logger.error(f"Error saving cached embedding: {e}")
+
+    def _flush_index(self):
+        with self._lock:
+            self._index_dirty = False
+            self._save_timer = None
+        self._save_index()
 
     def _get_cache_key(self, text: str) -> str:
         """Generate cache key from text"""

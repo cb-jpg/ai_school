@@ -1,16 +1,47 @@
 import asyncio
 import json
 import re
+import threading
 import uuid
+from collections import OrderedDict
 from datetime import datetime
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Tuple
 from loguru import logger
 
 from ..agent.output_types import DisplayText, Actions
 from ..live2d_model import Live2dModel
 from ..tts.tts_interface import TTSInterface
-from ..utils.stream_audio import prepare_audio_payload
+from ..utils.stream_audio import (
+    build_audio_payload,
+    encode_audio_payload_basics,
+    prepare_audio_payload,
+)
 from .types import WebSocketSend
+
+# 句级 TTS 缓存：key=(voice, text) → (audio_base64, volumes)。
+# TTSTaskManager 每轮会话新建，缓存必须放模块级才能跨用户命中——
+# 专题讲解（static-narration 固定文本）、连接问候、重复演示问题等
+# 只有第一个人真调 TTS 合成，其余直接复用，大幅降低高并发下 edge-tts 上游压力。
+_TTS_CACHE_MAX = 256
+_tts_payload_cache: "OrderedDict[Tuple[str, str], Tuple[str, list]]" = OrderedDict()
+_tts_cache_lock = threading.Lock()
+
+
+def _tts_cache_get(key: Tuple[str, str]) -> Optional[Tuple[str, list]]:
+    with _tts_cache_lock:
+        item = _tts_payload_cache.get(key)
+        if item is None:
+            return None
+        _tts_payload_cache.move_to_end(key)
+        return item
+
+
+def _tts_cache_put(key: Tuple[str, str], value: Tuple[str, list]) -> None:
+    with _tts_cache_lock:
+        _tts_payload_cache[key] = value
+        _tts_payload_cache.move_to_end(key)
+        while len(_tts_payload_cache) > _TTS_CACHE_MAX:
+            _tts_payload_cache.popitem(last=False)
 
 
 class TTSTaskManager:
@@ -139,9 +170,21 @@ class TTSTaskManager:
         """Process TTS generation and queue the result for ordered delivery"""
         audio_file_path = None
         try:
-            audio_file_path = await self._generate_audio(tts_engine, tts_text)
-            payload = prepare_audio_payload(
-                audio_path=audio_file_path,
+            cache_key = (str(getattr(tts_engine, "voice", "")), tts_text)
+            cached = _tts_cache_get(cache_key)
+            if cached is not None:
+                audio_base64, volumes = cached
+            else:
+                audio_file_path = await self._generate_audio(tts_engine, tts_text)
+                # 解码/重编码/base64 是 CPU 密集操作，挪到线程池，
+                # 不再阻塞事件循环（高并发下这是开口延迟劣化的主因之一）
+                audio_base64, volumes = await asyncio.to_thread(
+                    encode_audio_payload_basics, audio_file_path
+                )
+                _tts_cache_put(cache_key, (audio_base64, volumes))
+            payload = build_audio_payload(
+                audio_base64=audio_base64,
+                volumes=volumes,
                 display_text=display_text,
                 actions=actions,
             )

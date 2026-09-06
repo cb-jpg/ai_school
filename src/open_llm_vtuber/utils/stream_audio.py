@@ -43,6 +43,55 @@ def _get_volume_by_chunks(audio: AudioSegment, chunk_length_ms: int) -> list:
     return [volume / max_volume for volume in volumes]
 
 
+def encode_audio_payload_basics(
+    audio_path: str, chunk_length_ms: int = 20
+) -> tuple[str, list]:
+    """Decode audio file and compute per-chunk volumes; returns (audio_base64, volumes).
+
+    CPU 密集（ffmpeg/pydub 解码 + WAV 重编码 + base64 + RMS 分块），
+    在事件循环内直接调用会阻塞整个服务，调用方应放进线程池执行。
+    """
+    try:
+        # Supplying the MP3 codec lets ffmpeg decode directly without invoking
+        # a separate system ffprobe binary. The uv imageio-ffmpeg package ships
+        # a self-contained ffmpeg executable but no ffprobe.
+        if Path(audio_path).suffix.lower() == ".mp3":
+            audio = AudioSegment.from_file(audio_path, format="mp3", codec="mp3")
+        else:
+            audio = AudioSegment.from_file(audio_path)
+        audio_bytes = audio.export(format="wav").read()
+    except Exception as e:
+        raise ValueError(
+            f"Error loading or converting generated audio file to wav file '{audio_path}': {e}"
+        )
+    audio_base64 = base64.b64encode(audio_bytes).decode("utf-8")
+    volumes = _get_volume_by_chunks(audio, chunk_length_ms)
+    return audio_base64, volumes
+
+
+def build_audio_payload(
+    audio_base64: str,
+    volumes: list,
+    chunk_length_ms: int = 20,
+    display_text: DisplayText = None,
+    actions: Actions = None,
+    forwarded: bool = False,
+) -> dict[str, any]:
+    """Assemble the audio payload dict from pre-encoded audio data."""
+    if isinstance(display_text, DisplayText):
+        display_text = display_text.to_dict()
+
+    return {
+        "type": "audio",
+        "audio": audio_base64,
+        "volumes": volumes,
+        "slice_length": chunk_length_ms,
+        "display_text": display_text,
+        "actions": actions.to_dict() if actions else None,
+        "forwarded": forwarded,
+    }
+
+
 def prepare_audio_payload(
     audio_path: str | None,
     chunk_length_ms: int = 20,
@@ -78,33 +127,15 @@ def prepare_audio_payload(
             "forwarded": forwarded,
         }
 
-    try:
-        # Supplying the MP3 codec lets ffmpeg decode directly without invoking
-        # a separate system ffprobe binary. The uv imageio-ffmpeg package ships
-        # a self-contained ffmpeg executable but no ffprobe.
-        if Path(audio_path).suffix.lower() == ".mp3":
-            audio = AudioSegment.from_file(audio_path, format="mp3", codec="mp3")
-        else:
-            audio = AudioSegment.from_file(audio_path)
-        audio_bytes = audio.export(format="wav").read()
-    except Exception as e:
-        raise ValueError(
-            f"Error loading or converting generated audio file to wav file '{audio_path}': {e}"
-        )
-    audio_base64 = base64.b64encode(audio_bytes).decode("utf-8")
-    volumes = _get_volume_by_chunks(audio, chunk_length_ms)
-
-    payload = {
-        "type": "audio",
-        "audio": audio_base64,
-        "volumes": volumes,
-        "slice_length": chunk_length_ms,
-        "display_text": display_text,
-        "actions": actions.to_dict() if actions else None,
-        "forwarded": forwarded,
-    }
-
-    return payload
+    audio_base64, volumes = encode_audio_payload_basics(audio_path, chunk_length_ms)
+    return build_audio_payload(
+        audio_base64=audio_base64,
+        volumes=volumes,
+        chunk_length_ms=chunk_length_ms,
+        display_text=display_text,
+        actions=actions,
+        forwarded=forwarded,
+    )
 
 
 # Example usage:

@@ -2,9 +2,31 @@ import os
 import re
 import json
 import uuid
+import asyncio
 from datetime import datetime
 from typing import Literal, List, TypedDict, Optional
 from loguru import logger
+
+# 历史文件写操作全局串行化：store_message 是整文件读-改-写，
+# 并发下必须有序，否则同会话连续两条消息（如 AI 回复 + 打断标记）会互相覆盖。
+# 只串行化文件 IO 本身（毫秒级），不影响各连接的会话处理。
+_history_write_lock = asyncio.Lock()
+
+
+async def store_message_async(
+    conf_uid: str,
+    history_uid: str,
+    role: Literal["human", "ai", "system"],
+    content: str,
+    name: str | None = None,
+    avatar: str | None = None,
+    username: str | None = None,
+):
+    """store_message 的异步版：文件读写挪到线程池，不阻塞事件循环（对话热路径）"""
+    async with _history_write_lock:
+        await asyncio.to_thread(
+            store_message, conf_uid, history_uid, role, content, name, avatar, username
+        )
 
 
 class HistoryMessage(TypedDict):

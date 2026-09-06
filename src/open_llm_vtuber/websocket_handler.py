@@ -7,6 +7,7 @@ import numpy as np
 from loguru import logger
 
 from .service_context import ServiceContext
+from .agent.agent_factory import AgentFactory
 from .chat_group import (
     ChatGroupManager,
     handle_group_operation,
@@ -196,10 +197,47 @@ class WebSocketHandler:
         # Start microphone
         await websocket.send_text(json.dumps({"type": "control", "text": "start-mic"}))
 
+    def _create_session_agent(self):
+        """Create a dedicated agent instance for one session.
+
+        agent_engine 持有会话状态（_memory 对话记忆、interrupt 标记等），
+        全部连接共享 default_context_cache.agent_engine 会导致并发用户互串上下文、
+        任意连接 fetch/create history 改写所有人的记忆，因此必须每会话新建。
+        共享的重引擎（asr/tts/vad/live2d）仍按引用复用。
+        """
+        cached = self.default_context_cache
+        agent_config = cached.character_config.agent_config
+        try:
+            return AgentFactory.create_agent(
+                conversation_agent_choice=agent_config.conversation_agent_choice,
+                agent_settings=agent_config.agent_settings.model_dump(),
+                llm_configs=agent_config.llm_configs.model_dump(),
+                system_prompt=cached.system_prompt,
+                live2d_model=cached.live2d_model,
+                tts_preprocessor_config=cached.character_config.tts_preprocessor_config,
+                character_avatar=cached.character_config.avatar or "",
+                system_config=cached.system_config.model_dump(),
+                tool_manager=getattr(cached, "tool_manager", None),
+                tool_executor=getattr(cached, "tool_executor", None),
+                mcp_prompt_string=getattr(cached, "mcp_prompt", ""),
+            )
+        except Exception as e:
+            logger.error(f"Failed to create per-session agent: {e}")
+            return None
+
     async def _init_service_context(
         self, send_text: Callable, client_uid: str, username: str | None = None
     ) -> ServiceContext:
         """Initialize service context for a new session by cloning the default context"""
+        agent_engine = self._create_session_agent()
+        if agent_engine is None:
+            # 兜底：创建失败时退回共享实例（隔离退化但连接可用），日志告警
+            logger.warning(
+                "Falling back to shared default agent for client {} "
+                "(context isolation degraded)",
+                client_uid,
+            )
+            agent_engine = self.default_context_cache.agent_engine
         session_service_context = ServiceContext()
         await session_service_context.load_cache(
             config=self.default_context_cache.config.model_copy(deep=True),
@@ -213,7 +251,7 @@ class WebSocketHandler:
             asr_engine=self.default_context_cache.asr_engine,
             tts_engine=self.default_context_cache.tts_engine,
             vad_engine=self.default_context_cache.vad_engine,
-            agent_engine=self.default_context_cache.agent_engine,
+            agent_engine=agent_engine,
             translate_engine=self.default_context_cache.translate_engine,
             mcp_server_registery=self.default_context_cache.mcp_server_registery,
             tool_adapter=self.default_context_cache.tool_adapter,
@@ -334,9 +372,11 @@ class WebSocketHandler:
             send_group_update=self.send_group_update,
         )
 
-        # Clean up other client data
+        # Clean up other client data.
+        # context 必须先取出（含 close）：pop 之后再 get 永远拿到 None，
+        # 会导致每会话的 agent_engine / MCP 客户端不被释放
+        context = self.client_contexts.pop(client_uid, None)
         self.client_connections.pop(client_uid, None)
-        self.client_contexts.pop(client_uid, None)
         self.received_data_buffers.pop(client_uid, None)
         self.accepted_utterances.pop(client_uid, None)
         self.static_narration_tasks.pop(client_uid, None)
@@ -346,8 +386,7 @@ class WebSocketHandler:
                 task.cancel()
             self.current_conversation_tasks.pop(client_uid, None)
 
-        # Call context close to clean up resources (e.g., MCPClient)
-        context = self.client_contexts.get(client_uid)
+        # Call context close to clean up resources (e.g., MCPClient, agent LLM client)
         if context:
             await context.close()
 
@@ -356,8 +395,8 @@ class WebSocketHandler:
 
     async def _cleanup_failed_connection(self, client_uid: str) -> None:
         """Clean up failed connection data"""
+        context = self.client_contexts.pop(client_uid, None)
         self.client_connections.pop(client_uid, None)
-        self.client_contexts.pop(client_uid, None)
         self.received_data_buffers.pop(client_uid, None)
         self.accepted_utterances.pop(client_uid, None)
         self.static_narration_tasks.pop(client_uid, None)
@@ -368,6 +407,9 @@ class WebSocketHandler:
             if task and not task.done():
                 task.cancel()
             self.current_conversation_tasks.pop(client_uid, None)
+
+        if context:
+            await context.close()
 
         message_handler.cleanup_client(client_uid)
 

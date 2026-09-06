@@ -672,6 +672,15 @@ class BasicMemoryAgent(AgentInterface):
         async for output in chat_func_decorated(input_data):
             yield output
 
+    async def close(self) -> None:
+        """Release session resources (underlying LLM HTTP client).
+
+        每会话持有独立 agent 实例（会话记忆隔离），
+        断开时由 ServiceContext.close() 调用，避免连接池/句柄累积。
+        """
+        if self._llm is not None and hasattr(self._llm, "aclose"):
+            await self._llm.aclose()
+
     def reset_interrupt(self) -> None:
         """Reset interrupt flag."""
         self._interrupt_handled = False

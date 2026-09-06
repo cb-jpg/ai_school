@@ -4,7 +4,7 @@ Supports both text-based and vector-based similarity search.
 """
 import json
 from pathlib import Path
-from typing import List, Dict, Tuple, Optional, Any
+from typing import List, Dict, Tuple, Optional, Any, Iterable
 from loguru import logger
 import numpy as np
 
@@ -50,6 +50,17 @@ class VectorStore:
 
         # BM25 分词缓存（chunk_id -> tokens），避免每次查询重复分词
         self._bm25_tokens: Dict[str, List[str]] = {}
+
+        # 全库检索索引（对话 RAG 用）：embedding 矩阵 + 全语料 BM25 各构建一次。
+        # 高并发下单次查询只做 1 次 query embedding + 1 次矩阵余弦 + 1 次 BM25 打分，
+        # 替代旧版逐条目循环（每 query × 91 条目的 BM25/余弦），避免线程池被 GIL 密集任务灌满。
+        self._g_entry_key: Optional[frozenset] = None
+        self._g_index_mtime: Optional[float] = None
+        self._g_built: bool = False
+        self._g_all_chunks: List[Chunk] = []
+        self._g_bm25: Optional["BM25Okapi"] = None
+        self._g_vec_chunks: List[Chunk] = []
+        self._g_vec_matrix: Optional[np.ndarray] = None
 
         # jieba 词典首次加载约 1 秒，放在启动期而不是首次查询
         if BM25_AVAILABLE:
@@ -111,6 +122,166 @@ class VectorStore:
         except Exception as e:
             logger.error(f"Error restoring embeddings: {e}")
 
+    # ------------------------------------------------------------------
+    # 全库检索索引（对话 RAG 高并发路径）
+    # ------------------------------------------------------------------
+
+    def _index_mtime(self) -> Optional[float]:
+        """知识库索引文件的 mtime；跨进程改库（管理端写入另一进程）时据此失效重建"""
+        try:
+            return self.knowledge_dir.joinpath("index.json").stat().st_mtime
+        except OSError:
+            return None
+
+    def invalidate_global_index(self) -> None:
+        """条目增删改索引后调用，使全库检索索引失效"""
+        self._g_entry_key = None
+        self._g_index_mtime = None
+        self._g_built = False
+        self._g_all_chunks = []
+        self._g_bm25 = None
+        self._g_vec_chunks = []
+        self._g_vec_matrix = None
+
+    def _ensure_global_index(self, entry_ids: Iterable[str]) -> None:
+        """确保全库索引就绪：条目集合或 index.json mtime 变化时重建"""
+        key = frozenset(entry_ids)
+        mtime = self._index_mtime()
+        if self._g_built and self._g_entry_key == key and self._g_index_mtime == mtime:
+            return
+
+        chunks: List[Chunk] = []
+        for entry_id in key:
+            chunks.extend(self.load_entry_chunks(entry_id))
+
+        if self.use_embeddings and self.embedding_model:
+            self._ensure_embeddings(chunks)
+
+        self._g_all_chunks = chunks
+        self._g_vec_chunks = (
+            [c for c in chunks if c.id in self._embeddings_index]
+            if self.use_embeddings and self.embedding_model
+            else []
+        )
+        self._g_vec_matrix = (
+            np.array([self._embeddings_index[c.id] for c in self._g_vec_chunks])
+            if self._g_vec_chunks
+            else None
+        )
+        self._g_bm25 = None
+        if BM25_AVAILABLE and chunks:
+            corpus = []
+            for chunk in chunks:
+                tokens = self._bm25_tokens.get(chunk.id)
+                if tokens is None:
+                    tokens = [t for t in jieba.lcut(chunk.content) if t.strip()]
+                    self._bm25_tokens[chunk.id] = tokens
+                corpus.append(tokens)
+            self._g_bm25 = BM25Okapi(corpus)
+
+        self._g_entry_key = key
+        self._g_index_mtime = mtime
+        self._g_built = True
+        logger.info(
+            f"Global search index built: {len(chunks)} chunks "
+            f"({len(self._g_vec_chunks)} vectorized, BM25={'on' if self._g_bm25 else 'off'})"
+        )
+
+    def search_all(
+        self,
+        query: str,
+        entry_ids: Iterable[str],
+        top_k: int = 5,
+        min_score: float = 0.3,
+    ) -> List[Tuple[Chunk, float]]:
+        """全库混合检索（向量 + BM25，RRF 融合），语义与逐条目 search() 一致，
+        但每次查询只做一次 embedding、一次全库余弦、一次 BM25 打分。
+
+        上报分数仍为余弦相似度，与 rag_service 低置信阈值语义保持一致。
+        """
+        self._ensure_global_index(entry_ids)
+
+        has_vectors = self._g_vec_matrix is not None and len(self._g_vec_chunks) > 0
+        if has_vectors and self._g_bm25 is not None:
+            return self._global_hybrid_search(query, top_k, min_score)
+        if has_vectors:
+            return self._global_vector_search(query, top_k, min_score)
+        return self._text_search(query, self._g_all_chunks, top_k, min_score)
+
+    def _global_vector_ranking(
+        self, query: str
+    ) -> Tuple[List[Chunk], Dict[str, float]]:
+        """一次 query embedding + 一次全库矩阵余弦，返回全库排序"""
+        try:
+            query_embedding = self.embedding_model.embed_text(query, use_cache=True)
+        except Exception as e:
+            logger.error(f"Query embedding failed: {e}")
+            return [], {}
+
+        similarities = self.embedding_model.model.batch_similarity(
+            query_embedding, self._g_vec_matrix
+        )
+        cosine_by_id = {
+            c.id: float(s) for c, s in zip(self._g_vec_chunks, similarities)
+        }
+        ranking = sorted(
+            self._g_vec_chunks, key=lambda c: cosine_by_id[c.id], reverse=True
+        )
+        return ranking, cosine_by_id
+
+    def _global_bm25_ranking(self, query: str) -> List[Chunk]:
+        """全库 BM25 一次打分，只返回得分 > 0 的 chunk"""
+        if self._g_bm25 is None or not self._g_all_chunks:
+            return []
+        query_tokens = [t for t in jieba.lcut(query) if t.strip()]
+        scores = self._g_bm25.get_scores(query_tokens)
+        ranked = sorted(
+            zip(self._g_all_chunks, scores), key=lambda x: x[1], reverse=True
+        )
+        return [chunk for chunk, score in ranked if score > 0]
+
+    def _global_vector_search(
+        self, query: str, top_k: int, min_score: float
+    ) -> List[Tuple[Chunk, float]]:
+        """纯向量单路（BM25 依赖缺失时的退路），语义与 _vector_search 一致"""
+        ranking, cosine_by_id = self._global_vector_ranking(query)
+        results = [
+            (chunk, cosine_by_id[chunk.id])
+            for chunk in ranking
+            if cosine_by_id[chunk.id] >= min_score
+        ]
+        return results[:top_k]
+
+    def _global_hybrid_search(
+        self, query: str, top_k: int, min_score: float
+    ) -> List[Tuple[Chunk, float]]:
+        """全库 RRF 融合；融合逻辑与 _hybrid_search 一致。
+
+        返回仍按余弦降序截断 top_k：旧版逐条目检索最终在 rag_service 按
+        余弦合并排序，低置信阈值（docs[0].score）依赖这一语义，必须保持。
+        """
+        vector_ranking, cosine_by_id = self._global_vector_ranking(query)
+        bm25_ranking = self._global_bm25_ranking(query)
+
+        rrf: Dict[str, float] = {}
+        for ranking in (vector_ranking, bm25_ranking):
+            for rank, chunk in enumerate(ranking, start=1):
+                rrf[chunk.id] = rrf.get(chunk.id, 0.0) + 1.0 / (RRF_K + rank)
+
+        by_id = {c.id: c for c in self._g_all_chunks}
+        bm25_top = {c.id for c in bm25_ranking[:top_k]}
+
+        survivors: List[Tuple[Chunk, float]] = []
+        fused = sorted(rrf.items(), key=lambda x: x[1], reverse=True)
+        for chunk_id, _ in fused[: top_k * 2]:
+            cosine = cosine_by_id.get(chunk_id, 0.0)
+            # 保留：余弦过阈值，或 BM25 路前列命中
+            if cosine >= min_score or chunk_id in bm25_top:
+                survivors.append((by_id[chunk_id], cosine))
+
+        survivors.sort(key=lambda x: x[1], reverse=True)
+        return survivors[:top_k]
+
     def index_chunks(self, entry_id: str, chunks: List[Chunk]) -> bool:
         """
         Index chunks for a knowledge entry with embeddings.
@@ -149,6 +320,7 @@ class VectorStore:
 
             # Save to disk
             self._save_entry_vectors(entry_id, chunks)
+            self.invalidate_global_index()
 
             logger.info(f"Indexed {len(chunks)} chunks for entry {entry_id}")
             return True
@@ -446,6 +618,7 @@ class VectorStore:
             entry_file = self.vectors_dir / f"{entry_id}.json"
             if entry_file.exists():
                 entry_file.unlink()
+            self.invalidate_global_index()
 
             logger.info(f"Removed vectors for entry {entry_id}")
             return True

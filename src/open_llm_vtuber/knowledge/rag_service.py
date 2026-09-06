@@ -5,11 +5,17 @@
 - 关键词判断是否需要检索（沿用旧 school_rag 的触发词表）
 - 从向量库检索已发布知识并构建增强 prompt
 - 记录未命中 / 低置信问题到 data/runtime/question_log.json（供后台"未命中问题查看"）
+
+并发说明（2026-09-06 扩容改造）：
+- 检索跑在模块级专用小线程池上（不挤占默认 executor、抢不死 GIL），超量请求在 asyncio 侧排队
+- 查询结果带 TTL 缓存：校园场景大量用户问相同/相近问题，同题只算一次
 """
 import asyncio
 import json
 import threading
 import time
+from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 from uuid import uuid4
@@ -21,6 +27,16 @@ from .vector_store import get_vector_store
 
 # 运行时数据固定在仓库根目录 data/runtime 下
 RUNTIME_DIR = Path(__file__).resolve().parents[3] / "data" / "runtime"
+
+# 检索专用线程池：小池子限制 GIL 密集任务的最大并发，其余请求排队等待
+_SEARCH_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="rag-search")
+
+# 查询结果缓存：TTL + 容量上限
+_QUERY_CACHE_TTL = 180.0
+_QUERY_CACHE_MAX = 256
+
+# 可检索条目集合缓存的有效期（配合 crud 全内存读取，这里只为省去每次全表过滤）
+_SEARCHABLE_TTL = 30.0
 
 # 学校相关关键词（用于检测是否需要进行 RAG 检索）——沿用 school_rag 触发词表
 SCHOOL_KEYWORDS = [
@@ -62,6 +78,8 @@ class QuestionLog:
         self.log_file = log_file or (RUNTIME_DIR / "question_log.json")
         self._lock = threading.Lock()
         self.data: Dict[str, list] = {}
+        self._dirty = False
+        self._save_timer: Optional[threading.Timer] = None
         self._load()
 
     def _load(self) -> None:
@@ -88,6 +106,24 @@ class QuestionLog:
         if len(items) > MAX_LOGGED_QUESTIONS:
             del items[: len(items) - MAX_LOGGED_QUESTIONS]
 
+    def _schedule_save(self) -> None:
+        """防抖写盘：对话热路径上记录问题时不再同步写 JSON 阻塞调用方，
+        合并 2s 窗口内的多次记录为一次落盘"""
+        with self._lock:
+            self._dirty = True
+            if self._save_timer is not None:
+                return
+            timer = threading.Timer(2.0, self._flush_save)
+            timer.daemon = True
+            self._save_timer = timer
+        timer.start()
+
+    def _flush_save(self) -> None:
+        with self._lock:
+            self._dirty = False
+            self._save_timer = None
+        self._save()
+
     def record_unanswered(self, question: str) -> None:
         q = question.strip()
         if not q:
@@ -107,7 +143,7 @@ class QuestionLog:
                     "last_asked": _now_iso(),
                 })
             self._trim("unanswered")
-            self._save()
+        self._schedule_save()
 
     def record_low_confidence(self, question: str, score: float) -> None:
         q = question.strip()
@@ -130,7 +166,7 @@ class QuestionLog:
                     "last_asked": _now_iso(),
                 })
             self._trim("low_confidence")
-            self._save()
+        self._schedule_save()
 
     def get_unanswered(self) -> list:
         return list(self.data.get("unanswered", []))
@@ -167,6 +203,11 @@ class RagService:
 
     def __init__(self):
         self.question_log = QuestionLog()
+        self._query_cache: "OrderedDict[Tuple[str, int], Tuple[float, List[Dict[str, Any]]]]" = (
+            OrderedDict()
+        )
+        self._query_cache_lock = threading.Lock()
+        self._searchable_cache: Tuple[float, Set[str]] = (0.0, set())
 
     @staticmethod
     def needs_rag_retrieval(query: str) -> bool:
@@ -176,39 +217,78 @@ class RagService:
         return any(keyword in query for keyword in SCHOOL_KEYWORDS)
 
     def _searchable_entry_ids(self) -> Set[str]:
-        """可被检索的知识条目：已索引或已发布（归档/处理中/出错的不参与）"""
+        """可被检索的知识条目：已索引或已发布（归档/处理中/出错的不参与）
+
+        结果短暂缓存（crud 索引本身是全内存读取，这里省去每次全表过滤与集合构建）；
+        知识库管理端改动后最迟 _SEARCHABLE_TTL 秒生效。
+        """
+        now = time.monotonic()
+        cached_at, cached_ids = self._searchable_cache
+        if cached_ids and now - cached_at < _SEARCHABLE_TTL:
+            return cached_ids
         try:
             entries = get_knowledge_crud().get_all(include_archived=False)
-            return {
+            ids = {
                 e.id for e in entries
                 if e.status in (KnowledgeStatus.INDEXED, KnowledgeStatus.PUBLISHED)
             }
         except Exception as e:
             logger.error(f"获取可检索知识条目失败：{e}")
-            return set()
+            return cached_ids
+        self._searchable_cache = (now, ids)
+        return ids
+
+    @staticmethod
+    def _normalize_query(query: str) -> str:
+        """查询归一化：压缩空白，让"同题不同空白"命中同一缓存"""
+        return " ".join(query.split())
+
+    def _cache_get(self, key: Tuple[str, int]) -> Optional[List[Dict[str, Any]]]:
+        with self._query_cache_lock:
+            item = self._query_cache.get(key)
+            if item is None:
+                return None
+            cached_at, docs = item
+            if time.monotonic() - cached_at > _QUERY_CACHE_TTL:
+                del self._query_cache[key]
+                return None
+            self._query_cache.move_to_end(key)
+            return docs
+
+    def _cache_put(self, key: Tuple[str, int], docs: List[Dict[str, Any]]) -> None:
+        with self._query_cache_lock:
+            self._query_cache[key] = (time.monotonic(), docs)
+            self._query_cache.move_to_end(key)
+            while len(self._query_cache) > _QUERY_CACHE_MAX:
+                self._query_cache.popitem(last=False)
 
     def _search_sync(
         self, query: str, entry_ids: Set[str], top_k: int
     ) -> List[Tuple[Chunk, float]]:
-        store = get_vector_store()
-        results: List[Tuple[Chunk, float]] = []
-        for entry_id in entry_ids:
-            results.extend(
-                store.search(query, entry_id=entry_id, top_k=top_k, min_score=MIN_SCORE)
-            )
-        results.sort(key=lambda x: x[1], reverse=True)
-        return results[:top_k]
+        # 全库一次混合检索（向量 + BM25，RRF），替代旧版逐条目循环
+        return get_vector_store().search_all(
+            query, entry_ids, top_k=top_k, min_score=MIN_SCORE
+        )
 
     async def search(self, query: str, top_k: int = TOP_K) -> List[Dict[str, Any]]:
         """检索已发布知识，返回 [{chunk_id, entry_id, title, category, content, score}]
 
         管理端搜索与对话 RAG 共用这一条检索路径。
+        检索跑在专用小线程池上；相同查询在 TTL 内直接命中缓存（校园场景同题率极高）。
         """
+        cache_key = (self._normalize_query(query), top_k)
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            return cached
+
         searchable = self._searchable_entry_ids()
         if not searchable:
             return []
         try:
-            results = await asyncio.to_thread(self._search_sync, query, searchable, top_k)
+            loop = asyncio.get_running_loop()
+            results = await loop.run_in_executor(
+                _SEARCH_EXECUTOR, self._search_sync, query, searchable, top_k
+            )
         except Exception as e:
             logger.error(f"RAG 检索失败：{e}")
             return []
@@ -225,6 +305,7 @@ class RagService:
                 "content": chunk.content,
                 "score": round(float(score), 4),
             })
+        self._cache_put(cache_key, docs)
         return docs
 
     async def retrieve_and_enrich_input(
