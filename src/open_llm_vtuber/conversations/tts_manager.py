@@ -156,7 +156,9 @@ class TTSTaskManager:
                     next_payload = buffered_payloads.pop(self._next_sequence_to_send)
                     span = current_span()
                     t_dumps = time.monotonic()
-                    payload_text = json.dumps(next_payload)
+                    # ensure_ascii=False：音频 base64 本就是 ASCII，中文 display_text
+                    # 直接出 UTF-8——转义更少、更快、帧更小
+                    payload_text = json.dumps(next_payload, ensure_ascii=False)
                     if span is not None:
                         span.set_once("dumps", round(time.monotonic() - t_dumps, 3))
                     await websocket_send(payload_text)

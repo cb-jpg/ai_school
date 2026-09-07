@@ -75,7 +75,8 @@ async def process_agent_output(
         logger.error(f"Error processing agent output: {e}")
         await websocket_send(
             json.dumps(
-                {"type": "error", "message": f"Error processing response: {str(e)}"}
+                {"type": "error", "message": f"Error processing response: {str(e)}"},
+                ensure_ascii=False,
             )
         )
 
@@ -132,7 +133,7 @@ async def handle_audio_output(
             display_text=display_text,
             actions=actions.to_dict() if actions else None,
         )
-        await websocket_send(json.dumps(audio_payload))
+        await websocket_send(json.dumps(audio_payload, ensure_ascii=False))
     return full_response
 
 
@@ -146,7 +147,9 @@ async def send_conversation_start_signals(websocket_send: WebSocketSend) -> None
             }
         )
     )
-    await websocket_send(json.dumps({"type": "full-text", "text": "Thinking..."}))
+    await websocket_send(
+        json.dumps({"type": "full-text", "text": "Thinking..."}, ensure_ascii=False)
+    )
 
 
 async def process_user_input(
@@ -174,7 +177,9 @@ async def finalize_conversation_turn(
     """Finalize a conversation turn"""
     if tts_manager.task_list:
         await asyncio.gather(*tts_manager.task_list)
-        await websocket_send(json.dumps({"type": "backend-synth-complete"}))
+        await websocket_send(
+            json.dumps({"type": "backend-synth-complete"}, ensure_ascii=False)
+        )
 
         # 旧版无限等待：客户端不发 playback-complete 时本轮任务永久挂起
         # （压测/异常客户端下逐轮累积）。改为 30s 超时后照常收尾。
@@ -187,7 +192,9 @@ async def finalize_conversation_turn(
                 f"No playback completion response from {client_uid} in 30s, finalizing anyway"
             )
 
-    await websocket_send(json.dumps({"type": "force-new-message"}))
+    await websocket_send(
+        json.dumps({"type": "force-new-message"}, ensure_ascii=False)
+    )
 
     if broadcast_ctx and broadcast_ctx.broadcast_func:
         await broadcast_ctx.broadcast_func(
@@ -210,7 +217,7 @@ async def send_conversation_end_signal(
         "text": "conversation-chain-end",
     }
 
-    await websocket_send(json.dumps(chain_end_msg))
+    await websocket_send(json.dumps(chain_end_msg, ensure_ascii=False))
 
     if broadcast_ctx and broadcast_ctx.broadcast_func and broadcast_ctx.group_members:
         await broadcast_ctx.broadcast_func(
