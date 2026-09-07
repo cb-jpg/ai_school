@@ -210,13 +210,15 @@ def segment_text_by_regex(text: str) -> Tuple[List[str], str]:
     return complete_sentences, remaining_text
 
 
-def segment_text_by_pysbd(text: str) -> Tuple[List[str], str]:
+def segment_text_by_pysbd(text: str, lang_hint: str | None = None) -> Tuple[List[str], str]:
     """
     Segment text into complete sentences and remaining text.
     Uses pysbd for supported languages, falls back to regex for others.
 
     Args:
         text: Text to segment into sentences
+        lang_hint: 已检测过的语言（跳过重复的 langdetect.detect，其较贵且
+            跑在事件循环上）；None 则照旧现场检测
 
     Returns:
         Tuple[List[str], str]: (list of complete sentences, remaining incomplete text)
@@ -226,7 +228,7 @@ def segment_text_by_pysbd(text: str) -> Tuple[List[str], str]:
 
     try:
         # Detect language
-        lang = detect_language(text)
+        lang = lang_hint if lang_hint is not None else detect_language(text)
 
         if lang is not None:
             # Use pysbd for supported languages
@@ -320,6 +322,9 @@ class SentenceDivider:
         self._buffer = ""
         # Replace active_tags dict with a stack to handle nesting
         self._tag_stack = []
+        # 本轮语言记忆化：langdetect.detect 每轮只跑一次（divider 每轮新建）
+        self._lang_detected = False
+        self._lang_hint: str | None = None
 
     def _get_current_tags(self) -> List[TagInfo]:
         """
@@ -599,10 +604,28 @@ class SentenceDivider:
         """Segment text using the configured method"""
         if self.segment_method == "regex":
             return segment_text_by_regex(text)
-        return segment_text_by_pysbd(text)
+        # 语言检测较贵且跑在事件循环上：成功检测后本轮记忆化；
+        # 失败（None）不记忆化，后续 buffer 继续尝试（与逐次检测行为一致）
+        if not self._lang_detected:
+            hint = detect_language(text)
+            if hint is not None:
+                self._lang_detected = True
+                self._lang_hint = hint
+        if self._lang_hint is None:
+            # 本轮语言 pysbd 不支持，直接走 regex（与原行为一致）
+            return segment_text_by_regex(text)
+        sentences, remaining = segment_text_by_pysbd(text, lang_hint=self._lang_hint)
+        if not sentences and contains_end_punctuation(text):
+            # 缓存的语言切不出来（罕见：回答中途换语言），清缓存重测
+            self._lang_detected = False
+            self._lang_hint = None
+            return segment_text_by_pysbd(text)
+        return sentences, remaining
 
     def reset(self):
         """Reset the divider state for a new conversation"""
         self._is_first_sentence = True
         self._buffer = ""
         self._tag_stack = []
+        self._lang_detected = False
+        self._lang_hint = None
