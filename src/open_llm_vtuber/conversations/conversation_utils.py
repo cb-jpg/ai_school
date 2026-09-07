@@ -176,13 +176,16 @@ async def finalize_conversation_turn(
         await asyncio.gather(*tts_manager.task_list)
         await websocket_send(json.dumps({"type": "backend-synth-complete"}))
 
+        # 旧版无限等待：客户端不发 playback-complete 时本轮任务永久挂起
+        # （压测/异常客户端下逐轮累积）。改为 30s 超时后照常收尾。
         response = await message_handler.wait_for_response(
-            client_uid, "frontend-playback-complete"
+            client_uid, "frontend-playback-complete", timeout=30.0
         )
 
         if not response:
-            logger.warning(f"No playback completion response from {client_uid}")
-            return
+            logger.warning(
+                f"No playback completion response from {client_uid} in 30s, finalizing anyway"
+            )
 
     await websocket_send(json.dumps({"type": "force-new-message"}))
 

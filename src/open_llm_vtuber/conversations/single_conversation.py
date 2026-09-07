@@ -16,7 +16,7 @@ from .conversation_utils import (
 )
 from .types import WebSocketSend
 from .tts_manager import TTSTaskManager
-from ..chat_history_manager import store_message_async
+from ..chat_history_manager import store_message_async, store_message_detached
 from ..service_context import ServiceContext
 from ..utils.turn_latency import begin_turn, current_span
 
@@ -114,11 +114,12 @@ async def process_single_conversation(
         )
 
         # Store user message (check if we should skip storing to history)
+        # 发后即忘：等锁 + 整文件读改写不再卡在 LLM 调用之前的开口路径上
         skip_history = metadata and metadata.get("skip_history", False)
         if context.history_uid and not skip_history:
             hist_span = current_span()
             t_hist = time.monotonic()
-            await store_message_async(
+            store_message_detached(
                 conf_uid=context.character_config.conf_uid,
                 history_uid=context.history_uid,
                 role="human",

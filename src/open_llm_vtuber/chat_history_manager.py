@@ -3,14 +3,40 @@ import re
 import json
 import uuid
 import asyncio
+import threading
+from collections import OrderedDict
 from datetime import datetime
 from typing import Literal, List, TypedDict, Optional
 from loguru import logger
 
-# 历史文件写操作全局串行化：store_message 是整文件读-改-写，
-# 并发下必须有序，否则同会话连续两条消息（如 AI 回复 + 打断标记）会互相覆盖。
-# 只串行化文件 IO 本身（毫秒级），不影响各连接的会话处理。
-_history_write_lock = asyncio.Lock()
+# 历史文件写操作按"会话"串行化：store_message 是整文件读-改-写，
+# 同一会话必须有序，否则连续两条消息（如 AI 回复 + 打断标记）会互相覆盖。
+# 旧版是全局单锁（所有用户互相排队，64 并发下整文件重写串成串行瓶颈），
+# 现改为按 (conf_uid, username, history_uid) 分锁：同会话保序，跨会话并行。
+# 锁注册表有上限淘汰，防止长期运行下随历史数无限增长。
+_history_locks: "OrderedDict[str, asyncio.Lock]" = OrderedDict()
+_history_locks_guard = threading.Lock()
+_HISTORY_LOCKS_MAX = 4096
+
+
+def _history_lock(conf_uid: str, history_uid: str, username: str | None) -> asyncio.Lock:
+    """取（或建）指定会话的写锁。分锁键与文件路径解析（_scope_dir）语义一致。"""
+    key = f"{conf_uid}|{username}|{history_uid}"
+    with _history_locks_guard:
+        lock = _history_locks.get(key)
+        if lock is None:
+            lock = asyncio.Lock()
+            _history_locks[key] = lock
+            while len(_history_locks) > _HISTORY_LOCKS_MAX:
+                for stale_key, stale_lock in list(_history_locks.items()):
+                    if not stale_lock.locked():
+                        _history_locks.pop(stale_key)
+                        break
+                else:  # 全部在用，宁可暂时超限也不丢锁
+                    break
+        else:
+            _history_locks.move_to_end(key)
+    return lock
 
 
 async def store_message_async(
@@ -22,11 +48,38 @@ async def store_message_async(
     avatar: str | None = None,
     username: str | None = None,
 ):
-    """store_message 的异步版：文件读写挪到线程池，不阻塞事件循环（对话热路径）"""
-    async with _history_write_lock:
+    """store_message 的异步版：文件读写挪到线程池，不阻塞事件循环（对话热路径）；
+    同会话写入保序（分锁），跨会话不再互相排队"""
+    async with _history_lock(conf_uid, history_uid, username):
         await asyncio.to_thread(
             store_message, conf_uid, history_uid, role, content, name, avatar, username
         )
+
+
+def store_message_detached(
+    conf_uid: str,
+    history_uid: str,
+    role: Literal["human", "ai", "system"],
+    content: str,
+    name: str | None = None,
+    avatar: str | None = None,
+    username: str | None = None,
+) -> None:
+    """store_message_async 的"发后即忘"版：把写入耗时（等锁 + 整文件读改写）
+    从对话热路径移除。独立 task 承载——父协程被打断取消时写入仍会完成；
+    同会话内先来先排（asyncio 锁 FIFO 唤醒），user→ai 消息顺序保持。
+    失败只记日志不静默。"""
+    task = asyncio.create_task(
+        store_message_async(
+            conf_uid, history_uid, role, content, name, avatar, username
+        )
+    )
+
+    def _log_failure(t: asyncio.Task) -> None:
+        if not t.cancelled() and t.exception() is not None:
+            logger.error(f"后台写历史失败（该消息可能未持久化）: {t.exception()}")
+
+    task.add_done_callback(_log_failure)
 
 
 class HistoryMessage(TypedDict):
