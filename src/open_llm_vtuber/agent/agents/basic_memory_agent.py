@@ -28,6 +28,7 @@ from ...mcpp.tool_manager import ToolManager
 from ...mcpp.json_detector import StreamJSONDetector
 from ...mcpp.types import ToolCallObject
 from ...mcpp.tool_executor import ToolExecutor
+from ...utils.turn_latency import current_span
 
 
 class BasicMemoryAgent(AgentInterface):
@@ -656,6 +657,10 @@ class BasicMemoryAgent(AgentInterface):
                     else:
                         continue
                     if text_chunk:
+                        # LATENCY 分段计时：首个非空 token = LLM 首字时刻（set_once 首次胜出）
+                        _span = current_span()
+                        if _span is not None:
+                            _span.mark("llm_ttft")
                         yield text_chunk
                         complete_response += text_chunk
                 if complete_response:

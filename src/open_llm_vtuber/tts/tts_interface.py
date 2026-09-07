@@ -1,12 +1,15 @@
 import abc
 import os
 import asyncio
+import time
 
 from loguru import logger
 
 
 class TTSInterface(metaclass=abc.ABCMeta):
-    async def async_generate_audio(self, text: str, file_name_no_ext=None) -> str:
+    async def async_generate_audio(
+        self, text: str, file_name_no_ext=None, timings: "dict | None" = None
+    ) -> str:
         """
         Asynchronously generate speech audio file using TTS.
 
@@ -17,12 +20,24 @@ class TTSInterface(metaclass=abc.ABCMeta):
             the text to speak
         file_name_no_ext (optional and deprecated): str
             name of the file without file extension
+        timings (optional): LATENCY 分段计时用——线程池内取不到 contextvar，
+            传入 dict 时在线程内记录 start/end 两个 monotonic 时刻带回
 
         Returns:
         str: the path to the generated audio file
 
         """
-        return await asyncio.to_thread(self.generate_audio, text, file_name_no_ext)
+        if timings is None:
+            return await asyncio.to_thread(self.generate_audio, text, file_name_no_ext)
+
+        def _timed_generate():
+            timings["start"] = time.monotonic()
+            try:
+                return self.generate_audio(text, file_name_no_ext)
+            finally:
+                timings["end"] = time.monotonic()
+
+        return await asyncio.to_thread(_timed_generate)
 
     @abc.abstractmethod
     def generate_audio(self, text: str, file_name_no_ext=None) -> str:

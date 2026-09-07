@@ -24,6 +24,7 @@ from loguru import logger
 from .crud import get_knowledge_crud
 from .models import KnowledgeStatus, Chunk
 from .vector_store import get_vector_store
+from ..utils.turn_latency import current_span
 
 # 运行时数据固定在仓库根目录 data/runtime 下
 RUNTIME_DIR = Path(__file__).resolve().parents[3] / "data" / "runtime"
@@ -263,12 +264,20 @@ class RagService:
                 self._query_cache.popitem(last=False)
 
     def _search_sync(
-        self, query: str, entry_ids: Set[str], top_k: int
+        self, query: str, entry_ids: Set[str], top_k: int,
+        timings: "dict[str, float] | None" = None,
     ) -> List[Tuple[Chunk, float]]:
         # 全库一次混合检索（向量 + BM25，RRF），替代旧版逐条目循环
-        return get_vector_store().search_all(
-            query, entry_ids, top_k=top_k, min_score=MIN_SCORE
-        )
+        # timings：LATENCY 分段计时用（线程内取不到 contextvar，显式带回时刻）
+        if timings is not None:
+            timings["start"] = time.monotonic()
+        try:
+            return get_vector_store().search_all(
+                query, entry_ids, top_k=top_k, min_score=MIN_SCORE
+            )
+        finally:
+            if timings is not None:
+                timings["end"] = time.monotonic()
 
     async def search(self, query: str, top_k: int = TOP_K) -> List[Dict[str, Any]]:
         """检索已发布知识，返回 [{chunk_id, entry_id, title, category, content, score}]
@@ -279,19 +288,30 @@ class RagService:
         cache_key = (self._normalize_query(query), top_k)
         cached = self._cache_get(cache_key)
         if cached is not None:
+            span = current_span()
+            if span is not None:
+                span.set_once("rag_cache", True)
             return cached
 
         searchable = self._searchable_entry_ids()
         if not searchable:
             return []
+        span = current_span()
+        timings: dict[str, float] = {"submit": time.monotonic()}
         try:
             loop = asyncio.get_running_loop()
             results = await loop.run_in_executor(
-                _SEARCH_EXECUTOR, self._search_sync, query, searchable, top_k
+                _SEARCH_EXECUTOR, self._search_sync, query, searchable, top_k,
+                timings if span is not None else None,
             )
         except Exception as e:
             logger.error(f"RAG 检索失败：{e}")
             return []
+        if span is not None:
+            span.set_once("rag", round(time.monotonic() - timings["submit"], 3))
+            if "start" in timings and "end" in timings:
+                span.set_once("rag_q", round(timings["start"] - timings["submit"], 3))
+                span.set_once("rag_exec", round(timings["end"] - timings["start"], 3))
 
         crud = get_knowledge_crud()
         docs = []

@@ -20,6 +20,7 @@ from loguru import logger
 
 from .stateless_llm_interface import StatelessLLMInterface
 from ...mcpp.types import ToolCallObject
+from ...utils.turn_latency import current_span
 
 
 class AsyncLLM(StatelessLLMInterface):
@@ -135,6 +136,11 @@ class AsyncLLM(StatelessLLMInterface):
 
             available_tools = tools if self.support_tools else NOT_GIVEN
 
+            # LATENCY 分段计时：llm_req=发出请求，llm_hdr=流式响应返回
+            # （两者差 ≈ 连接建立 + 上游排队），首字见 llm_ttft
+            _span = current_span()
+            if _span is not None:
+                _span.mark("llm_req")
             try:
                 stream: AsyncStream[
                     ChatCompletionChunk
@@ -163,6 +169,9 @@ class AsyncLLM(StatelessLLMInterface):
             logger.debug(
                 f"Tool Support: {self.support_tools}, Available tools: {available_tools}"
             )
+            _span = current_span()
+            if _span is not None:
+                _span.mark("llm_hdr")
 
             async for chunk in stream:
                 if self.support_tools:

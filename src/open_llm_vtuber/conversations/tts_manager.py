@@ -2,6 +2,7 @@ import asyncio
 import json
 import re
 import threading
+import time
 import uuid
 from collections import OrderedDict
 from datetime import datetime
@@ -16,6 +17,7 @@ from ..utils.stream_audio import (
     encode_audio_payload_basics,
     prepare_audio_payload,
 )
+from ..utils.turn_latency import current_span
 from .types import WebSocketSend
 
 # 句级 TTS 缓存：key=(voice, text) → (audio_base64, volumes)。
@@ -136,7 +138,16 @@ class TTSTaskManager:
                 # Send payloads in order
                 while self._next_sequence_to_send in buffered_payloads:
                     next_payload = buffered_payloads.pop(self._next_sequence_to_send)
-                    await websocket_send(json.dumps(next_payload))
+                    span = current_span()
+                    t_dumps = time.monotonic()
+                    payload_text = json.dumps(next_payload)
+                    if span is not None:
+                        span.set_once("dumps", round(time.monotonic() - t_dumps, 3))
+                    await websocket_send(payload_text)
+                    # LATENCY 汇总行：首个 payload（sequence 0）发出即客户端"开口"时刻
+                    if span is not None and not span.logged and self._next_sequence_to_send == 0:
+                        span.mark("open")
+                        span.emit()
                     self._next_sequence_to_send += 1
 
                 self._payload_queue.task_done()
@@ -174,13 +185,20 @@ class TTSTaskManager:
             cached = _tts_cache_get(cache_key)
             if cached is not None:
                 audio_base64, volumes = cached
+                span = current_span()
+                if span is not None:
+                    span.set_once("cached", True)
             else:
                 audio_file_path = await self._generate_audio(tts_engine, tts_text)
                 # 解码/重编码/base64 是 CPU 密集操作，挪到线程池，
                 # 不再阻塞事件循环（高并发下这是开口延迟劣化的主因之一）
+                span = current_span()
+                t_encode = time.monotonic()
                 audio_base64, volumes = await asyncio.to_thread(
                     encode_audio_payload_basics, audio_file_path
                 )
+                if span is not None:
+                    span.set_once("enc", round(time.monotonic() - t_encode, 3))
                 _tts_cache_put(cache_key, (audio_base64, volumes))
             payload = build_audio_payload(
                 audio_base64=audio_base64,
@@ -209,10 +227,19 @@ class TTSTaskManager:
     async def _generate_audio(self, tts_engine: TTSInterface, text: str) -> str:
         """Generate audio file from text"""
         logger.debug(f"🏃Generating audio for '''{text}'''...")
-        return await tts_engine.async_generate_audio(
+        # LATENCY 分段计时：tts_q=排队等线程时间，synth=合成本身耗时
+        # （线程内取不到 contextvar，用 timings dict 带回时刻）
+        span = current_span()
+        timings = {"submit": time.monotonic()} if span is not None else None
+        path = await tts_engine.async_generate_audio(
             text=text,
             file_name_no_ext=f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}",
+            timings=timings,
         )
+        if span is not None and timings and "start" in timings and "end" in timings:
+            span.set_once("tts_q", round(timings["start"] - timings["submit"], 3))
+            span.set_once("synth", round(timings["end"] - timings["start"], 3))
+        return path
 
     def clear(self) -> None:
         """Clear all pending tasks and reset state"""

@@ -17,6 +17,9 @@
 用法：
   .venv/Scripts/python.exe scripts/concurrency_stress_test.py
   PYTHONIOENCODING=utf-8 .venv/Scripts/python.exe scripts/concurrency_stress_test.py
+  可选：--levels 64,96  --timeout 150  --no-rag（不触发 RAG）
+        --diversify（各问各的出题池，防缓存美化结果，贴近真实课堂）
+        --history（每连接建真实历史，使历史写入路径生效）
 """
 
 import asyncio
@@ -39,8 +42,9 @@ WS_URL = f"ws://{HOST}:{PORT}/client-ws?token={TOKEN}"
 SSH_TARGET = "liucb@183.36.243.124"
 
 def _parse_args():
-    """--levels 64,96 --timeout 150 [--no-rag] 可覆盖默认梯度/单轮超时/关闭 RAG 问题"""
-    global LEVELS, TURN_TIMEOUT, Q_SCHOOL
+    """--levels 64,96 --timeout 150 [--no-rag] [--diversify] [--history]
+    可覆盖默认梯度/单轮超时/关闭 RAG 问题/各问各的出题/建立真实历史"""
+    global LEVELS, TURN_TIMEOUT, Q_SCHOOL, DIVERSIFY, USE_HISTORY
     argv = sys.argv[1:]
     for i, a in enumerate(argv):
         if a == "--levels" and i + 1 < len(argv):
@@ -49,6 +53,10 @@ def _parse_args():
             TURN_TIMEOUT = float(argv[i + 1])
         elif a == "--no-rag":
             Q_SCHOOL = "给我讲一个笑话"  # 不含学校关键词，不触发 RAG 检索
+        elif a == "--diversify":
+            DIVERSIFY = True
+        elif a == "--history":
+            USE_HISTORY = True
 
 
 LEVELS = [1, 2, 4, 8, 12, 16, 24, 32, 48]
@@ -60,7 +68,47 @@ LEVEL_COOLDOWN = 20.0
 Q_SCHOOL = "学校的校训是什么？"  # 触发 RAG
 Q_CASUAL = "用一句话介绍你自己"  # 纯 LLM
 
+# --diversify 出题池：真实场景"各问各的"，同题会让 RAG 查询缓存/TTS 句缓存
+# 美化结果。校情题每题都含 SCHOOL_KEYWORDS 触发词（rag_service.py），
+# 按 client index 确定性轮转 + "请问，"前缀双旋转，N=64 时 64 题互不相同。
+SCHOOL_POOL = [
+    "学校的校训是什么？", "学校有几个校区，分别在哪里？", "学校的办学理念是什么？",
+    "学校有哪些社团活动可以参加？", "学校食堂的伙食怎么样？", "学校的图书馆怎么借书？",
+    "学校的宿舍管理规定有哪些？", "学校的校歌叫什么名字？", "学校的校徽有什么含义？",
+    "学校拿过哪些奖项和荣誉？", "学校今年的招生计划出来了吗？", "学校有哪些特色课程？",
+    "学校的班主任是怎么安排的？", "学校的运动会什么时候开？", "学校有哪些教学设施？",
+    "学校实验室的开放时间是什么时候？", "学校操场平时对外开放吗？", "学校的学生会有哪些部门？",
+    "学校的优秀学生怎么评选？", "学校的校长是谁？", "学校创办于哪一年？",
+    "学校的年级是怎么划分的？", "学校的校车路线有哪些？", "学校的作息时间表是怎样的？",
+    "学校什么时候开家长会？", "学校有哪些奖学金制度？", "学校的校规对发型有规定吗？",
+    "学校转学需要办理什么手续？", "学校的社团招新在什么时候？", "学校的期末考试安排出来了吗？",
+    "学校的招生咨询电话是多少？", "学校的建校历史有多久了？",
+]
+CASUAL_POOL = [
+    "用一句话介绍你自己", "给我讲一个笑话", "今天天气怎么样？", "你会做什么？",
+    "你喜欢什么颜色？", "帮我算一下 37 加 45 等于多少", "给我背一首古诗",
+    "你晚上吃什么了吗？", "用一句话夸夸我", "你觉得学习累吗？", "给我出个谜语吧",
+    "你最喜欢哪个季节？", "简单介绍一下你的爱好", "给我说一句加油的话",
+    "一加一等于几？", "你叫什么名字呀？", "给我讲一个成语故事", "你觉得数学有趣吗？",
+    "用两个字形容今天", "给我推荐一部动画片", "你会唱歌吗？来两句", "你的偶像是谁？",
+    "周末你一般干什么？", "给我说个脑筋急转弯",
+]
+
+DIVERSIFY = False
+USE_HISTORY = False
+
 _parse_args()  # 须在 Q_SCHOOL 定义之后调用，--no-rag 才能生效
+
+
+def questions_for(idx: int) -> tuple[str, str]:
+    """--diversify 时按 client index 确定性出题（各问各的）；默认行为不变"""
+    if not DIVERSIFY:
+        return Q_SCHOOL, Q_CASUAL
+    prefix = "请问，" if idx % 2 else ""
+    return (
+        prefix + SCHOOL_POOL[idx % len(SCHOOL_POOL)],
+        CASUAL_POOL[idx % len(CASUAL_POOL)],
+    )
 
 # ---- 保险丝阈值（四指标，超标即中止）----
 GUARD_AVAIL_MB = 8192.0
@@ -197,6 +245,7 @@ class TurnResult:
     def __init__(self):
         self.ok = False
         self.t_first = None      # 首段音频到达（开口）延迟
+        self.t_rag = None        # rag-status 到达延迟（RAG 检索完成时刻）
         self.t_done = None       # 末个 backend-synth-complete 延迟
         self.n_audio = 0
         self.audio_bytes = 0
@@ -235,6 +284,8 @@ async def run_turn(ws, client_uid: str, text: str) -> TurnResult:
             if r.t_first is None:
                 r.t_first = time.monotonic() - t0
         elif t == "rag-status":
+            if r.t_rag is None:
+                r.t_rag = time.monotonic() - t0
             r.rag = (bool(m.get("has_context")), m.get("doc_count"))
         elif t == "backend-synth-complete":
             synth_dones += 1
@@ -298,8 +349,26 @@ async def client_session(idx: int, results: list, connect_delay: float):
     except asyncio.TimeoutError:
         pass
 
+    if USE_HISTORY:
+        # 建立真实历史，使服务端历史写入路径生效（默认压测不建历史，
+        # store_message_async 整个被跳过，历史写入优化的效果对其不可见）
+        try:
+            await ws.send(json.dumps({"type": "create-new-history"}))
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                m = json.loads(await asyncio.wait_for(
+                    ws.recv(), timeout=deadline - time.monotonic()))
+                if isinstance(m, dict) and m.get("type") == "new-history-created":
+                    rec["history"] = m.get("history_uid")
+                    break
+        except (asyncio.TimeoutError, json.JSONDecodeError, TypeError,
+                websockets.exceptions.WebSocketException, OSError) as e:
+            # 建史失败不阻断压测（hist 字段会显示为 '-'）
+            print(f"  [client {idx}] create-new-history 失败（不影响压测）: {type(e).__name__}")
+
+    q_school, q_casual = questions_for(idx)
     try:
-        for turn_i, q in ((1, Q_SCHOOL), (2, Q_CASUAL)):
+        for turn_i, q in ((1, q_school), (2, q_casual)):
             try:
                 tr = await run_turn(ws, client_uid, q)
             except websockets.exceptions.ConnectionClosed as e:
@@ -307,6 +376,7 @@ async def client_session(idx: int, results: list, connect_delay: float):
                 # 记为该客户端失败，不能让异常炸掉整个 gather
                 rec["turns"].append({
                     "turn": turn_i, "ok": False, "t_open": None, "t_done": None,
+                    "t_rag": None, "t_rag_to_open": None,
                     "n_audio": 0, "audio_kb": 0,
                     "error": f"ConnectionClosed: {type(e).__name__}", "rag": None,
                 })
@@ -315,6 +385,11 @@ async def client_session(idx: int, results: list, connect_delay: float):
                 "turn": turn_i, "ok": tr.ok,
                 "t_open": None if tr.t_first is None else round(tr.t_first, 2),
                 "t_done": None if tr.t_done is None else round(tr.t_done, 2),
+                "t_rag": None if tr.t_rag is None else round(tr.t_rag, 2),
+                "t_rag_to_open": (
+                    None if (tr.t_first is None or tr.t_rag is None)
+                    else round(tr.t_first - tr.t_rag, 2)
+                ),
                 "n_audio": tr.n_audio,
                 "audio_kb": round(tr.audio_bytes / 1024),
                 "error": tr.error, "rag": tr.rag,
@@ -351,18 +426,25 @@ async def run_level(n: int) -> dict:
         "turns_ok": len(ok_turns), "turns_attempted": len(all_turns),
         "t_open_med": None, "t_open_p95": None,
         "t_done_med": None, "t_done_p95": None,
+        "t_rag_med": None, "t_rag_to_open_med": None,
         "rag_hit": len(rag_hits),
         "errors": [t["error"] for t in all_turns if t["error"]][:5],
         "turns_detail": all_turns,
     }
     firsts = [t["t_open"] for t in ok_turns if t.get("t_open") is not None]
     dones = [t["t_done"] for t in ok_turns if t.get("t_done") is not None]
+    rag_ts = [t["t_rag"] for t in ok_turns if t.get("t_rag") is not None]
+    rag_to_open = [t["t_rag_to_open"] for t in ok_turns if t.get("t_rag_to_open") is not None]
     if firsts:
         stats["t_open_med"] = round(statistics.median(firsts), 1)
         stats["t_open_p95"] = round(pctl(firsts, 95), 1)
     if dones:
         stats["t_done_med"] = round(statistics.median(dones), 1)
         stats["t_done_p95"] = round(pctl(dones, 95), 1)
+    if rag_ts:
+        stats["t_rag_med"] = round(statistics.median(rag_ts), 1)
+    if rag_to_open:
+        stats["t_rag_to_open_med"] = round(statistics.median(rag_to_open), 1)
 
     with metrics_lock:
         ms = dict(metrics_state)
@@ -371,6 +453,10 @@ async def run_level(n: int) -> dict:
           f"  开口 med/p95 = {stats['t_open_med']}/{stats['t_open_p95']}s"
           f"  整轮 med/p95 = {stats['t_done_med']}/{stats['t_done_p95']}s"
           f"  墙钟 {stats['wall_s']}s")
+    if stats["t_rag_med"] is not None:
+        print(f"  分段: text→RAG完成 med = {stats['t_rag_med']}s"
+              f"  RAG完成→开口 med = {stats['t_rag_to_open_med']}s"
+              "  （后者 ≈ LLM首字+首句TTS+编码）")
     if stats["errors"]:
         print(f"  错误样例: {stats['errors']}")
     print(f"  服务器: avail={ms['avail_mb']}MB load1={ms['load1']} "
@@ -404,7 +490,9 @@ async def warmup():
 
 
 async def main():
-    print(f"压测目标 ws://{HOST}:{PORT}/client-ws  梯度={LEVELS}")
+    print(f"压测目标 ws://{HOST}:{PORT}/client-ws  梯度={LEVELS}"
+          + ("  模式=diversify(各问各的)" if DIVERSIFY else "")
+          + ("  历史=on" if USE_HISTORY else ""))
     await warmup()
 
     stop_event = threading.Event()

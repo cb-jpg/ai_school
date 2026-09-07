@@ -1,6 +1,7 @@
 from typing import Union, List, Dict, Any, Optional
 import asyncio
 import json
+import time
 from loguru import logger
 import numpy as np
 
@@ -17,6 +18,7 @@ from .types import WebSocketSend
 from .tts_manager import TTSTaskManager
 from ..chat_history_manager import store_message_async
 from ..service_context import ServiceContext
+from ..utils.turn_latency import begin_turn, current_span
 
 # Import necessary types from agent outputs
 from ..agent.output_types import SentenceOutput, AudioOutput
@@ -30,6 +32,7 @@ async def process_single_conversation(
     images: Optional[List[Dict[str, Any]]] = None,
     session_emoji: str = np.random.choice(EMOJI_LIST),
     metadata: Optional[Dict[str, Any]] = None,
+    turn_t0: "float | None" = None,
 ) -> str:
     """Process a single-user conversation turn
 
@@ -41,6 +44,7 @@ async def process_single_conversation(
         images: Optional list of image data
         session_emoji: Emoji identifier for the conversation
         metadata: Optional metadata for special processing flags
+        turn_t0: LATENCY 分段计时起点（create_task 前取的时刻），None 则不计时
 
     Returns:
         str: Complete response text
@@ -50,6 +54,11 @@ async def process_single_conversation(
     full_response = ""  # Initialize full_response here
 
     try:
+        # LATENCY 分段计时：绑定 span（本 task 子树可见），sched = 调度延迟
+        span = begin_turn(client_uid, turn_t0)
+        if span is not None:
+            span.mark("sched")
+
         # Send initial signals
         await send_conversation_start_signals(websocket_send)
         logger.info(f"New Conversation Chain {session_emoji} started!")
@@ -83,6 +92,10 @@ async def process_single_conversation(
                     enriched_input_text = rag_result.get("enriched_query", input_text)
                     logger.info(f"RAG 检索成功，检索到 {len(rag_result.get('retrieved_docs', []))} 条相关资料")
 
+                span = current_span()
+                if span is not None:
+                    span.set_once("rag_hit", bool(rag_result.get("has_context")))
+
                 # 发送 RAG 检索状态到前端（命中与否都发，便于前端收起提示条）
                 await websocket_send(json.dumps({
                     "type": "rag-status",
@@ -103,6 +116,8 @@ async def process_single_conversation(
         # Store user message (check if we should skip storing to history)
         skip_history = metadata and metadata.get("skip_history", False)
         if context.history_uid and not skip_history:
+            hist_span = current_span()
+            t_hist = time.monotonic()
             await store_message_async(
                 conf_uid=context.character_config.conf_uid,
                 history_uid=context.history_uid,
@@ -111,6 +126,8 @@ async def process_single_conversation(
                 name=context.character_config.human_name,
                 username=context.username,
             )
+            if hist_span is not None:
+                hist_span.set_once("hist", round(time.monotonic() - t_hist, 3))
 
         try:
             # agent.chat yields Union[SentenceOutput, Dict[str, Any]]

@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 from typing import Dict, Optional, Callable
 
 import numpy as np
@@ -96,6 +97,8 @@ async def handle_conversation_trigger(
             )
     else:
         # Use client_uid as task key for individual conversations
+        # turn_t0：LATENCY 分段计时起点（create_task 前），与协程真正开跑的差值即调度延迟
+        turn_t0 = time.monotonic()
         current_conversation_tasks[client_uid] = asyncio.create_task(
             process_single_conversation(
                 context=context,
@@ -105,6 +108,7 @@ async def handle_conversation_trigger(
                 images=images,
                 session_emoji=session_emoji,
                 metadata=metadata,
+                turn_t0=turn_t0,
             )
         )
 

@@ -14,6 +14,7 @@ from ..asr.asr_interface import ASRInterface
 from ..live2d_model import Live2dModel
 from ..tts.tts_interface import TTSInterface
 from ..utils.stream_audio import prepare_audio_payload
+from ..utils.turn_latency import current_span
 
 
 # Convert class methods to standalone functions
@@ -93,6 +94,11 @@ async def handle_sentence_output(
     full_response = ""
     async for display_text, tts_text, actions in output:
         logger.debug(f"🏃 Processing output: '''{tts_text}'''...")
+
+        # LATENCY 分段计时：首句字符数（set_once 首次胜出，只记第一句）
+        _span = current_span()
+        if _span is not None:
+            _span.set_once("fs_chars", len(tts_text))
 
         if translate_engine:
             if len(re.sub(r'[\s.,!?，。！？\'"』」）】\s]+', "", tts_text)):
