@@ -1,10 +1,12 @@
 import asyncio
 import json
+import os
 import re
 import threading
 import time
 import uuid
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import List, Optional, Dict, Tuple
 from loguru import logger
@@ -44,6 +46,20 @@ def _tts_cache_put(key: Tuple[str, str], value: Tuple[str, list]) -> None:
         _tts_payload_cache.move_to_end(key)
         while len(_tts_payload_cache) > _TTS_CACHE_MAX:
             _tts_payload_cache.popitem(last=False)
+
+
+# 合成并发上限：edge-tts 每次合成经 to_thread 占住一个默认线程池线程直到
+# 网络完成（0.5-2s），高并发突发下与音频编码/ASR 挤满默认 executor，
+# 同时对微软端点形成 TLS 握手风暴（长尾劣化）。用 FIFO 信号量整流——
+# 各轮首句按到达顺序排队、等待有界（N=64÷3 workers≈21 首句/worker，
+# ÷12 并发 × ~0.7s ≈ 首句最多等 ~1.5s）；少用户时无竞争零影响。
+# 旋钮 OLLV_TTS_MAX_CONC（设为 0/负数 = 退化为串行合成，作紧急刹车）。
+_TTS_MAX_CONC = max(1, int(os.environ.get("OLLV_TTS_MAX_CONC", "12")))
+_SYNTH_SEMAPHORE = asyncio.Semaphore(_TTS_MAX_CONC)
+
+# 音频编码专用池（mp3 解码/WAV 重编码/base64/RMS）：不再与合成线程
+# 共享默认 executor，编码永远不会排在 12 路合成线程后面
+_ENCODE_EXECUTOR = ThreadPoolExecutor(max_workers=8, thread_name_prefix="audio-encode")
 
 
 class TTSTaskManager:
@@ -189,13 +205,17 @@ class TTSTaskManager:
                 if span is not None:
                     span.set_once("cached", True)
             else:
-                audio_file_path = await self._generate_audio(tts_engine, tts_text)
-                # 解码/重编码/base64 是 CPU 密集操作，挪到线程池，
-                # 不再阻塞事件循环（高并发下这是开口延迟劣化的主因之一）
+                # 合成整流：只包住合成调用（FIFO 排队等待计入 tts_q 打点）；
+                # 编码与 payload 队列不碰信号量，无死锁路径
+                async with _SYNTH_SEMAPHORE:
+                    audio_file_path = await self._generate_audio(tts_engine, tts_text)
+                # 解码/重编码/base64 是 CPU 密集操作，跑专用编码池，
+                # 不再阻塞事件循环、也不再排在合成线程后面
                 span = current_span()
                 t_encode = time.monotonic()
-                audio_base64, volumes = await asyncio.to_thread(
-                    encode_audio_payload_basics, audio_file_path
+                loop = asyncio.get_running_loop()
+                audio_base64, volumes = await loop.run_in_executor(
+                    _ENCODE_EXECUTOR, encode_audio_payload_basics, audio_file_path
                 )
                 if span is not None:
                     span.set_once("enc", round(time.monotonic() - t_encode, 3))
