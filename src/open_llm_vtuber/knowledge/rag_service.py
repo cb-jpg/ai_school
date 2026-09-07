@@ -64,6 +64,13 @@ TOP_K = 6
 MIN_SCORE = 0.3                 # 相似度低于此分数的块不参与结果
 LOW_CONFIDENCE_THRESHOLD = 0.5  # 命中但最高分低于此值记为低置信问题
 
+# 对话 RAG 参数（与管理端 search 的 TOP_K 区分）：
+# RAG 资料几乎是对话 prompt 的全部 prefill，条数直接决定 LLM 首字延迟；
+# 4 条 + 单条 480 字符上限（切块时已限 500，几乎无损）把上下文压 ~1/3，
+# 换取 64 并发突发下更快的 TTFT。MIN_SCORE/RRF 排序不变，质量不受影响。
+CHAT_TOP_K = 4
+DOC_CHAR_CAP = 480
+
 # 问题记录上限（防止文件无限增长）
 MAX_LOGGED_QUESTIONS = 500
 
@@ -329,7 +336,7 @@ class RagService:
         return docs
 
     async def retrieve_and_enrich_input(
-        self, query: str, top_k: int = TOP_K
+        self, query: str, top_k: int = CHAT_TOP_K
     ) -> Dict[str, Any]:
         """检索知识库并返回丰富后的输入信息
 
@@ -357,9 +364,14 @@ class RagService:
         if best_score < LOW_CONFIDENCE_THRESHOLD:
             self.question_log.record_low_confidence(query, best_score)
 
+        def _fmt_doc(i: int, doc: Dict[str, Any]) -> str:
+            content = doc["content"]
+            if len(content) > DOC_CHAR_CAP:
+                content = content[:DOC_CHAR_CAP] + "…"
+            return f"[资料{i}] {doc['title']}：{content}"
+
         knowledge_context = "\n\n".join(
-            f"[资料{i}] {doc['title']}：{doc['content']}"
-            for i, doc in enumerate(docs, 1)
+            _fmt_doc(i, doc) for i, doc in enumerate(docs, 1)
         )
         enriched_query = f"""【用户问题】
 {query}

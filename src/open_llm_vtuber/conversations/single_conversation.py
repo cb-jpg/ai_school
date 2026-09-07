@@ -78,14 +78,14 @@ async def process_single_conversation(
 
         # RAG 检索集成：检查是否需要从学校知识库（data/knowledge）检索相关信息
         try:
-            from ..knowledge.rag_service import get_rag_service
+            from ..knowledge.rag_service import CHAT_TOP_K, get_rag_service
             rag_service = get_rag_service()
 
             if rag_service.needs_rag_retrieval(input_text):
                 logger.info("检测到学校相关问题，执行 RAG 检索...")
                 rag_result = await rag_service.retrieve_and_enrich_input(
                     query=input_text,
-                    top_k=6,
+                    top_k=CHAT_TOP_K,  # 调用点曾硬编码 6，会覆盖默认值——改它瘦身才生效
                 )
 
                 if rag_result.get("has_context"):
@@ -101,7 +101,7 @@ async def process_single_conversation(
                     "type": "rag-status",
                     "has_context": bool(rag_result.get("has_context")),
                     "doc_count": len(rag_result.get("retrieved_docs", [])),
-                }))
+                }, ensure_ascii=False))
         except Exception as e:
             logger.warning(f"RAG 检索失败，继续使用原始输入: {e}")
 
@@ -143,7 +143,7 @@ async def process_single_conversation(
                     output_item["name"] = context.character_config.character_name
                     logger.debug(f"Sending tool status update: {output_item}")
 
-                    await websocket_send(json.dumps(output_item))
+                    await websocket_send(json.dumps(output_item, ensure_ascii=False))
 
                 elif isinstance(output_item, (SentenceOutput, AudioOutput)):
                     # Handle SentenceOutput or AudioOutput
@@ -176,7 +176,8 @@ async def process_single_conversation(
                     {
                         "type": "error",
                         "message": f"Error processing agent response: {str(e)}",
-                    }
+                    },
+                    ensure_ascii=False,
                 )
             )
             # full_response will contain partial response before error
@@ -185,7 +186,9 @@ async def process_single_conversation(
         # Wait for any pending TTS tasks
         if tts_manager.task_list:
             await asyncio.gather(*tts_manager.task_list)
-            await websocket_send(json.dumps({"type": "backend-synth-complete"}))
+            await websocket_send(
+                json.dumps({"type": "backend-synth-complete"}, ensure_ascii=False)
+            )
 
         await finalize_conversation_turn(
             tts_manager=tts_manager,
@@ -213,7 +216,10 @@ async def process_single_conversation(
     except Exception as e:
         logger.error(f"Error in conversation chain: {e}")
         await websocket_send(
-            json.dumps({"type": "error", "message": f"Conversation error: {str(e)}"})
+            json.dumps(
+                {"type": "error", "message": f"Conversation error: {str(e)}"},
+                ensure_ascii=False,
+            )
         )
         raise
     finally:
