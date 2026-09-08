@@ -8,11 +8,12 @@ import {
   Text,
 } from '@chakra-ui/react';
 import {
-  FiArrowLeft,
   FiArrowUpRight,
   FiAward,
   FiBookOpen,
   FiClock,
+  FiHome,
+  FiMessageCircle,
   FiMic,
   FiPlay,
   FiUsers,
@@ -313,6 +314,30 @@ export default function CampusKnowledge({
           overflowX={{ base: 'auto', lg: 'visible' }}
           css={{ '&::-webkit-scrollbar': { display: 'none' } }}
         >
+            <Button
+              data-testid="campus-nav-home"
+              aria-label="返回学校首页"
+              onClick={() => {
+                interrupt();
+                window.location.hash = '#/home';
+              }}
+              height="40px"
+              px={{ base: '12px', lg: '16px' }}
+              borderRadius="md"
+              variant="ghost"
+              color={ink}
+              fontFamily={swissFont}
+              fontWeight="500"
+              fontSize="sm"
+              flexShrink={0}
+              _hover={{ background: blueWash, color: blue }}
+              transition="all 200ms ease"
+            >
+              <HStack gap="8px">
+                <FiHome size={16} />
+                <Text>首页</Text>
+              </HStack>
+            </Button>
             {campusTopics.map((topic) => (
               <TopicNavigationButton
                 key={topic.id}
@@ -324,7 +349,7 @@ export default function CampusKnowledge({
             {activeTopic && (
               <Button
                 data-testid="campus-close"
-                aria-label="返回普通对话页面"
+                aria-label="返回对话界面"
                 onClick={handleClose}
                 height="40px"
                 px="16px"
@@ -336,8 +361,8 @@ export default function CampusKnowledge({
                 fontSize="sm"
                 _hover={{ background: blueWash, color: blue }}
               >
-                <FiArrowLeft size={16} style={{ marginRight: '8px' }} />
-                返回对话
+                <FiMessageCircle size={16} style={{ marginRight: '8px' }} />
+                对话
               </Button>
             )}
         </Flex>

@@ -22,7 +22,7 @@ export const SCHOOL_CONFIG = {
   description: '与AI数字人"小石"对话，探索知识的无限可能',
   navigation: [
     { id: 'home', label: '首页', icon: FiHome },
-    { id: 'chat', label: '对话界面', icon: FiMessageCircle },
+    { id: 'chat', label: '对话', icon: FiMessageCircle },
     { id: 'intro', label: '学校简介', icon: FiBook },
     { id: 'history', label: '校史', icon: FiClock },
     { id: 'achievements', label: '学校成就', icon: FiAward },

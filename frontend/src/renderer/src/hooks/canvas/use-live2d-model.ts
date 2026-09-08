@@ -39,15 +39,16 @@ const DRAG_DISTANCE_THRESHOLD_PX = 5; // Min distance to be considered a drag
 //    屏高比例 g 处的 y_view = (1-2g)（y 上下翻转，负值=往下）。
 // 对话界面（heroAlign='right'）：scale 0.62 ≈ 人物占约 40% 屏高（2026-09-03 晚校准）；
 //   中心 (0.24, 0) = 75% 屏宽 + 垂直正中（用户要求：右侧中间位置）。
-// 新首页（heroAlign='center'）：09-08 真机校准——水平居中、略缩小、下移到
-//   头部露出学校简介卡下缘、脚部靠近"开始对话"按钮（y=-0.32 ≈ 人物中心在 66% 屏高）。
+// 新首页（heroAlign='center'）：09-08 二轮改版——人物右侧偏大突出形象，
+//   左侧窄栏给学校简介（文字多换行）；x=0.24 ≈ 75% 屏宽，scale 0.88 ≈ 51% 屏高，
+//   y=-0.12 ≈ 人物中心在 56% 屏高（头露在选项行下方、脚近开始对话按钮）。
 // 验证用 scripts/cdp_fb_dump.py 抓帧缓冲（CDP 整页截图拍不到 GL 图层！）。换角色如大小不合适改这些常量。
 const HERO_FIT_FACTOR = 0.62;
 const HERO_CENTER_Y = 0;
 const HERO_OFFSET_X = 0.24;
-const HOME_FIT_FACTOR = 0.55;
-const HOME_CENTER_Y = -0.32;
-const HOME_OFFSET_X = 0;
+const HOME_FIT_FACTOR = 0.88;
+const HOME_CENTER_Y = -0.12;
+const HOME_OFFSET_X = 0.24;
 
 function parseModelUrl(url: string): { baseUrl: string; modelDir: string; modelFileName: string } {
   try {
@@ -298,16 +299,29 @@ export const useLive2DModel = ({
       cancelled = false;
       cleanup = startPoll();
     };
+    // 路由切换（首页↔对话界面↔专题页）必然伴随 hash 变化：无条件重启适配。
+    // 仅靠 deps 变化重启在个别时序下会漏（真机报过"回首页人物不归位"），这里双保险
+    let hashTimer: ReturnType<typeof setTimeout> | null = null;
+    const onHashChange = () => {
+      if (hashTimer) clearTimeout(hashTimer);
+      // 防抖：等页面切换渲染稳定后再适配
+      hashTimer = setTimeout(() => {
+        onRebound();
+      }, 350);
+    };
     window.addEventListener('live2d-rebound', onRebound);
+    window.addEventListener('hashchange', onHashChange);
     return () => {
       cancelled = true;
       cleanup();
       outerStop?.();
+      if (hashTimer) clearTimeout(hashTimer);
       window.removeEventListener('live2d-rebound', onRebound);
+      window.removeEventListener('hashchange', onHashChange);
     };
-    // heroOffsetX 变化（首页居中 ↔ 对话界面右侧）时重新适配站位；
+    // heroAlign 变化（首页右侧大站位 ↔ 对话界面右侧）时重新适配站位；
     // 已适配过时比例≈1 不再缩放，只平移到目标站位
-  }, [touchThrough, modelInfo?.url, heroOffsetX]);
+  }, [touchThrough, modelInfo?.url, heroAlign, heroOffsetX, heroFitFactor, heroCenterY]);
 
   const getCanvasScale = useCallback(() => {
     const canvas = document.getElementById('canvas') as HTMLCanvasElement;
