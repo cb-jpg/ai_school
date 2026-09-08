@@ -84,10 +84,10 @@ const officialSources = {
     url: 'https://www.nanhai.gov.cn/fsnhq/zwgk/zwdt/gzdt/content/post_7189407.html',
   },
   information: {
-    title: '喜讯！大沥又一位学子保送北大！',
-    publisher: '佛山市南海区人民政府',
-    publishedAt: '2025-07-04',
-    url: 'https://www.nanhai.gov.cn/fsnhq/zwgk/zwdt/zjyw/content/post_6632746.html',
+    title: '佛山唯一！保送北大！',
+    publisher: '南方+（南方日报）',
+    publishedAt: '2025-06-30',
+    url: 'https://static.nfnews.com/content/202506/30/c11454630.html',
   },
   afterSchool: {
     title: '均衡筑基，美好赋能，南海绘就义务教育优质均衡“国字号”答卷',

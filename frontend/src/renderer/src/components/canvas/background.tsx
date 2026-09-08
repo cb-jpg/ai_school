@@ -4,7 +4,7 @@ import { useCamera } from '@/context/camera-context';
 import { useBgUrl } from '@/context/bgurl-context';
 import { apiUrl } from '@/services/api-base';
 
-const Background = memo(({ children }: { children?: React.ReactNode }) => {
+const Background = memo(({ children, splitLayout = true }: { children?: React.ReactNode; /** 桌面端左右分屏遮罩（对话界面用）；首页等居中布局传 false 关闭 */ splitLayout?: boolean }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [resolvedBgUrl, setResolvedBgUrl] = useState<string | null>(null);
   const {
@@ -123,7 +123,7 @@ const Background = memo(({ children }: { children?: React.ReactNode }) => {
         height="100%"
         bg="linear-gradient(to right, rgba(245, 247, 250, 0.95) 0%, rgba(245, 247, 250, 0.7) 50%, rgba(245, 247, 250, 0.2) 100%)"
         zIndex={1}
-        display={{ base: 'none', md: 'block' }}
+        display={{ base: 'none', md: splitLayout ? 'block' : 'none' }}
       />
 
       {/* 右侧保持清晰 */}
@@ -134,7 +134,7 @@ const Background = memo(({ children }: { children?: React.ReactNode }) => {
         width="55%"
         height="100%"
         zIndex={1}
-        display={{ base: 'none', md: 'block' }}
+        display={{ base: 'none', md: splitLayout ? 'block' : 'none' }}
       />
 
       {children}

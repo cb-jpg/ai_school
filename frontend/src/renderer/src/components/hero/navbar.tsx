@@ -5,7 +5,7 @@
 
 import { memo } from 'react';
 import { Flex, Text, Button, HStack, IconButton } from '@chakra-ui/react';
-import { FiMenu, FiSettings, FiHome, FiBook, FiClock, FiAward, FiUsers, FiLogOut } from 'react-icons/fi';
+import { FiMenu, FiSettings, FiHome, FiBook, FiClock, FiAward, FiUsers, FiMessageCircle, FiLogOut } from 'react-icons/fi';
 import { useInterrupt } from '@/hooks/utils/use-interrupt';
 import { useAuth } from '@/context/auth-context';
 
@@ -18,6 +18,7 @@ interface NavItem {
 // 图标映射
 const iconMap: Record<string, React.ElementType> = {
   home: FiHome,
+  chat: FiMessageCircle,
   intro: FiBook,
   history: FiClock,
   achievements: FiAward,
@@ -30,6 +31,8 @@ interface NavbarProps {
   onMobileMenuToggle: () => void;
   mobileMenuOpen: boolean;
   onSettingsToggle?: () => void;
+  /** 隐藏桌面端中部导航（首页已有顶部选项行承担导航，避免重复） */
+  hideCenterNav?: boolean;
 }
 
 const handleNavClick = (itemId: string, onInterrupt?: () => void) => {
@@ -40,6 +43,9 @@ const handleNavClick = (itemId: string, onInterrupt?: () => void) => {
 
   switch (itemId) {
     case 'home':
+      window.location.hash = '#/home';
+      break;
+    case 'chat':
       window.location.hash = '#/hero';
       break;
     case 'intro':
@@ -64,6 +70,7 @@ const Navbar = memo(({
   navigation,
   onMobileMenuToggle,
   onSettingsToggle,
+  hideCenterNav,
 }: NavbarProps) => {
   const { interrupt } = useInterrupt();
   const { user, logout } = useAuth();
@@ -109,9 +116,9 @@ const Navbar = memo(({
         </Text>
       </HStack>
 
-      {/* Center: Desktop Navigation */}
+      {/* Center: Desktop Navigation（首页由选项行承担导航，hideCenterNav 时隐藏） */}
       <HStack
-        display={{ base: 'none', md: 'flex' }}
+        display={hideCenterNav ? 'none' : { base: 'none', md: 'flex' }}
         gap={{ base: 8, md: 6, lg: 8 }}
       >
         {navigation.map((item) => {

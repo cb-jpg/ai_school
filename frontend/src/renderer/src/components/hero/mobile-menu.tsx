@@ -5,7 +5,7 @@
 
 import { memo } from 'react';
 import { Box, Flex, Button, Text, IconButton, HStack } from '@chakra-ui/react';
-import { FiX, FiHome, FiBook, FiClock, FiAward, FiUsers, FiLogOut } from 'react-icons/fi';
+import { FiX, FiHome, FiBook, FiClock, FiAward, FiUsers, FiMessageCircle, FiLogOut } from 'react-icons/fi';
 import { useInterrupt } from '@/hooks/utils/use-interrupt';
 import { useAuth } from '@/context/auth-context';
 
@@ -24,6 +24,7 @@ interface MobileMenuProps {
 // 图标映射
 const iconMap: Record<string, React.ElementType> = {
   home: FiHome,
+  chat: FiMessageCircle,
   intro: FiBook,
   history: FiClock,
   achievements: FiAward,
@@ -41,6 +42,9 @@ const handleNavClick = (itemId: string, onClose: () => void, onInterrupt?: () =>
   // Navigate based on item id
   switch (itemId) {
     case 'home':
+      window.location.hash = '#/home';
+      break;
+    case 'chat':
       window.location.hash = '#/hero';
       break;
     case 'intro':

@@ -50,12 +50,10 @@ const schoolColors = {
 };
 
 interface DialogBoxProps {
-  schoolName: string;
-  tagline: string;
   description: string;
 }
 
-const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
+const DialogBox = memo(({ description }: DialogBoxProps) => {
   const textInput = useTextInput();
   const { wsState } = useWebSocket();
   const { aiState } = useAiState();
@@ -225,24 +223,13 @@ const DialogBox = memo(({ tagline, description }: DialogBoxProps) => {
           </HStack>
         </HStack>
 
-        {/* 标题块：手机端作为对话卡头部（紧贴导航栏下方），桌面端维持原设计 */}
-        <Box order={{ base: 0, md: 1 }} px={{ base: 1, md: 0 }}>
+        {/* 副标题：桌面端显示一句说明（手机端隐藏，由状态行承担头部） */}
+        <Box order={{ base: 0, md: 1 }} px={{ base: 0, md: 0 }} display={{ base: 'none', sm: 'block' }}>
           <Text
-            fontSize={{ base: 'lg', sm: '4xl', md: '5xl' }}
-            fontWeight="bold"
-            color={schoolColors.text}
-            mb={{ base: 1, sm: 3 }}
-            style={{ fontFamily: '"Helvetica Neue", Arial, sans-serif' }}
-          >
-            {tagline}
-          </Text>
-
-          <Text
-            fontSize={{ base: 'xs', sm: 'base', md: 'lg' }}
+            fontSize={{ sm: 'base', md: 'lg' }}
             color={schoolColors.textSecondary}
-            maxW={{ base: 'sm', sm: 'lg', md: 'xl' }}
-            mb={{ base: 2, sm: 5 }}
-            display={{ base: 'none', sm: 'block' }}
+            maxW={{ sm: 'lg', md: 'xl' }}
+            mb={{ sm: 5 }}
           >
             {description}
           </Text>

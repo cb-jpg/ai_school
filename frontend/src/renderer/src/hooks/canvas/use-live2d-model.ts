@@ -20,6 +20,8 @@ interface UseLive2DModelProps {
    *  仅当触点命中模型（anyhitTest/isHitOnModel）才 preventDefault 拦截处理，
    *  其余触摸完全放行给下层 UI（消息滚动/按钮/输入框均可正常操作） */
   touchThrough?: boolean;
+  /** hero 页人物水平站位（仅手机竖屏适配生效）：center=首页居中；right=对话界面右侧 */
+  heroAlign?: 'center' | 'right';
 }
 
 interface Position {
@@ -34,14 +36,18 @@ const DRAG_DISTANCE_THRESHOLD_PX = 5; // Min distance to be considered a drag
 // hero 全屏穿透模式的模型初始适配参数（真机校准值，Hiyori/荣耀X60Pro）：
 // ⚠️ 竖屏画布下 Live2D 视图空间按【高度】等比映射（视图 X 只覆盖 ±0.475 屏宽），
 //    不是 ±1 对应全宽！换算：屏宽比例 f 处的 x_view = (2f-1)×0.475；
-//    屏高比例 g 处的 y_view = (1-2g)（y 上下翻转）。
-// 绝对 scale（投影归一后）0.62 ≈ 人物占约 40% 屏高（2026-09-03 晚再放大）；
-// HERO_CENTER_Y 0 → 模型中心在屏幕垂直正中（用户要求：右侧中间位置）；
-// HERO_OFFSET_X 0.24 → 模型中心约 75% 屏宽（站在画面右侧，对话框让到左边）。
-// 验证用 scripts/cdp_fb_dump.py 抓帧缓冲（CDP 整页截图拍不到 GL 图层！）。换角色如大小不合适改这三个常量。
+//    屏高比例 g 处的 y_view = (1-2g)（y 上下翻转，负值=往下）。
+// 对话界面（heroAlign='right'）：scale 0.62 ≈ 人物占约 40% 屏高（2026-09-03 晚校准）；
+//   中心 (0.24, 0) = 75% 屏宽 + 垂直正中（用户要求：右侧中间位置）。
+// 新首页（heroAlign='center'）：09-08 真机校准——水平居中、略缩小、下移到
+//   头部露出学校简介卡下缘、脚部靠近"开始对话"按钮（y=-0.32 ≈ 人物中心在 66% 屏高）。
+// 验证用 scripts/cdp_fb_dump.py 抓帧缓冲（CDP 整页截图拍不到 GL 图层！）。换角色如大小不合适改这些常量。
 const HERO_FIT_FACTOR = 0.62;
 const HERO_CENTER_Y = 0;
 const HERO_OFFSET_X = 0.24;
+const HOME_FIT_FACTOR = 0.55;
+const HOME_CENTER_Y = -0.32;
+const HOME_OFFSET_X = 0;
 
 function parseModelUrl(url: string): { baseUrl: string; modelDir: string; modelFileName: string } {
   try {
@@ -120,7 +126,13 @@ export const useLive2DModel = ({
   modelInfo,
   canvasRef,
   touchThrough = false,
+  heroAlign = 'right',
 }: UseLive2DModelProps) => {
+  // 站位换算在适配时使用；页面切换（首页↔对话界面）会触发重新适配到对应站位
+  const isHomeAlign = heroAlign === 'center';
+  const heroOffsetX = isHomeAlign ? HOME_OFFSET_X : HERO_OFFSET_X;
+  const heroFitFactor = isHomeAlign ? HOME_FIT_FACTOR : HERO_FIT_FACTOR;
+  const heroCenterY = isHomeAlign ? HOME_CENTER_Y : HERO_CENTER_Y;
   const { mode } = useMode();
   const isPet = mode === 'pet';
   const [isDragging, setIsDragging] = useState(false);
@@ -232,10 +244,10 @@ export const useLive2DModel = ({
     return () => clearTimeout(timer);
   }, [modelInfo?.url, getModelPosition]);
 
-  // --- hero 全屏穿透：模型就绪后适配上半屏初始站位（缩放+上移），用户仍可拖/捏 ---
+  // --- hero 全屏穿透：模型就绪后适配初始站位（缩放+站位），用户仍可拖/捏 ---
   useEffect(() => {
     if (!touchThrough) return undefined;
-    // 仅手机宽度适配；桌面端保持右侧全高布局不缩放
+    // 仅手机宽度适配；桌面端保持默认布局不缩放
     if (typeof window !== 'undefined' && window.innerWidth >= 768) return undefined;
     let cancelled = false;
     let outerStop: (() => void) | null = null;
@@ -259,15 +271,15 @@ export const useLive2DModel = ({
           // 先按当前实际画布尺寸重算投影（重建后可能按过渡尺寸建过投影），再适配站位
           LAppDelegate.getInstance()?.onResize?.();
           const current = matrix.getScaleX?.() || matrix.getArray()[0] || 1;
-          const ratio = HERO_FIT_FACTOR / current;
+          const ratio = heroFitFactor / current;
           if (Math.abs(ratio - 1) > 0.001) {
             matrix.scaleRelative(ratio, ratio);
           }
           const arr = matrix.getArray();
-          arr[12] = HERO_OFFSET_X;
-          arr[13] = HERO_CENTER_Y;
+          arr[12] = heroOffsetX;
+          arr[13] = heroCenterY;
           matrix.setMatrix(arr);
-          modelPositionRef.current = { x: HERO_OFFSET_X, y: HERO_CENTER_Y };
+          modelPositionRef.current = { x: heroOffsetX, y: heroCenterY };
         } catch (err) {
           console.error('[useLive2DModel] hero fit failed:', err);
         }
@@ -293,7 +305,9 @@ export const useLive2DModel = ({
       outerStop?.();
       window.removeEventListener('live2d-rebound', onRebound);
     };
-  }, [touchThrough, modelInfo?.url]);
+    // heroOffsetX 变化（首页居中 ↔ 对话界面右侧）时重新适配站位；
+    // 已适配过时比例≈1 不再缩放，只平移到目标站位
+  }, [touchThrough, modelInfo?.url, heroOffsetX]);
 
   const getCanvasScale = useCallback(() => {
     const canvas = document.getElementById('canvas') as HTMLCanvasElement;

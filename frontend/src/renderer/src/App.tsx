@@ -49,6 +49,7 @@ import { ModeProvider, useMode } from "./context/mode-context";
 import CampusKnowledge from "./components/campus/campus-knowledge";
 import { CampusTopicId, isCampusTopicId } from "./data/campus-knowledge";
 import HeroLanding from "./components/hero/hero-landing";
+import HomePage from "./components/hero/home-page";
 import KnowledgeAdmin from "./components/admin/knowledge-admin";
 import { DocumentKnowledge } from "./components/admin/document-knowledge";
 import { SystemLogs } from "./components/admin/system-logs";
@@ -65,6 +66,8 @@ import { CharacterConfig } from "./components/admin/character-config";
 // 定义路由类型
 type AppRoute = 'hero' | 'main' | 'campus' | 'main-admin';
 type MainRoute = 'dashboard' | 'test-conversation' | 'knowledge-admin' | 'workspace' | string;
+// hero 模式下的两个页面：home=新首页（默认），chat=对话界面（原首页迁移至 #/hero）
+type HeroView = 'home' | 'chat';
 
 const getCurrentRoute = (): AppRoute => {
   if (typeof window === 'undefined') return 'main-admin';
@@ -76,12 +79,20 @@ const getCurrentRoute = (): AppRoute => {
   }
 
   // Hero landing page route - include campus routes as hero mode
-  if (hash === '#/hero' || hash === '#/landing' || hash === '' || hash === '#/' || hash.startsWith('#/campus/')) {
+  if (hash === '#/home' || hash === '#/hero' || hash === '#/landing' || hash === '' || hash === '#/' || hash.startsWith('#/campus/')) {
     return 'hero';
   }
 
   // Default to admin workspace
   return 'main-admin';
+};
+
+// hero 模式下的页面视图：#/hero 为对话界面，其余（#/home、空 hash、专题页兜底）为新首页
+const readHeroView = (): HeroView => {
+  if (typeof window === 'undefined') return 'home';
+  const hash = window.location.hash;
+  if (hash === '#/hero' || hash === '#/landing') return 'chat';
+  return 'home';
 };
 
 const getCurrentMainRoute = (): MainRoute => {
@@ -106,6 +117,7 @@ function AppContent(): JSX.Element {
   );
   const [currentRoute, setCurrentRoute] = useState<AppRoute>(() => getCurrentRoute());
   const [currentMainRoute, setCurrentMainRoute] = useState<MainRoute>(() => getCurrentMainRoute());
+  const [heroView, setHeroView] = useState<HeroView>(() => readHeroView());
   const { mode } = useMode();
   const { user: authUser } = useAuth();
   const isElectron = window.api !== undefined;
@@ -129,6 +141,7 @@ function AppContent(): JSX.Element {
       setCurrentRoute(getCurrentRoute());
       setCurrentMainRoute(getCurrentMainRoute());
       setActiveCampusTopic(readCampusTopicFromLocation());
+      setHeroView(readHeroView());
     };
     window.addEventListener('hashchange', syncRoute);
     window.addEventListener('popstate', syncRoute);
@@ -219,29 +232,32 @@ function AppContent(): JSX.Element {
 
   // Show Hero Landing page on hero route (still wrapped in all providers)
   if (currentRoute === 'hero') {
+    // 新首页：#/home / 空 hash 且未打开专题页；#/hero 为对话界面
+    const isHomeView = heroView === 'home' && !activeCampusTopic;
     return (
       <>
-        {/* Background layer for hero route */}
-        <Background />
+        {/* Background layer for hero route（首页居中布局，关闭桌面端分屏遮罩） */}
+        <Background splitLayout={!isHomeView} />
 
-        {/* Live2D layer for hero route - 手机端全屏穿透画布，桌面端右侧 55% */}
+        {/* Live2D layer for hero route - 手机端全屏穿透画布；桌面端对话界面右侧 55%、
+            新首页全宽（人物居中） */}
         <Box
           position="absolute"
           top={0}
           right={0}
-          width={{ base: "100%", md: "55%" }}
+          width={isHomeView ? "100%" : { base: "100%", md: "55%" }}
           height={{
             base: "100vh",
             md: isElectron ? "calc(100vh - 30px)" : "100vh",
           }}
           zIndex={{ base: 15, md: 1 }}
           /* 手机端：全屏穿透画布（pointerEvents none + window 级 hitTest 触摸）。
-             人物可被拖到屏幕任意位置（包括对话框中间），且只有摸到模型本体
-             才拦截触摸，其余区域完全放行——消息滚动/按钮/输入框全部正常。
+             人物可被拖到屏幕任意位置（包括卡片中间），且只有摸到模型本体
+             才拦截触摸，其余区域完全放行——按钮/选项行/输入框全部正常。
              桌面端：画布不拦截鼠标（与历史行为一致）。 */
           pointerEvents="none"
         >
-          <Live2D showSidebar={false} touchThrough />
+          <Live2D showSidebar={false} touchThrough heroAlign={isHomeView ? 'center' : 'right'} />
         </Box>
 
         {/* CampusKnowledge overlay for topic pages */}
@@ -273,8 +289,8 @@ function AppContent(): JSX.Element {
           </Box>
         )}
 
-        {/* Subtitle for hero page - 手机端对话卡片内已展示文本，隐藏；专题页打开时隐藏 */}
-        {!activeCampusTopic && (
+        {/* Subtitle for hero page - 手机端对话卡片内已展示文本，隐藏；专题页/新首页隐藏 */}
+        {!activeCampusTopic && !isHomeView && (
         <Box
           position="absolute"
           bottom={{ base: "8%", md: "12%" }}
@@ -302,10 +318,14 @@ function AppContent(): JSX.Element {
         </Box>
         )}
 
-        {/* Hero UI overlay */}
-        <HeroLanding
-          activeCampusTopic={activeCampusTopic}
-        />
+        {/* 新首页（学校简介 + 居中数字人 + 开始对话）；对话界面/专题页仍走 HeroLanding */}
+        {isHomeView ? (
+          <HomePage onNavigateTopic={navigateToCampusTopic} />
+        ) : (
+          <HeroLanding
+            activeCampusTopic={activeCampusTopic}
+          />
+        )}
       </>
     );
   }
