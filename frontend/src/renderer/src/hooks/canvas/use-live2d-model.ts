@@ -20,7 +20,7 @@ interface UseLive2DModelProps {
    *  仅当触点命中模型（anyhitTest/isHitOnModel）才 preventDefault 拦截处理，
    *  其余触摸完全放行给下层 UI（消息滚动/按钮/输入框均可正常操作） */
   touchThrough?: boolean;
-  /** hero 页人物水平站位（仅手机竖屏适配生效）：center=首页居中；right=对话界面右侧 */
+  /** hero 页人物站位（仅手机竖屏适配生效）：center=首页；right=对话界面（两者站位现已一致） */
   heroAlign?: 'center' | 'right';
 }
 
@@ -37,18 +37,18 @@ const DRAG_DISTANCE_THRESHOLD_PX = 5; // Min distance to be considered a drag
 // ⚠️ 竖屏画布下 Live2D 视图空间按【高度】等比映射（视图 X 只覆盖 ±0.475 屏宽），
 //    不是 ±1 对应全宽！换算：屏宽比例 f 处的 x_view = (2f-1)×0.475；
 //    屏高比例 g 处的 y_view = (1-2g)（y 上下翻转，负值=往下）。
-// 对话界面（heroAlign='right'）：scale 0.62 ≈ 人物占约 40% 屏高（2026-09-03 晚校准）；
-//   中心 (0.24, 0) = 75% 屏宽 + 垂直正中（用户要求：右侧中间位置）。
-// 新首页（heroAlign='center'）：09-08 二轮改版——人物右侧偏大突出形象，
-//   左侧窄栏给学校简介（文字多换行）；x=0.24 ≈ 75% 屏宽，scale 0.88 ≈ 51% 屏高，
-//   y=-0.12 ≈ 人物中心在 56% 屏高（头露在选项行下方、脚近开始对话按钮）。
+// 首页与对话界面站位（2026-09-09 三轮定稿）：
+//   首页 scale 0.88 ≈ 51% 屏高，x=0.20 ≈ 72.5% 屏宽（用户要求比 0.24 稍往左），
+//     y=-0.12 ≈ 人物中心在 56% 屏高；
+//   对话界面 scale 0.80（比首页稍小，用户要求），x=0.24 ≈ 75% 屏宽，y 同。
+//   （聊天内容区右缩进 dialog-box 内已避开人物占位）
 // 验证用 scripts/cdp_fb_dump.py 抓帧缓冲（CDP 整页截图拍不到 GL 图层！）。换角色如大小不合适改这些常量。
-const HERO_FIT_FACTOR = 0.62;
-const HERO_CENTER_Y = 0;
+const HERO_FIT_FACTOR = 0.8;
+const HERO_CENTER_Y = -0.12;
 const HERO_OFFSET_X = 0.24;
 const HOME_FIT_FACTOR = 0.88;
 const HOME_CENTER_Y = -0.12;
-const HOME_OFFSET_X = 0.24;
+const HOME_OFFSET_X = 0.2;
 
 function parseModelUrl(url: string): { baseUrl: string; modelDir: string; modelFileName: string } {
   try {

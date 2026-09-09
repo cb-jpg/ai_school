@@ -17,9 +17,10 @@ import {
 } from '@chakra-ui/react';
 import { Switch } from '@/components/ui/switch';
 import { BsMicFill, BsMic } from 'react-icons/bs';
-import { FiClock, FiPlus } from 'react-icons/fi';
+import { FiClock, FiPlus, FiHome } from 'react-icons/fi';
 import { IoSend } from 'react-icons/io5';
 import { Alert } from '@/components/ui/alert';
+import { useInterrupt } from '@/hooks/utils/use-interrupt';
 import { useTextInput } from '@/hooks/footer/use-text-input';
 import { useWebSocket } from '@/context/websocket-context';
 import { useAiState, AiStateEnum } from '@/context/ai-state-context';
@@ -62,6 +63,13 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
   const { messages, historyList } = useChatHistory();
   const { modelInfo, isLoading: modelLoading } = useLive2DConfig();
   const { createNewHistory } = useSidebar();
+  const { interrupt } = useInterrupt();
+
+  // 返回新首页：先打断可能进行中的播报，再切路由
+  const goHome = () => {
+    interrupt();
+    window.location.hash = '#/home';
+  };
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showHistory, setShowHistory] = useState(false);
   const prevMessageCountRef = useRef(messages.length);
@@ -199,6 +207,15 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
             borderColor="rgba(226, 232, 240, 0.8)"
           >
             <IconButton
+              aria-label="返回首页"
+              size="sm"
+              variant="ghost"
+              color={schoolColors.textSecondary}
+              onClick={goHome}
+            >
+              <FiHome />
+            </IconButton>
+            <IconButton
               aria-label="新对话"
               size="sm"
               variant="ghost"
@@ -235,13 +252,15 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
           </Text>
         </Box>
 
-        {/* Messages Container —— 手机端顶部渐变：与上方人物区融合，人物仿佛站进卡片 */}
+        {/* Messages Container —— 手机端顶部渐变：与上方人物区融合，人物仿佛站进卡片；
+            右侧留出约人物占位宽（人物约 0.80 倍、约 65%~85% 屏宽），避免气泡被人物盖住 */}
         <Box
           flex={1}
           overflowY="auto"
           bg={{ base: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.9) 64px, #FFFFFF 112px)', md: schoolColors.white }}
           rounded={{ base: '2xl', md: 'xl' }}
           p={4}
+          pr={{ base: '88px', md: 4 }}
           border="1px solid"
           borderColor={{ base: 'transparent', md: schoolColors.border }}
           boxShadow={{ base: 'sm', md: 'sm' }}
@@ -259,6 +278,8 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
                 borderBottomRightRadius={msg.role === 'human' ? 'sm' : '2xl'}
                 borderBottomLeftRadius={msg.role === 'human' ? '2xl' : 'sm'}
                 alignSelf={msg.role === 'human' ? 'flex-end' : 'flex-start'}
+                /* 手机端用户气泡右缩进：右对齐会贴到人物占位区（约 65% 屏宽起），再推左一点 */
+                marginRight={{ base: '44px', md: 0 }}
                 maxWidth="84%"
                 fontSize="sm"
                 lineHeight="1.6"

@@ -101,20 +101,18 @@ export default function HeroLanding({
       <Flex
         h="full"
         alignItems="center"
-        justifyContent="space-between"
-        px={{ base: 6, md: 12, lg: 16 }}
-        /* 手机端：人物在右侧居中站立（Live2D 全屏穿透层），对话卡贴导航栏下方、
-           占据左侧整高（人物本体压在卡片右缘上方，输入行 z20 保持可点） */
+        px={{ base: 4, md: 12, lg: 16 }}
+        /* 手机端：人物右侧大站位与首页一致（Live2D 全屏穿透层），对话卡贴导航栏下方、
+           占据整宽（人物本体压在卡片右缘上方，输入行 z20 保持可点） */
         pt={{ base: '88px', md: 24 }}
         pb={{ base: 4, md: 16 }}
-        gap={8}
       >
-        {/* Left Side: 对话界面 */}
+        {/* 对话界面：不再特意在右侧留白给人物（展示功能已由新首页承担），
+           对话卡恢复正常宽度：手机端满宽，桌面端 680px 常规阅读宽度 */}
         {!activeCampusTopic && (
           <Box
             flex="1"
-            /* 手机端靠左收窄（92%），右侧留出人物空间；桌面端维持 600px 设计 */
-            maxWidth={{ base: '92%', md: '600px' }}
+            maxWidth={{ base: '100%', md: '680px' }}
             /* 手机端 zIndex 5：低于 Live2D 层(15)，人物可盖住卡片的状态行与
                消息区顶部；输入框区在 dialog-box 内部单独提升到 20 保证可点 */
             zIndex={{ base: 5, md: 10 }}
@@ -127,22 +125,6 @@ export default function HeroLanding({
             </Box>
           </Box>
         )}
-
-        {/* Right Side: Live2D Character Area (Transparent for Live2D background) */}
-        <Box
-          flex="1"
-          maxWidth={{ base: '100%', md: '50%', lg: '55%' }}
-          height="full"
-          zIndex={5}
-          pointerEvents="none"
-          /* 手机端 Live2D 已是全屏背景，此空位不占宽度，避免把对话区挤成窄条 */
-          display={{ base: 'none', md: 'flex' }}
-          alignItems="center"
-          justifyContent="center"
-          ml={4}
-        >
-          {/* Empty space - Live2D renders as background from App.tsx */}
-        </Box>
       </Flex>
 
       {/* 右侧设置侧栏 */}

@@ -2,14 +2,14 @@
  * Home Page Component
  * 学校数字人首页（验收展示页）
  * 布局：导航栏 → 专题选项行（可横滑）→ 左上学校简介块（渐变融入背景，
- *       含清北保送亮点与 App 简介）→ 右侧偏大 Live2D 数字人（穿透画布）
- *       → 底部"开始对话"进入对话界面（#/hero）
+ *       校名/理念标题可延展到人物侧，其余内容左侧窄栏多换行）→
+ *       右侧偏大 Live2D 数字人（穿透画布）→ 底部"开始对话"进入对话界面（#/hero）
  * 人物站位/大小由 use-live2d-model.ts 的 HOME_* 常量控制（右侧 78% 屏宽）。
  */
 
 import { useState } from 'react';
 import { Box, Button, Flex, HStack, Text } from '@chakra-ui/react';
-import { FiMessageCircle } from 'react-icons/fi';
+import { FiMessageCircle, FiHome } from 'react-icons/fi';
 import Navbar from './navbar';
 import MobileMenu from './mobile-menu';
 import HeroSidebar from './hero-sidebar';
@@ -107,10 +107,37 @@ export default function HomePage({
       {/* Content Column：z20 盖过 Live2D 穿透层(15)；pt 避开悬浮导航栏(手机~88px)；
           人物在右侧，内容在左上不与其相争 */}
       <Flex direction="column" h="full" position="relative" zIndex={20} pt={{ base: '92px', md: '110px' }}>
-        {/* 专题选项行：与专题页同款（手机端横向滑动），行尾附"对话"入口 */}
+        {/* 专题选项行：与专题页同款（手机端横向滑动），行首"首页"与专题页一致，
+            行尾附"对话"入口 */}
         <Box px={{ base: 3, md: 12, lg: 16 }}>
           <TopicTabRow
             onNavigateTopic={goTopic}
+            leading={
+              <Button
+                data-testid="campus-nav-home"
+                aria-label="回到学校首页"
+                onClick={() => {
+                  interrupt();
+                  window.location.hash = '#/home';
+                }}
+                height="40px"
+                px={{ base: '12px', lg: '16px' }}
+                borderRadius="md"
+                variant="ghost"
+                color="#121826"
+                fontFamily={campusColors.swissFont}
+                fontWeight="500"
+                fontSize="sm"
+                flexShrink={0}
+                _hover={{ background: campusColors.blueWash, color: campusColors.blue }}
+                transition="all 200ms ease"
+              >
+                <HStack gap="8px">
+                  <FiHome size={16} />
+                  <Text>首页</Text>
+                </HStack>
+              </Button>
+            }
             trailing={
               <Button
                 aria-label="进入对话界面"
@@ -133,9 +160,10 @@ export default function HomePage({
           />
         </Box>
 
-        {/* 左上学校简介块：无卡片边框，横向渐变右淡出，与背景融为一体；
-            手机端窄栏多换行（右侧留给人物）；轻重分明——校名(轻) / 办学理念(重) /
-            一句话简介(轻) / 清北保送亮点(重) / App 简介(轻) */}
+        {/* 学校简介块：无卡片边框，横向渐变右淡出，与背景融为一体。
+            校名眉行与办学理念大标题不囿于左栏、可延展到人物侧（加白色光晕保可读）；
+            下方内容仍在左侧窄栏多换行，不遮挡人物。轻重分明——校名(轻) /
+            办学理念(重) / 校训·理念·价值观(轻) / 清北保送·扬长课程亮点(重) / App 简介(轻) */}
         <Box
           alignSelf="stretch"
           mt={{ base: 2, md: 4 }}
@@ -144,13 +172,15 @@ export default function HomePage({
           pr={{ base: 6, md: 10 }}
           background="linear-gradient(100deg, rgba(248, 250, 252, 0.96) 0%, rgba(248, 250, 252, 0.82) 42%, rgba(248, 250, 252, 0) 74%)"
         >
-          <Box maxW={{ base: '212px', md: '520px' }}>
+          {/* 宽区：校名 + 办学理念（延伸到右侧） */}
+          <Box maxW={{ base: 'none', md: '760px' }}>
             <Text
               color={schoolColors.primary}
               fontSize={{ base: '11px', md: '13px' }}
               fontWeight="600"
               letterSpacing="0.15em"
               lineHeight="1.6"
+              textShadow="0 1px 6px rgba(255, 255, 255, 0.9)"
             >
               佛山市南海区石实实验学校 · AI校园数字人
             </Text>
@@ -158,29 +188,34 @@ export default function HomePage({
             <Text
               mt={{ base: 2, md: 2.5 }}
               color={schoolColors.text}
-              fontSize={{ base: '23px', md: '30px', lg: '34px' }}
+              fontSize={{ base: '19px', md: '30px', lg: '34px' }}
               fontWeight="bold"
               lineHeight="1.35"
+              textShadow="0 1px 8px rgba(255, 255, 255, 0.9), 0 0 18px rgba(255, 255, 255, 0.65)"
             >
               让每一个孩子都能成长、成才、成功
             </Text>
+          </Box>
 
+          {/* 窄栏：其余内容多换行（右侧留给人物） */}
+          <Box maxW={{ base: '212px', md: '520px' }}>
             <Text
               mt={{ base: 2, md: 2 }}
               color={schoolColors.textBody}
               fontSize={{ base: '13px', md: '15px' }}
               lineHeight="1.7"
             >
-              全日制寄宿制民办实验学校，始建于1999年，坐落于佛山市南海区大沥镇。
+              “扬长教育、人人出彩”——以爱治校、尊重你我，任重道远、毋忘奋斗。
             </Text>
 
-            {/* 亮点：清北保送（据南方+公开报道） */}
+            {/* 亮点一：清北保送（据南方+公开报道） */}
             <Flex mt={{ base: 4, md: 4 }} align="center" gap={{ base: 3, md: 4 }}>
               <Text
                 color={schoolColors.primary}
                 fontSize={{ base: '44px', md: '52px' }}
                 fontWeight="bold"
                 lineHeight="1"
+                flexShrink={0}
               >
                 {HIGHLIGHT_COUNT}
               </Text>
@@ -193,7 +228,7 @@ export default function HomePage({
                 >
                   位学子凭信息学特长
                   <Box as="span" display={{ base: 'block', md: 'inline' }}>
-                    保送清华大学、北京大学
+                    保送清华、北京大学
                   </Box>
                 </Text>
                 <Text mt="3px" color={schoolColors.textSecondary} fontSize={{ base: '10px', md: '12px' }} lineHeight="1.5">
@@ -202,17 +237,34 @@ export default function HomePage({
               </Box>
             </Flex>
 
-            {/* 分隔细线 + App 简介 */}
+            {/* 亮点二：扬长课程（学生视角的特色） */}
+            <Flex mt={{ base: 3, md: 3 }} align="center" gap={{ base: 3, md: 4 }}>
+              <Text
+                color={schoolColors.primary}
+                fontSize={{ base: '30px', md: '40px' }}
+                fontWeight="bold"
+                lineHeight="1"
+                flexShrink={0}
+              >
+                100+
+              </Text>
+              <Box maxW={{ base: '132px', md: 'none' }}>
+                <Text
+                  color={schoolColors.text}
+                  fontSize={{ base: '14px', md: '17px' }}
+                  fontWeight="semibold"
+                  lineHeight="1.5"
+                >
+                  门扬长选修课
+                </Text>
+                <Text mt="3px" color={schoolColors.textSecondary} fontSize={{ base: '10px', md: '12px' }} lineHeight="1.5">
+                  每学期“大学式选课”，信息学、科创、体艺等任你选
+                </Text>
+              </Box>
+            </Flex>
+
+            {/* 分隔细线（收束亮点区） */}
             <Box mt={{ base: 4, md: 4 }} width="64px" height="2px" bg="rgba(30, 84, 148, 0.35)" />
-            <Text
-              mt={{ base: 3, md: 3 }}
-              color={schoolColors.textSecondary}
-              fontSize={{ base: '12px', md: '13.5px' }}
-              lineHeight="1.8"
-            >
-              AI 数字人"小石"依托学校专属知识库，懂校史、知荣誉、能讲解，
-              支持语音与文字提问，回答可随时打断。
-            </Text>
           </Box>
         </Box>
 

@@ -66,6 +66,8 @@ interface TopicTabRowProps {
   /** 当前激活的专题（首页无专题传 null） */
   activeTopicId?: CampusTopicId | null;
   onNavigateTopic: (topicId: CampusTopicId) => void;
+  /** 行首附加按钮（如首页的"首页"） */
+  leading?: React.ReactNode;
   /** 行尾附加按钮（如首页的"对话界面"） */
   trailing?: React.ReactNode;
 }
@@ -73,6 +75,7 @@ interface TopicTabRowProps {
 export default function TopicTabRow({
   activeTopicId = null,
   onNavigateTopic,
+  leading,
   trailing,
 }: TopicTabRowProps) {
   return (
@@ -95,6 +98,7 @@ export default function TopicTabRow({
         overflowX={{ base: 'auto', lg: 'visible' }}
         css={{ '&::-webkit-scrollbar': { display: 'none' } }}
       >
+        {leading}
         {campusTopics.map((topic) => (
           <TopicTabButton
             key={topic.id}
