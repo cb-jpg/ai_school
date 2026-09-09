@@ -121,17 +121,17 @@ const Background = memo(({ children, splitLayout = true }: { children?: React.Re
               position="absolute"
               top={0}
               left={0}
-              filter="blur(16px) brightness(1.06)"
+              filter="blur(16px)"
               transform="scale(1.12)"
             />
-            {/* 浅色纱罩：保证前景文字/人物可读，维持明亮简洁风 */}
+            {/* 轻纱罩：仅略微统一色调，保住照片的层次感（太白会显灰、压人物） */}
             <Box
               position="absolute"
               top={0}
               left={0}
               width="100%"
               height="100%"
-              bg="rgba(248, 250, 252, 0.55)"
+              bg="rgba(248, 250, 252, 0.26)"
             />
           </>
         )

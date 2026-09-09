@@ -170,7 +170,7 @@ export default function HomePage({
           py={{ base: 3, md: 5 }}
           pl={{ base: 4, md: 12, lg: 16 }}
           pr={{ base: 6, md: 10 }}
-          background="linear-gradient(100deg, rgba(248, 250, 252, 0.96) 0%, rgba(248, 250, 252, 0.82) 42%, rgba(248, 250, 252, 0) 74%)"
+          background="linear-gradient(100deg, rgba(248, 250, 252, 0.94) 0%, rgba(248, 250, 252, 0.72) 32%, rgba(248, 250, 252, 0) 62%)"
         >
           {/* 宽区：校名 + 办学理念（延伸到右侧） */}
           <Box maxW={{ base: 'none', md: '760px' }}>
