@@ -216,6 +216,7 @@ class RagService:
         )
         self._query_cache_lock = threading.Lock()
         self._searchable_cache: Tuple[float, Set[str]] = (0.0, set())
+        self._searchable_total: int = -1
 
     @staticmethod
     def needs_rag_retrieval(query: str) -> bool:
@@ -229,21 +230,28 @@ class RagService:
 
         结果短暂缓存（crud 索引本身是全内存读取，这里省去每次全表过滤与集合构建）；
         知识库管理端改动后最迟 _SEARCHABLE_TTL 秒生效。
+        条目总数变化（新增/删除）时立即失效：否则新建条目会在缓存窗口内
+        不参与检索，且全局索引键不含新条目也不会触发重建（2026-09-09 实测踩坑）。
         """
         now = time.monotonic()
         cached_at, cached_ids = self._searchable_cache
-        if cached_ids and now - cached_at < _SEARCHABLE_TTL:
-            return cached_ids
         try:
             entries = get_knowledge_crud().get_all(include_archived=False)
-            ids = {
-                e.id for e in entries
-                if e.status in (KnowledgeStatus.INDEXED, KnowledgeStatus.PUBLISHED)
-            }
         except Exception as e:
             logger.error(f"获取可检索知识条目失败：{e}")
             return cached_ids
+        if (
+            cached_ids
+            and now - cached_at < _SEARCHABLE_TTL
+            and len(entries) == self._searchable_total
+        ):
+            return cached_ids
+        ids = {
+            e.id for e in entries
+            if e.status in (KnowledgeStatus.INDEXED, KnowledgeStatus.PUBLISHED)
+        }
         self._searchable_cache = (now, ids)
+        self._searchable_total = len(entries)
         return ids
 
     @staticmethod

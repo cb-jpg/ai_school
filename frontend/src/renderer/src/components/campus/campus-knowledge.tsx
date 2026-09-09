@@ -3,6 +3,7 @@ import {
   Button,
   Flex,
   HStack,
+  Image,
   Link,
   SimpleGrid,
   Text,
@@ -32,6 +33,7 @@ import {
   campusTopics,
   demoSchool,
 } from '@/data/campus-knowledge';
+import { imageForSection, topicBanners } from '@/data/campus-images';
 
 interface CampusKnowledgeProps {
   activeTopicId: CampusTopicId | null;
@@ -111,6 +113,8 @@ function KnowledgeSectionCard({
   onNarrate: () => void;
   disabled: boolean;
 }) {
+  // 按标题关键词匹配配图（学习标兵头像=portrait 圆形随文；荣誉牌匾/校园照片=card 横向大图）
+  const sectionImage = imageForSection(section.title);
   return (
     <Box
       data-testid={`campus-section-${section.id}`}
@@ -161,20 +165,63 @@ function KnowledgeSectionCard({
             </Button>
           </Flex>
 
-          <Text color={muted} fontSize="14px" lineHeight="1.7" mb="4">
-            {section.summary}
-          </Text>
+          {/* 摘要与事实：有头像配图时右侧并排圆形头像（学习标兵卡片） */}
+          <Flex gap={{ base: '3', md: '4' }} align="flex-start">
+            <Box flex="1" minWidth="0">
+              <Text color={muted} fontSize="14px" lineHeight="1.7" mb="4">
+                {section.summary}
+              </Text>
 
-          <Flex gap="3" flexWrap="wrap">
-            {section.facts.map((fact, idx) => (
-              <Flex key={idx} align="flex-start" gap="2">
-                <Box mt="2" width="4" height="4" flexShrink={0} background={blue} borderRadius="full" />
-                <Text color={muted} fontSize="13px" lineHeight="1.6">
-                  {fact}
-                </Text>
+              <Flex gap="3" flexWrap="wrap">
+                {section.facts.map((fact, idx) => (
+                  <Flex key={idx} align="flex-start" gap="2">
+                    <Box mt="2" width="4" height="4" flexShrink={0} background={blue} borderRadius="full" />
+                    <Text color={muted} fontSize="13px" lineHeight="1.6">
+                      {fact}
+                    </Text>
+                  </Flex>
+                ))}
               </Flex>
-            ))}
+            </Box>
+
+            {sectionImage?.variant === 'portrait' && (
+              <Box flexShrink={0} textAlign="center">
+                <Image
+                  src={sectionImage.src}
+                  alt={section.title}
+                  boxSize={{ base: '88px', md: '104px' }}
+                  borderRadius="full"
+                  objectFit="cover"
+                  border="2px solid"
+                  borderColor={hairline}
+                />
+                {sectionImage.caption && (
+                  <Text mt="1" color={muted} fontSize="10px" lineHeight="1.4" maxW="112px">
+                    {sectionImage.caption}
+                  </Text>
+                )}
+              </Box>
+            )}
           </Flex>
+
+          {/* 牌匾/场景配图：横向大图（荣誉、校园照片） */}
+          {sectionImage?.variant === 'card' && (
+            <Box mt="4" borderRadius="md" overflow="hidden" border="1px solid" borderColor={hairline}>
+              <Image
+                src={sectionImage.src}
+                alt={sectionImage.caption || section.title}
+                width="100%"
+                height={{ base: '150px', md: '190px' }}
+                objectFit="cover"
+                display="block"
+              />
+              {sectionImage.caption && (
+                <Text px="2" py="1" color={muted} fontSize="11px">
+                  {sectionImage.caption}
+                </Text>
+              )}
+            </Box>
+          )}
         </Box>
       </Flex>
     </Box>
@@ -237,9 +284,10 @@ export default function CampusKnowledge({
   }, [interrupt, setAiState, setSubtitleText]);
 
   const handleTopicNavigation = useCallback((topic: CampusTopic) => {
+    // 2026-09-09 用户要求：进入专题页不再自动播报简介语音，
+    // 需要讲解时用页面上的"完整讲解"或各段"讲解"按钮
     onNavigate(topic.id);
-    narrate(`${demoSchool.name}·${topic.navLabel}`, [topic.introNarration]);
-  }, [narrate, onNavigate]);
+  }, [onNavigate]);
 
   const fullNarration = useMemo(() => (
     activeTopic
@@ -440,10 +488,24 @@ export default function CampusKnowledge({
                 color={muted}
                 fontSize={{ base: '14px', md: '16px' }}
                 lineHeight="1.7"
-                mb="8"
+                mb="6"
               >
                 {activeTopic.subtitle}
               </Text>
+
+              {/* 专题配图横幅（校方素材，见 campus-images.ts） */}
+              {topicBanners[activeTopic.id] && (
+                <Box mb="6" borderRadius="lg" overflow="hidden" border="1px solid" borderColor={hairline}>
+                  <Image
+                    src={topicBanners[activeTopic.id]}
+                    alt={`${activeTopic.navLabel}配图`}
+                    width="100%"
+                    height={{ base: '150px', md: '210px' }}
+                    objectFit="cover"
+                    display="block"
+                  />
+                </Box>
+              )}
 
               {/* Stats */}
               <SimpleGrid columns={{ base: 2, md: 3 }} gap="6" mb="8" pb="8" borderBottom="1px solid" borderColor={hairline}>

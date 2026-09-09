@@ -37,6 +37,9 @@ import { useLive2dModels } from '@/hooks/live2d/use-live2d-models';
 import type { Live2dCharacter } from '@/services/live2d-models-api';
 import { toaster } from '@/components/ui/toaster';
 import fileUploadDialog from '@/utils/file-upload-dialog';
+// 校园实景背景（打包进前端，APK 离线可用；见 assets/school/）
+import bgCampusTrack from '@/assets/school/campus-track.jpg';
+import bgCampusGate from '@/assets/school/campus-gate.jpg';
 
 // 学校配色方案
 const schoolColors = {
@@ -53,11 +56,14 @@ const schoolColors = {
 
 // 数字人角色列表改为运行时从后端 /api/live2d-models/info 获取（见 useLive2dModels）
 
-// 背景图片列表：本地矢量背景由后端 /bg 静态目录提供（国内可离线可靠加载）
+// 背景图片列表：校园实景为前端打包资源（APK 离线可用）；
+// 矢量插画背景由后端 /bg 静态目录提供
 const BACKGROUNDS = [
   { id: 'default', name: '默认背景', url: '' },
   { id: 'camera', name: '摄像头背景', url: '' },
   { id: 'upload', name: '上传图片', url: '' },
+  { id: 'campus_track', name: '校园跑道（实景）', url: bgCampusTrack },
+  { id: 'campus_gate', name: '校门（实景）', url: bgCampusGate },
   { id: 'school_building', name: '学校建筑', url: '/bg/school/campus_skyline.svg' },
   { id: 'library', name: '图书馆', url: '/bg/school/library_warm.svg' },
   { id: 'classroom', name: '教室', url: '/bg/school/classroom_bright.svg' },

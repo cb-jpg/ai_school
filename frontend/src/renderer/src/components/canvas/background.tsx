@@ -3,6 +3,8 @@ import { memo, useEffect, useRef, useState } from 'react';
 import { useCamera } from '@/context/camera-context';
 import { useBgUrl } from '@/context/bgurl-context';
 import { apiUrl } from '@/services/api-base';
+// 内置默认背景：大沥太平校区跑道（校方《数据清单·芝兰玉树》画册照片，已打包进前端）
+import defaultCampusBg from '@/assets/school/campus-track.jpg';
 
 const Background = memo(({ children, splitLayout = true }: { children?: React.ReactNode; /** 桌面端左右分屏遮罩（对话界面用）；首页等居中布局传 false 关闭 */ splitLayout?: boolean }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -103,14 +105,31 @@ const Background = memo(({ children, splitLayout = true }: { children?: React.Re
             transform="scale(1.08)"
           />
         ) : (
-          <Box
-            width="100%"
-            height="100%"
-            bg="linear-gradient(135deg, rgba(30, 84, 148, 0.1) 0%, rgba(255, 107, 53, 0.05) 100%)"
-            position="absolute"
-            top={0}
-            left={0}
-          />
+          <>
+            {/* 默认背景：校园实景照片重虚化（未配置自定义背景时的兜底）。
+                同为打包资源（同源 https://localhost），不受 APK WebView 拦 http 图片影响 */}
+            <Image
+              src={defaultCampusBg}
+              alt="background"
+              width="100%"
+              height="100%"
+              objectFit="cover"
+              position="absolute"
+              top={0}
+              left={0}
+              filter="blur(16px) brightness(1.06)"
+              transform="scale(1.12)"
+            />
+            {/* 浅色纱罩：保证前景文字/人物可读，维持明亮简洁风 */}
+            <Box
+              position="absolute"
+              top={0}
+              left={0}
+              width="100%"
+              height="100%"
+              bg="rgba(248, 250, 252, 0.55)"
+            />
+          </>
         )
       )}
 

@@ -1,5 +1,5 @@
 import {
-  createContext, useMemo, useContext, useState, useCallback,
+  createContext, useMemo, useContext, useState, useCallback, useEffect,
 } from 'react';
 import { useLocalStorage } from '@/hooks/utils/use-local-storage';
 /**
@@ -46,6 +46,16 @@ export function BgUrlProvider({ children }: { children: React.ReactNode }) {
     'backgroundUrl',
     DEFAULT_BACKGROUND,
   );
+
+  // 旧版矢量插画背景（/bg/school/*.svg，存过相对路径或带 token 的绝对 URL 两种形态）
+  // 迁移为内置校园实景照片：Background 组件对空值已改为展示打包的校园跑道实拍图
+  useEffect(() => {
+    if (backgroundUrl.includes('/bg/school/')) {
+      setBackgroundUrl(DEFAULT_BACKGROUND);
+    }
+    // 仅挂载时校正一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // State for background files list
   const [backgroundFiles, setBackgroundFiles] = useState<BackgroundFile[]>([]);

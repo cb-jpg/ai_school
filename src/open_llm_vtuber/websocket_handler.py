@@ -194,8 +194,9 @@ class WebSocketHandler:
         # Send initial group status
         await self.send_group_update(websocket, client_uid)
 
-        # Start microphone
-        await websocket.send_text(json.dumps({"type": "control", "text": "start-mic"}))
+        # 注意：不再在连接建立时推送 start-mic。上游默认行为会让前端一连接就开麦，
+        # 在没有对话输入区的页面（首页/专题页）表现为"无人对话却在录音"。
+        # 本部署中麦克风只由用户在前端显式开启（2026-09-09）。
 
     def _create_session_agent(self):
         """Create a dedicated agent instance for one session.

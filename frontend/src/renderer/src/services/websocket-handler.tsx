@@ -78,8 +78,11 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
   const handleControlMessage = useCallback((controlText: string) => {
     switch (controlText) {
       case 'start-mic':
-        console.log('Starting microphone...');
-        startMic();
+        // 后端在连接建立时会无条件推送 start-mic（上游行为）。本产品要求麦克风
+        // 只能由用户按键开启：首页/专题页没有对话输入区，若照做会出现"没人
+        // 对话却在录音"（2026-09-09 用户反馈）。这里改为忽略，麦克风仅由
+        // 输入框麦克风键 / 各页面显式交互开启。
+        console.log('Ignored backend start-mic (mic is user-controlled in this app)');
         break;
       case 'stop-mic':
         console.log('Stopping microphone...');
