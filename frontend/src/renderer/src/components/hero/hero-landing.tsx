@@ -101,7 +101,7 @@ export default function HeroLanding({
       <Flex
         h="full"
         alignItems="center"
-        px={{ base: 4, md: 12, lg: 16 }}
+        px={{ base: 3, md: 12, lg: 16 }}
         /* 手机端：人物右侧大站位与首页一致（Live2D 全屏穿透层），对话卡贴导航栏下方、
            占据整宽（人物本体压在卡片右缘上方，输入行 z20 保持可点） */
         pt={{ base: '88px', md: 24 }}

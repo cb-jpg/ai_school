@@ -205,7 +205,13 @@ export default function HomePage({
               fontSize={{ base: '13px', md: '15px' }}
               lineHeight="1.7"
             >
-              “扬长教育、人人出彩”——以爱治校、尊重你我，任重道远、毋忘奋斗。
+              “扬长教育、人人出彩”
+              <Box as="span" display="block">
+                “以爱治校、尊重你我”
+              </Box>
+              <Box as="span" display="block">
+                “任重道远、毋忘奋斗”
+              </Box>
             </Text>
 
             {/* 亮点一：清北保送（据南方+公开报道） */}

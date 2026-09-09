@@ -259,8 +259,8 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
           overflowY="auto"
           bg={{ base: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.9) 64px, #FFFFFF 112px)', md: schoolColors.white }}
           rounded={{ base: '2xl', md: 'xl' }}
-          p={4}
-          pr={{ base: '88px', md: 4 }}
+          p={3}
+          pr={{ base: '84px', md: 3 }}
           border="1px solid"
           borderColor={{ base: 'transparent', md: schoolColors.border }}
           boxShadow={{ base: 'sm', md: 'sm' }}
@@ -278,8 +278,8 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
                 borderBottomRightRadius={msg.role === 'human' ? 'sm' : '2xl'}
                 borderBottomLeftRadius={msg.role === 'human' ? '2xl' : 'sm'}
                 alignSelf={msg.role === 'human' ? 'flex-end' : 'flex-start'}
-                /* 手机端用户气泡右缩进：右对齐会贴到人物占位区（约 65% 屏宽起），再推左一点 */
-                marginRight={{ base: '44px', md: 0 }}
+                /* 手机端用户气泡右缩进：右对齐会贴到人物占位区（约 67% 屏宽起），再推左一点 */
+                marginRight={{ base: '40px', md: 0 }}
                 maxWidth="84%"
                 fontSize="sm"
                 lineHeight="1.6"

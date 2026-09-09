@@ -37,18 +37,18 @@ const DRAG_DISTANCE_THRESHOLD_PX = 5; // Min distance to be considered a drag
 // ⚠️ 竖屏画布下 Live2D 视图空间按【高度】等比映射（视图 X 只覆盖 ±0.475 屏宽），
 //    不是 ±1 对应全宽！换算：屏宽比例 f 处的 x_view = (2f-1)×0.475；
 //    屏高比例 g 处的 y_view = (1-2g)（y 上下翻转，负值=往下）。
-// 首页与对话界面站位（2026-09-09 三轮定稿）：
-//   首页 scale 0.88 ≈ 51% 屏高，x=0.20 ≈ 72.5% 屏宽（用户要求比 0.24 稍往左），
+// 首页与对话界面站位（2026-09-09 四轮微调）：
+//   首页 scale 0.88 ≈ 51% 屏高，x=0.22 ≈ 73% 屏宽（用户定：标题"成功"的"成"字正下方），
 //     y=-0.12 ≈ 人物中心在 56% 屏高；
-//   对话界面 scale 0.80（比首页稍小，用户要求），x=0.24 ≈ 75% 屏宽，y 同。
+//   对话界面 scale 0.80（比首页稍小），x=0.27 ≈ 78.4% 屏宽（用户要求再右移，给左侧聊天让位）。
 //   （聊天内容区右缩进 dialog-box 内已避开人物占位）
 // 验证用 scripts/cdp_fb_dump.py 抓帧缓冲（CDP 整页截图拍不到 GL 图层！）。换角色如大小不合适改这些常量。
 const HERO_FIT_FACTOR = 0.8;
 const HERO_CENTER_Y = -0.12;
-const HERO_OFFSET_X = 0.24;
+const HERO_OFFSET_X = 0.27;
 const HOME_FIT_FACTOR = 0.88;
 const HOME_CENTER_Y = -0.12;
-const HOME_OFFSET_X = 0.2;
+const HOME_OFFSET_X = 0.22;
 
 function parseModelUrl(url: string): { baseUrl: string; modelDir: string; modelFileName: string } {
   try {
