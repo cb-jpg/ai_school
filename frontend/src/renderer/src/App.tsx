@@ -197,6 +197,20 @@ function AppContent(): JSX.Element {
   document.documentElement.style.width = '100%';
   document.body.style.width = '100%';
 
+  // body 滚动守卫：App 是固定视口应用（body 已被上方样式锁定），但
+  // overflow:hidden 的元素仍可被浏览器程序化滚动——切页内容替换时滚动锚定
+  // 会把 body 滚动几十 px 且不恢复，表现为整页被顶上去、底部露出异色带、
+  // 顶部导航被裁（2026-09-09 真机实锤：body.scrollTop=47.7）。页面内滚动
+  // 全部走各自的内部容器，body 一旦滚动立即归零。
+  useEffect(() => {
+    const el = document.body;
+    const onScroll = () => {
+      if (el.scrollTop !== 0) el.scrollTop = 0;
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
+
   const live2dWindowFrameStyle = {
     position: "absolute" as const,
     top: isElectron ? "30px" : "0px",

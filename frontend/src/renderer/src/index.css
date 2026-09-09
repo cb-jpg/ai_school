@@ -5,6 +5,15 @@ body, html {
     background-color: transparent;
     /* 安卓 WebView 里禁止下拉刷新/回弹（App 为固定视口，滚动都在内部容器） */
     overscroll-behavior: none;
+    /* 禁用滚动锚定：切页内容替换时 Chrome 会补偿性滚动 body，
+       造成整页上移残留（2026-09-09 对话页真机实锤） */
+    overflow-anchor: none;
+}
+
+/* 根容器裁剪溢出：对话消息等内部滚动内容会把 body 撑出 ~47px 可滚空间，
+   配合滚动锚定导致切页时整页被顶上去。裁掉后 body 无可滚空间 */
+#root {
+    overflow: hidden;
 }
 
 /* Hero Landing Page Animations */
