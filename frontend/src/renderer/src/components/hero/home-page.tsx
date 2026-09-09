@@ -116,6 +116,7 @@ export default function HomePage({
               <Button
                 data-testid="campus-nav-home"
                 aria-label="回到学校首页"
+                aria-current="page"
                 onClick={() => {
                   interrupt();
                   window.location.hash = '#/home';
@@ -123,13 +124,14 @@ export default function HomePage({
                 height="40px"
                 px={{ base: '12px', lg: '16px' }}
                 borderRadius="md"
-                variant="ghost"
-                color="#121826"
+                /* 首页上此按钮恒为当前页：与专题页 TopicNavigationButton 激活态同款（蓝底白字） */
+                background={campusColors.blue}
+                color="white"
                 fontFamily={campusColors.swissFont}
                 fontWeight="500"
                 fontSize="sm"
                 flexShrink={0}
-                _hover={{ background: campusColors.blueWash, color: campusColors.blue }}
+                _hover={{ background: campusColors.blue, color: 'white' }}
                 transition="all 200ms ease"
               >
                 <HStack gap="8px">
@@ -182,7 +184,7 @@ export default function HomePage({
               lineHeight="1.6"
               textShadow="0 1px 6px rgba(255, 255, 255, 0.9)"
             >
-              佛山市南海区石实实验学校 · AI校园数字人
+              佛山市南海区石实实验学校 · AI校园数字人 · 小石
             </Text>
 
             <Text
