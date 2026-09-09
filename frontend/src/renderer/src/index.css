@@ -3,6 +3,8 @@ body, html {
     padding: 0;
     overflow: visible;
     background-color: transparent;
+    /* 安卓 WebView 里禁止下拉刷新/回弹（App 为固定视口，滚动都在内部容器） */
+    overscroll-behavior: none;
 }
 
 /* Hero Landing Page Animations */

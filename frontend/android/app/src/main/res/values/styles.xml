@@ -20,6 +20,9 @@
 
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="android:background">@drawable/splash</item>
+        <!-- 纯色打底+启动图居中（launch_bg.xml）：该背景会终身作为窗口背景，
+             WebView 表面之下的底部手势条区域露出的是它的底部切片——
+             用纯色打底才不会在页面底部露出一截启动图的橙色 -->
+        <item name="android:background">@drawable/launch_bg</item>
     </style>
 </resources>

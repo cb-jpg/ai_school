@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 启动背景=纯色。该背景会终身作为窗口背景：WebView 表面（布局视口 ~793px）
+     之下的手势条区域露出的就是它的底部切片——必须为纯色，
+     此前用 splash 整图时页面底部会露出一截启动图的橙色 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#E3D2D0"/>
+        </shape>
+    </item>
+</layer-list>

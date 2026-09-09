@@ -25,6 +25,12 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         // 展示场景常亮，避免讲解中息屏
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        // WebView 表面（布局视口 ~793px）之外的手势条区域由窗口背景绘制；
+        // 启动主题的 windowBackground=splash 启动图，会在页面底部露出一截橙色切片。
+        // 这里直接换成与前端背景底部收束色一致的纯色（background.tsx BG_BOTTOM_COLOR），
+        // 让页面与手势条区域颜色无缝衔接
+        getWindow().setBackgroundDrawable(
+                new android.graphics.drawable.ColorDrawable(android.graphics.Color.parseColor("#E3D2D0")));
         requestMediaPermissions();
         forceWebViewNetworkSettings();
     }

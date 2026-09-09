@@ -61,6 +61,12 @@ export default function HeroLanding({
         maxVvHeight.current = Math.max(maxVvHeight.current, vv.height);
         setKbViewport(null);
       }
+      // 键盘弹出/收起时浏览器会把 body 滚到输入框（overflow:hidden 仍可被
+      // 程序化滚动），收起后滚动量残留 → 整页永久上移、顶部导航被裁。
+      // 布局已由上方压缩自行露出输入框，这个滚动只会帮倒忙，一律归零
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
     };
     vv.addEventListener('resize', onVvResize);
     return () => vv.removeEventListener('resize', onVvResize);

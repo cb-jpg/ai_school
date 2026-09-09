@@ -6,6 +6,10 @@ import { apiUrl } from '@/services/api-base';
 // 内置默认背景：大沥太平校区跑道（校方《数据清单·芝兰玉树》画册照片，已打包进前端）
 import defaultCampusBg from '@/assets/school/campus-track.jpg';
 
+// 页面底部收束色：与安卓窗口背景色保持一致（MainActivity 里同步设置），
+// WebView 表面之下的手势条区域由窗口背景绘制，颜色对齐后底部无异色断层
+const BG_BOTTOM_COLOR = '#E3D2D0';
+
 const Background = memo(({ children, splitLayout = true }: { children?: React.ReactNode; /** 桌面端左右分屏遮罩（对话界面用）；首页等居中布局传 false 关闭 */ splitLayout?: boolean }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [resolvedBgUrl, setResolvedBgUrl] = useState<string | null>(null);
@@ -132,6 +136,19 @@ const Background = memo(({ children, splitLayout = true }: { children?: React.Re
           </>
         )
       )}
+
+      {/* 底部收束：背景（无论照片还是纯色）向下渐变到窗口背景同色，
+          盖住 WebView 表面底缘与手势条区域的颜色差 */}
+      <Box
+        position="absolute"
+        left={0}
+        right={0}
+        bottom={0}
+        height={{ base: '150px', md: '110px' }}
+        background={`linear-gradient(to top, ${BG_BOTTOM_COLOR} 30%, rgba(227, 210, 208, 0) 100%)`}
+        zIndex={1}
+        pointerEvents="none"
+      />
 
       {/* 左侧虚化遮罩 - web 端左右分屏设计的一部分；App 手机端无分屏布局，隐藏 */}
       <Box
