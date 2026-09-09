@@ -5,7 +5,7 @@
  * 在桌面端中部导航与手机端右上角下拉菜单中，默认进入的新首页见 home-page.tsx
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Box, Flex, IconButton } from '@chakra-ui/react';
 import { FiSettings } from 'react-icons/fi';
 import Navbar from './navbar';
@@ -43,12 +43,36 @@ export default function HeroLanding({
     setSidebarOpen(!sidebarOpen);
   };
 
+  // 软键盘压缩布局：部分 WebView 在 adjustResize 下 100vh 不随窗口缩小，
+  // 输入框会被键盘挡住。用 visualViewport 实测可见高度直接压根容器，
+  // 键盘弹出时整页缩到可见区（输入框自然升到键盘上方），收起即复原。
+  const [kbViewport, setKbViewport] = useState<number | null>(null);
+  const maxVvHeight = useRef(0);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return undefined;
+    maxVvHeight.current = vv.height;
+    const onVvResize = () => {
+      // 距最大可见高度收缩超过阈值视为键盘弹出（忽略双指缩放的轻微变化）
+      const keyboardOpen = maxVvHeight.current - vv.height > 120;
+      if (keyboardOpen) {
+        setKbViewport(vv.height);
+      } else {
+        maxVvHeight.current = Math.max(maxVvHeight.current, vv.height);
+        setKbViewport(null);
+      }
+    };
+    vv.addEventListener('resize', onVvResize);
+    return () => vv.removeEventListener('resize', onVvResize);
+  }, []);
+
   return (
     <Box
       position="relative"
       h="100vh"
       w="full"
       overflow="hidden"
+      style={kbViewport ? { height: `${kbViewport}px` } : undefined}
       css={{
         // 移除背景样式，由Background组件处理
         fontFamily: "'Helvetica Neue', Arial, sans-serif",
