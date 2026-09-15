@@ -12,6 +12,7 @@ import { LAppDelegate } from '../../../WebSDK/src/lappdelegate';
 import { LAppLive2DManager } from '../../../WebSDK/src/lapplive2dmanager';
 import { initializeLive2D } from '@cubismsdksamples/main';
 import { useMode } from '@/context/mode-context';
+import { usePortraitBoard } from '@/hooks/utils/use-portrait-board';
 
 interface UseLive2DModelProps {
   modelInfo: ModelInfo | undefined;
@@ -49,6 +50,21 @@ const HERO_OFFSET_X = 0.27;
 const HOME_FIT_FACTOR = 0.88;
 const HOME_CENTER_Y = -0.12;
 const HOME_OFFSET_X = 0.22;
+
+// 竖屏大屏（壁挂数字屏 1272×2800 / 竖放平板）站位初值（2026-09-15 桌面模拟定，
+// 待真机微调；换算同上——竖屏画布按高度等比映射，视图 X 覆盖 ±0.475 屏宽）：
+//   首页：内容列(限宽 840 居中)在屏上半部，人物居中站下方展示区——
+//     fit 0.95 ≈ 55% 屏高，x=0 即屏宽 50%，y=-0.34 即人物中心 67% 屏高
+//     （避开上方文字块与底部"开始对话"按钮）；
+//   对话界面：对话卡 840 居中，人物右侧小比例——fit 0.6，x=0.34 ≈ 86% 屏宽
+//     （人物左缘轻压卡片右缘，与手机端"人物压卡片右缘"设计一致），
+//     y=-0.18 即人物中心 59% 屏高。
+const HERO_BOARD_FIT_FACTOR = 0.6;
+const HERO_BOARD_CENTER_Y = -0.18;
+const HERO_BOARD_OFFSET_X = 0.34;
+const HOME_BOARD_FIT_FACTOR = 0.95;
+const HOME_BOARD_CENTER_Y = -0.34;
+const HOME_BOARD_OFFSET_X = 0;
 
 function parseModelUrl(url: string): { baseUrl: string; modelDir: string; modelFileName: string } {
   try {
@@ -131,9 +147,17 @@ export const useLive2DModel = ({
 }: UseLive2DModelProps) => {
   // 站位换算在适配时使用；页面切换（首页↔对话界面）会触发重新适配到对应站位
   const isHomeAlign = heroAlign === 'center';
-  const heroOffsetX = isHomeAlign ? HOME_OFFSET_X : HERO_OFFSET_X;
-  const heroFitFactor = isHomeAlign ? HOME_FIT_FACTOR : HERO_FIT_FACTOR;
-  const heroCenterY = isHomeAlign ? HOME_CENTER_Y : HERO_CENTER_Y;
+  // 竖屏大屏（壁挂数字屏/竖放平板）换用大屏站位常量（人物比例与站位按大屏排版）
+  const isBoard = usePortraitBoard();
+  const heroOffsetX = isBoard
+    ? (isHomeAlign ? HOME_BOARD_OFFSET_X : HERO_BOARD_OFFSET_X)
+    : (isHomeAlign ? HOME_OFFSET_X : HERO_OFFSET_X);
+  const heroFitFactor = isBoard
+    ? (isHomeAlign ? HOME_BOARD_FIT_FACTOR : HERO_BOARD_FIT_FACTOR)
+    : (isHomeAlign ? HOME_FIT_FACTOR : HERO_FIT_FACTOR);
+  const heroCenterY = isBoard
+    ? (isHomeAlign ? HOME_BOARD_CENTER_Y : HERO_BOARD_CENTER_Y)
+    : (isHomeAlign ? HOME_CENTER_Y : HERO_CENTER_Y);
   const { mode } = useMode();
   const isPet = mode === 'pet';
   const [isDragging, setIsDragging] = useState(false);
@@ -248,8 +272,10 @@ export const useLive2DModel = ({
   // --- hero 全屏穿透：模型就绪后适配初始站位（缩放+站位），用户仍可拖/捏 ---
   useEffect(() => {
     if (!touchThrough) return undefined;
-    // 仅手机宽度适配；桌面端保持默认布局不缩放
-    if (typeof window !== 'undefined' && window.innerWidth >= 768) return undefined;
+    // 竖屏（手机 + 大屏竖屏）都做站位适配；横屏桌面保持默认布局不缩放。
+    // 原门槛是 innerWidth>=768 跳过，1272px 宽的竖屏数字屏被误判为桌面，
+    // 人物完全不做站位适配（SDK 默认居中默认比例），真机表现为下半屏无人
+    if (typeof window !== 'undefined' && !window.matchMedia('(orientation: portrait)').matches) return undefined;
     let cancelled = false;
     let outerStop: (() => void) | null = null;
 

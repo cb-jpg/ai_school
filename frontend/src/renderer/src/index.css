@@ -2,6 +2,10 @@ body, html {
     margin: 0;
     padding: 0;
     overflow: visible;
+    /* 横向一律裁剪：关闭态设置侧栏（fixed + translateX(100%)）等屏外元素
+       仍会撑出 body 横向可滚空间（1272 视口实测 scrollWidth=1348），
+       Android WebView 横向平移后不回位 = 真机"整页偏左、左侧被裁" */
+    overflow-x: hidden;
     background-color: transparent;
     /* 安卓 WebView 里禁止下拉刷新/回弹（App 为固定视口，滚动都在内部容器） */
     overscroll-behavior: none;

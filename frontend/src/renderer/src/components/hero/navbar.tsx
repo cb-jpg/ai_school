@@ -8,6 +8,7 @@ import { Flex, Text, Button, HStack, IconButton } from '@chakra-ui/react';
 import { FiMenu, FiSettings, FiHome, FiBook, FiClock, FiAward, FiUsers, FiMessageCircle, FiLogOut } from 'react-icons/fi';
 import { useInterrupt } from '@/hooks/utils/use-interrupt';
 import { useAuth } from '@/context/auth-context';
+import { usePortraitBoard } from '@/hooks/utils/use-portrait-board';
 
 interface NavItem {
   id: string;
@@ -75,6 +76,8 @@ const Navbar = memo(({
   const { interrupt } = useInterrupt();
   const { user, logout } = useAuth();
   const isAdmin = user?.role === 'admin';
+  // 竖屏大屏：字号放大、左右留白对齐 840px 居中内容列
+  const isPortraitBoard = usePortraitBoard();
 
   const handleAdminConsole = () => {
     // 切换界面时打断语音播报
@@ -91,9 +94,9 @@ const Navbar = memo(({
       left={0}
       right={0}
       zIndex={30}
-      px={{ base: 6, md: 12, lg: 16 }}
-      pt={{ base: 7, md: 6 }}
-      pb={{ base: 5, md: 6 }}
+      px={isPortraitBoard ? 'max(24px, calc((100vw - 840px) / 2))' : { base: 6, md: 12, lg: 16 }}
+      pt={isPortraitBoard ? 5 : { base: 7, md: 6 }}
+      pb={isPortraitBoard ? 5 : { base: 5, md: 6 }}
       justifyContent="space-between"
       alignItems="center"
       bg="white"
@@ -104,7 +107,7 @@ const Navbar = memo(({
       {/* Left Side: Logo（与右侧按钮同一行内垂直居中） */}
       <HStack gap={4} alignItems="center">
         <Text
-          fontSize={{ base: 'lg', sm: 'xl' }}
+          fontSize={isPortraitBoard ? '28px' : { base: 'lg', sm: 'xl' }}
           fontWeight="bold"
           letterSpacing="tight"
           color="#1E5494"
@@ -119,7 +122,7 @@ const Navbar = memo(({
       {/* Center: Desktop Navigation（首页由选项行承担导航，hideCenterNav 时隐藏） */}
       <HStack
         display={hideCenterNav ? 'none' : { base: 'none', md: 'flex' }}
-        gap={{ base: 8, md: 6, lg: 8 }}
+        gap={isPortraitBoard ? 10 : { base: 8, md: 6, lg: 8 }}
       >
         {navigation.map((item) => {
           const Icon = iconMap[item.id] || item.icon;
@@ -127,7 +130,7 @@ const Navbar = memo(({
             <HStack
               key={item.id}
               gap={2}
-              fontSize="sm"
+              fontSize={isPortraitBoard ? '19px' : 'sm'}
               color="gray.600"
               _hover={{ color: '#1E5494' }}
               transition="all 0.2s"
@@ -135,7 +138,7 @@ const Navbar = memo(({
               fontWeight="500"
               onClick={() => handleNavClick(item.id, interrupt)}
             >
-              <Icon size={16} />
+              <Icon size={isPortraitBoard ? 22 : 16} />
               <Text>{item.label}</Text>
             </HStack>
           );
@@ -144,20 +147,20 @@ const Navbar = memo(({
 
       {/* Right Side: 设置（手机端，原悬浮齿轮移入导航栏）+ CTA Button (Desktop) + 抽屉键 */}
       <HStack gap={2} alignItems="center">
-        {/* 设置按钮（手机端）：打开右侧设置侧栏 */}
+        {/* 设置按钮（手机端/竖屏大屏）：打开右侧设置侧栏 */}
         {onSettingsToggle && (
           <IconButton
-            display={{ base: 'flex', md: 'none' }}
+            display={isPortraitBoard ? 'flex' : { base: 'flex', md: 'none' }}
             aria-label="设置"
             onClick={onSettingsToggle}
             size="sm"
-            boxSize="32px"
+            boxSize={isPortraitBoard ? '44px' : '32px'}
             bg="transparent"
             color="#1E5494"
             _hover={{ bg: 'gray.100' }}
             _active={{ scale: 0.9 }}
           >
-            <FiSettings size={18} />
+            <FiSettings size={isPortraitBoard ? 24 : 18} />
           </IconButton>
         )}
 

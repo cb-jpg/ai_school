@@ -8,6 +8,7 @@ import { Box, Button, Flex, HStack, Text } from '@chakra-ui/react';
 import { FiBookOpen, FiClock, FiAward, FiUsers } from 'react-icons/fi';
 import type { IconType } from 'react-icons';
 import { CampusTopic, CampusTopicId, campusTopics } from '@/data/campus-knowledge';
+import { usePortraitBoard } from '@/hooks/utils/use-portrait-board';
 
 const swissFont = '"Helvetica Neue", Arial, sans-serif';
 const ink = '#121826';
@@ -33,20 +34,22 @@ export function TopicTabButton({
   onClick: () => void;
 }) {
   const Icon = topicIcons[topic.id];
+  // 竖屏大屏：按钮放大（壁挂数字屏远距离触控/观看）
+  const isPortraitBoard = usePortraitBoard();
   return (
     <Button
       data-testid={`campus-nav-${topic.id}`}
       aria-current={active ? 'page' : undefined}
       aria-label={`进入${topic.navLabel}页面`}
       onClick={onClick}
-      height="40px"
-      px={{ base: '12px', lg: '16px' }}
+      height={isPortraitBoard ? '54px' : '40px'}
+      px={isPortraitBoard ? '20px' : { base: '12px', lg: '16px' }}
       borderRadius="md"
       background={active ? blue : 'transparent'}
       color={active ? 'white' : ink}
       fontFamily={swissFont}
       fontWeight="500"
-      fontSize="sm"
+      fontSize={isPortraitBoard ? '19px' : 'sm'}
       flexShrink={0}
       _hover={{
         background: active ? blue : blueWash,
@@ -54,8 +57,8 @@ export function TopicTabButton({
       }}
       transition="all 200ms ease"
     >
-      <HStack gap="8px">
-        <Icon size={16} />
+      <HStack gap={isPortraitBoard ? '10px' : '8px'}>
+        <Icon size={isPortraitBoard ? 22 : 16} />
         <Text>{topic.navLabel}</Text>
       </HStack>
     </Button>
@@ -78,24 +81,26 @@ export default function TopicTabRow({
   leading,
   trailing,
 }: TopicTabRowProps) {
+  // 竖屏大屏：整行按手机端"单行横滑"形态放大展示（内容列限宽内一行放不下时仍可滑）
+  const isPortraitBoard = usePortraitBoard();
   return (
     <Box
       flexShrink={0}
-      px={{ base: '12px', md: '20px', lg: '24px' }}
-      py={{ base: '10px', md: '20px' }}
+      px={isPortraitBoard ? '20px' : { base: '12px', md: '20px', lg: '24px' }}
+      py={isPortraitBoard ? '14px' : { base: '10px', md: '20px' }}
       background={paper}
       borderRadius="lg"
       boxShadow="sm"
       border="1px solid"
       borderColor={hairline}
     >
-      {/* 手机端一行横向滑动；桌面端保持换行布局（与专题页一致） */}
+      {/* 手机端/竖屏大屏一行横向滑动；桌面端保持换行布局（与专题页一致） */}
       <Flex
         align="center"
-        justify={{ base: 'flex-start', lg: 'flex-end' }}
-        gap="8px"
-        flexWrap={{ base: 'nowrap', lg: 'wrap' }}
-        overflowX={{ base: 'auto', lg: 'visible' }}
+        justify={isPortraitBoard ? 'flex-start' : { base: 'flex-start', lg: 'flex-end' }}
+        gap={isPortraitBoard ? '10px' : '8px'}
+        flexWrap={isPortraitBoard ? 'nowrap' : { base: 'nowrap', lg: 'wrap' }}
+        overflowX={isPortraitBoard ? 'auto' : { base: 'auto', lg: 'visible' }}
         css={{ '&::-webkit-scrollbar': { display: 'none' } }}
       >
         {leading}

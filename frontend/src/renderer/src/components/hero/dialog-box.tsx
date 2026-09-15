@@ -21,6 +21,7 @@ import { FiClock, FiPlus, FiHome } from 'react-icons/fi';
 import { IoSend } from 'react-icons/io5';
 import { Alert } from '@/components/ui/alert';
 import { useInterrupt } from '@/hooks/utils/use-interrupt';
+import { usePortraitBoard } from '@/hooks/utils/use-portrait-board';
 import { useTextInput } from '@/hooks/footer/use-text-input';
 import { useWebSocket } from '@/context/websocket-context';
 import { useAiState, AiStateEnum } from '@/context/ai-state-context';
@@ -64,6 +65,8 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
   const { modelInfo, isLoading: modelLoading } = useLive2DConfig();
   const { createNewHistory } = useSidebar();
   const { interrupt } = useInterrupt();
+  // 竖屏大屏：消息/输入字号放大，右侧为人物占位留出缩进
+  const isPortraitBoard = usePortraitBoard();
 
   // 返回新首页：先打断可能进行中的播报，再切路由
   const goHome = () => {
@@ -150,9 +153,9 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
     <Flex
       flexDirection="column"
       h="full"
-      /* 手机端人物区占上半屏，对话区填剩余高度；桌面端保持 75vh/500px 设计 */
-      maxHeight={{ base: 'none', md: '75vh' }}
-      minHeight={{ base: '0px', md: '500px' }}
+      /* 手机端/竖屏大屏人物区占上半屏，对话区填剩余高度；桌面端保持 75vh/500px 设计 */
+      maxHeight={isPortraitBoard ? 'none' : { base: 'none', md: '75vh' }}
+      minHeight={isPortraitBoard ? '0px' : { base: '0px', md: '500px' }}
     >
       {/* Connection Status Alert */}
       {wsState !== 'OPEN' && (
@@ -186,7 +189,7 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
               rounded="full"
               bg={getStatusColor()}
             />
-            <Text fontSize="sm" color={schoolColors.textSecondary}>
+            <Text fontSize={isPortraitBoard ? '16px' : 'sm'} color={schoolColors.textSecondary}>
               {getStatusText()}
             </Text>
             {wsState === 'OPEN' && !modelInfo && (
@@ -240,10 +243,10 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
           </HStack>
         </HStack>
 
-        {/* 副标题：桌面端显示一句说明（手机端隐藏，由状态行承担头部） */}
-        <Box order={{ base: 0, md: 1 }} px={{ base: 0, md: 0 }} display={{ base: 'none', sm: 'block' }}>
+        {/* 副标题：桌面端/竖屏大屏显示一句说明（手机端隐藏，由状态行承担头部） */}
+        <Box order={{ base: 0, md: 1 }} px={{ base: 0, md: 0 }} display={isPortraitBoard ? 'block' : { base: 'none', sm: 'block' }}>
           <Text
-            fontSize={{ sm: 'base', md: 'lg' }}
+            fontSize={isPortraitBoard ? '20px' : { sm: 'base', md: 'lg' }}
             color={schoolColors.textSecondary}
             maxW={{ sm: 'lg', md: 'xl' }}
             mb={{ sm: 5 }}
@@ -253,35 +256,36 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
         </Box>
 
         {/* Messages Container —— 手机端顶部渐变：与上方人物区融合，人物仿佛站进卡片；
-            右侧留出约人物占位宽（人物约 0.80 倍、约 65%~85% 屏宽），避免气泡被人物盖住 */}
+            右侧留出约人物占位宽（人物约 0.80 倍、约 65%~85% 屏宽），避免气泡被人物盖住。
+            竖屏大屏：右侧同样为人物站位留 ~190px 缩进，气泡字号放大 */}
         <Box
           flex={1}
           overflowY="auto"
-          bg={{ base: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.9) 64px, #FFFFFF 112px)', md: schoolColors.white }}
+          bg={isPortraitBoard ? schoolColors.white : { base: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.9) 64px, #FFFFFF 112px)', md: schoolColors.white }}
           rounded={{ base: '2xl', md: 'xl' }}
-          p={3}
-          pr={{ base: '84px', md: 3 }}
+          p={isPortraitBoard ? 5 : 3}
+          pr={isPortraitBoard ? '190px' : { base: '84px', md: 3 }}
           border="1px solid"
-          borderColor={{ base: 'transparent', md: schoolColors.border }}
+          borderColor={isPortraitBoard ? schoolColors.border : { base: 'transparent', md: schoolColors.border }}
           boxShadow={{ base: 'sm', md: 'sm' }}
           order={2}
         >
-          <VStack gap={3} align="stretch">
+          <VStack gap={isPortraitBoard ? 5 : 3} align="stretch">
             {messages.map((msg, index) => (
               <Box
                 key={index}
                 bg={msg.role === 'human' ? schoolColors.userBubble : schoolColors.assistantBubble}
                 color={msg.role === 'human' ? 'white' : schoolColors.text}
-                p={3}
+                p={isPortraitBoard ? 5 : 3}
                 rounded="2xl"
                 /* 内角收小形成气泡尾巴方向感 */
                 borderBottomRightRadius={msg.role === 'human' ? 'sm' : '2xl'}
                 borderBottomLeftRadius={msg.role === 'human' ? '2xl' : 'sm'}
                 alignSelf={msg.role === 'human' ? 'flex-end' : 'flex-start'}
                 /* 手机端用户气泡右缩进：右对齐会贴到人物占位区（约 67% 屏宽起），再推左一点 */
-                marginRight={{ base: '40px', md: 0 }}
+                marginRight={isPortraitBoard ? 0 : { base: '40px', md: 0 }}
                 maxWidth="84%"
-                fontSize="sm"
+                fontSize={isPortraitBoard ? '18px' : 'sm'}
                 lineHeight="1.6"
                 wordBreak="break-word"
                 boxShadow={msg.role === 'human' ? 'none' : 'sm'}
@@ -298,12 +302,12 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
               <Box
                 bg={schoolColors.assistantBubble}
                 color={schoolColors.textSecondary}
-                p={3}
+                p={isPortraitBoard ? 5 : 3}
                 rounded="2xl"
                 borderBottomLeftRadius="sm"
                 alignSelf="flex-start"
                 maxWidth="84%"
-                fontSize="sm"
+                fontSize={isPortraitBoard ? '18px' : 'sm'}
                 lineHeight="1.6"
                 wordBreak="break-word"
                 boxShadow="sm"
@@ -376,13 +380,14 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
             border="1px solid"
             borderColor={schoolColors.border}
             rounded="2xl"
-            p={3}
-            pr={16}
+            p={isPortraitBoard ? 4 : 3}
+            pr={isPortraitBoard ? '84px' : 16}
             width="full"
             resize="none"
             height="auto"
-            minHeight="48px"
-            maxHeight="120px"
+            minHeight={isPortraitBoard ? '64px' : '48px'}
+            maxHeight={isPortraitBoard ? '160px' : '120px'}
+            fontSize={isPortraitBoard ? '20px' : undefined}
             boxShadow="sm"
             _placeholder={{ color: 'gray.400' }}
             _focus={{
@@ -392,18 +397,18 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
             }}
           />
 
-          {/* 麦克风 / 发送 切换键（悬浮于输入框右缘居中） */}
+          {/* 麦克风 / 发送 切换键（悬浮于输入框右缘居中；竖屏大屏放大为远距触控尺寸） */}
           {hasInputText ? (
             <Box
               as="button"
               onClick={handleSendMessage}
               aria-label="发送"
               position="absolute"
-              right={2}
+              right={isPortraitBoard ? 3 : 2}
               top="50%"
               transform="translateY(-50%)"
-              width="40px"
-              height="40px"
+              width={isPortraitBoard ? '56px' : '40px'}
+              height={isPortraitBoard ? '56px' : '40px'}
               rounded="full"
               bg={schoolColors.primary}
               color="white"
@@ -415,7 +420,7 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
               _active={{ transform: 'translateY(-50%) scale(0.92)' }}
               style={{ cursor: 'pointer' }}
             >
-              <IoSend size={18} />
+              <IoSend size={isPortraitBoard ? 24 : 18} />
             </Box>
           ) : (
             <Box
@@ -433,11 +438,11 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
               }}
               aria-label={micOn ? '停止录音' : '开始录音'}
               position="absolute"
-              right={2}
+              right={isPortraitBoard ? 3 : 2}
               top="50%"
               transform="translateY(-50%)"
-              width="40px"
-              height="40px"
+              width={isPortraitBoard ? '56px' : '40px'}
+              height={isPortraitBoard ? '56px' : '40px'}
               rounded="full"
               bg={micOn ? schoolColors.secondary : schoolColors.primary}
               color="white"
@@ -449,7 +454,7 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
               _active={{ transform: 'translateY(-50%) scale(0.92)' }}
               style={{ cursor: 'pointer' }}
             >
-              {micOn ? <BsMicFill size={18} /> : <BsMic size={18} />}
+              {micOn ? <BsMicFill size={isPortraitBoard ? 24 : 18} /> : <BsMic size={isPortraitBoard ? 24 : 18} />}
             </Box>
           )}
         </Box>
@@ -457,7 +462,7 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
         {/* 麦克风自动停止设置 —— 同输入区，保持可点 */}
         <HStack
           gap={3}
-          fontSize="xs"
+          fontSize={isPortraitBoard ? '15px' : 'xs'}
           color={schoolColors.textSecondary}
           order={4}
           position="relative"

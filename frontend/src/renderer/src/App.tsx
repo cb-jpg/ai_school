@@ -62,6 +62,7 @@ import AppLoginPage from "./components/auth/app-login-page";
 import UnansweredQuestions from "./components/admin/unanswered-questions";
 import UserManagement from "./components/admin/user-management";
 import { CharacterConfig } from "./components/admin/character-config";
+import { usePortraitBoard } from "./hooks/utils/use-portrait-board";
 
 // 定义路由类型
 type AppRoute = 'hero' | 'main' | 'campus' | 'main-admin';
@@ -121,6 +122,9 @@ function AppContent(): JSX.Element {
   const { mode } = useMode();
   const { user: authUser } = useAuth();
   const isElectron = window.api !== undefined;
+  // 竖屏大屏（壁挂数字屏/竖放平板）：hero 路由的画布层与文案样式走手机竖屏
+  // 同款的全宽穿透形态，而非 md 档"右侧 55% / 低层级"的横屏布局
+  const isPortraitBoard = usePortraitBoard();
   const live2dContainerRef = useRef<HTMLDivElement>(null);
   const currentLayoutRef = useRef({ showSidebar, isFooterCollapsed });
   const previousLayoutRef = useRef<{ showSidebar: boolean; isFooterCollapsed: boolean } | null>(null);
@@ -201,11 +205,13 @@ function AppContent(): JSX.Element {
   // overflow:hidden 的元素仍可被浏览器程序化滚动——切页内容替换时滚动锚定
   // 会把 body 滚动几十 px 且不恢复，表现为整页被顶上去、底部露出异色带、
   // 顶部导航被裁（2026-09-09 真机实锤：body.scrollTop=47.7）。页面内滚动
-  // 全部走各自的内部容器，body 一旦滚动立即归零。
+  // 全部走各自的内部容器，body 一旦滚动立即归零。横向同理归零（竖屏大屏
+  // 真机实锤：屏外设置抽屉撑出横向可滚空间，WebView 平移后左缘被裁）。
   useEffect(() => {
     const el = document.body;
     const onScroll = () => {
       if (el.scrollTop !== 0) el.scrollTop = 0;
+      if (el.scrollLeft !== 0) el.scrollLeft = 0;
     };
     el.addEventListener('scroll', onScroll, { passive: true });
     return () => el.removeEventListener('scroll', onScroll);
@@ -253,18 +259,18 @@ function AppContent(): JSX.Element {
         {/* Background layer for hero route（首页居中布局，关闭桌面端分屏遮罩） */}
         <Background splitLayout={!isHomeView} />
 
-        {/* Live2D layer for hero route - 手机端全屏穿透画布；桌面端对话界面右侧 55%、
+        {/* Live2D layer for hero route - 手机端/竖屏大屏全屏穿透画布；桌面端对话界面右侧 55%、
             新首页全宽（人物居中） */}
         <Box
           position="absolute"
           top={0}
           right={0}
-          width={isHomeView ? "100%" : { base: "100%", md: "55%" }}
+          width={isHomeView || isPortraitBoard ? "100%" : { base: "100%", md: "55%" }}
           height={{
             base: "100vh",
             md: isElectron ? "calc(100vh - 30px)" : "100vh",
           }}
-          zIndex={{ base: 15, md: 1 }}
+          zIndex={isPortraitBoard ? 15 : { base: 15, md: 1 }}
           /* 手机端：全屏穿透画布（pointerEvents none + window 级 hitTest 触摸）。
              人物可被拖到屏幕任意位置（包括卡片中间），且只有摸到模型本体
              才拦截触摸，其余区域完全放行——按钮/选项行/输入框全部正常。

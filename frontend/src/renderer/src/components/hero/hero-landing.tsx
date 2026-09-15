@@ -13,6 +13,7 @@ import MobileMenu from './mobile-menu';
 import DialogBox from './dialog-box';
 import HeroSidebar from './hero-sidebar';
 import { SCHOOL_CONFIG } from './school-config';
+import { usePortraitBoard } from '@/hooks/utils/use-portrait-board';
 import { CampusTopicId } from '@/data/campus-knowledge';
 
 // 学校配色方案 - 基于石实实验学校的设计
@@ -30,6 +31,8 @@ export default function HeroLanding({
 }: HeroLandingProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // 竖屏大屏：对话卡限宽 840 居中、铺满高度（手机竖屏同款形态放大），人物右侧小站位
+  const isPortraitBoard = usePortraitBoard();
 
   const handleMobileMenuToggle = () => {
     setMobileMenuOpen(!mobileMenuOpen);
@@ -93,14 +96,14 @@ export default function HeroLanding({
         onSettingsToggle={toggleSidebar}
       />
 
-      {/* 设置按钮 - 打开右侧侧栏（手机端已移入导航栏；专题页打开时隐藏，避免浮在专题页上） */}
+      {/* 设置按钮 - 打开右侧侧栏（手机端已移入导航栏，竖屏大屏同；专题页打开时隐藏，避免浮在专题页上） */}
       {!activeCampusTopic && (
         <Box
           position="absolute"
           top={{ base: 20, md: 24 }}
           right={{ base: 4, md: 8, lg: 12 }}
           zIndex={20}
-          display={{ base: 'none', md: 'block' }}
+          display={isPortraitBoard ? 'none' : { base: 'none', md: 'block' }}
         >
           <IconButton
             aria-label="设置"
@@ -127,28 +130,29 @@ export default function HeroLanding({
         navigation={SCHOOL_CONFIG.navigation}
       />
 
-      {/* Main Content Area - 直接显示对话界面 */}
+      {/* Main Content Area - 直接显示对话界面（竖屏大屏：对话卡限宽 840 居中） */}
       <Flex
         h="full"
         alignItems="center"
-        px={{ base: 3, md: 12, lg: 16 }}
+        justifyContent={isPortraitBoard ? 'center' : undefined}
+        px={isPortraitBoard ? '24px' : { base: 3, md: 12, lg: 16 }}
         /* 手机端：人物右侧大站位与首页一致（Live2D 全屏穿透层），对话卡贴导航栏下方、
-           占据整宽（人物本体压在卡片右缘上方，输入行 z20 保持可点） */
-        pt={{ base: '88px', md: 24 }}
-        pb={{ base: 4, md: 16 }}
+           占据整宽（人物本体压在卡片右缘上方，输入行 z20 保持可点）；竖屏大屏同形态 */
+        pt={isPortraitBoard ? '150px' : { base: '88px', md: 24 }}
+        pb={isPortraitBoard ? 10 : { base: 4, md: 16 }}
       >
         {/* 对话界面：不再特意在右侧留白给人物（展示功能已由新首页承担），
-           对话卡恢复正常宽度：手机端满宽，桌面端 680px 常规阅读宽度 */}
+           对话卡恢复正常宽度：手机端满宽，桌面端 680px 常规阅读宽度，竖屏大屏 840px 居中 */}
         {!activeCampusTopic && (
           <Box
             flex="1"
-            maxWidth={{ base: '100%', md: '680px' }}
-            /* 手机端 zIndex 5：低于 Live2D 层(15)，人物可盖住卡片的状态行与
+            maxWidth={isPortraitBoard ? '840px' : { base: '100%', md: '680px' }}
+            /* 手机端/竖屏大屏 zIndex 5：低于 Live2D 层(15)，人物可盖住卡片的状态行与
                消息区顶部；输入框区在 dialog-box 内部单独提升到 20 保证可点 */
-            zIndex={{ base: 5, md: 10 }}
-            h={{ base: 'full', md: 'auto' }}
+            zIndex={isPortraitBoard ? 5 : { base: 5, md: 10 }}
+            h={isPortraitBoard ? 'full' : { base: 'full', md: 'auto' }}
           >
-            <Box height={{ base: 'full', md: '75vh' }}>
+            <Box height={isPortraitBoard ? 'full' : { base: 'full', md: '75vh' }}>
               <DialogBox
                 description={SCHOOL_CONFIG.description}
               />
