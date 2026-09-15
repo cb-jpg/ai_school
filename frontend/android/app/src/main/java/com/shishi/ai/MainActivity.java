@@ -39,6 +39,9 @@ public class MainActivity extends BridgeActivity {
      * 部分 ROM 的 WebView 默认混合内容模式不是 ALWAYS_ALLOW：
      * fetch 放行但 http 图片被"自动升级 https"后连不上非 TLS 后端，
      * Live2D 纹理加载全部失败（2026-08-31 真机踩坑）。这里显式钉死。
+     * 另：一体机/定制 ROM 常改系统字体大小，WebView 会按 fontScale 放大
+     * textZoom（文字变大、容器不变）→ 文字重叠溢出、界面错乱（2026-09-14
+     * 一体机适配）。UI 按 px 定版，这里把 textZoom 钉死 100% 保证各端一致。
      */
     private void forceWebViewNetworkSettings() {
         WebView webView = getBridge() != null ? getBridge().getWebView() : null;
@@ -46,20 +49,23 @@ public class MainActivity extends BridgeActivity {
             WebSettings settings = webView.getSettings();
             android.util.Log.d("AISchool", "before: mixed=" + settings.getMixedContentMode()
                     + " blockImg=" + settings.getBlockNetworkImage()
-                    + " blockLoads=" + settings.getBlockNetworkLoads());
+                    + " blockLoads=" + settings.getBlockNetworkLoads()
+                    + " textZoom=" + settings.getTextZoom());
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
             settings.setBlockNetworkImage(false);
             settings.setBlockNetworkLoads(false);
+            settings.setTextZoom(100);
             android.util.Log.d("AISchool", "after: mixed=" + settings.getMixedContentMode()
                     + " blockImg=" + settings.getBlockNetworkImage()
-                    + " blockLoads=" + settings.getBlockNetworkLoads());
+                    + " blockLoads=" + settings.getBlockNetworkLoads()
+                    + " textZoom=" + settings.getTextZoom());
         }
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        // 防止 ROM/其它组件在生命周期中改写图片加载设置
+        // 防止 ROM/其它组件在生命周期中改写图片加载/字体缩放设置
         forceWebViewNetworkSettings();
     }
 

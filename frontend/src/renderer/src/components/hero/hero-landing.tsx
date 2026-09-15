@@ -15,6 +15,7 @@ import HeroSidebar from './hero-sidebar';
 import { SCHOOL_CONFIG } from './school-config';
 import { usePortraitBoard } from '@/hooks/utils/use-portrait-board';
 import { CampusTopicId } from '@/data/campus-knowledge';
+import { IS_KIOSK } from '@/utils/device-profile';
 
 // 学校配色方案 - 基于石实实验学校的设计
 const schoolColors = {
@@ -49,11 +50,13 @@ export default function HeroLanding({
   // 软键盘压缩布局：部分 WebView 在 adjustResize 下 100vh 不随窗口缩小，
   // 输入框会被键盘挡住。用 visualViewport 实测可见高度直接压根容器，
   // 键盘弹出时整页缩到可见区（输入框自然升到键盘上方），收起即复原。
+  // 大屏一体机不走此启发式（kiosk ROM 的 vv.height 会随机缩水导致误判常驻、
+  // 页面永久缩成半截——改由 device-profile 的 --app-vh 守卫实测压根）。
   const [kbViewport, setKbViewport] = useState<number | null>(null);
   const maxVvHeight = useRef(0);
   useEffect(() => {
     const vv = window.visualViewport;
-    if (!vv) return undefined;
+    if (!vv || IS_KIOSK) return undefined;
     maxVvHeight.current = vv.height;
     const onVvResize = () => {
       // 距最大可见高度收缩超过阈值视为键盘弹出（忽略双指缩放的轻微变化）
@@ -67,9 +70,12 @@ export default function HeroLanding({
       // 键盘弹出/收起时浏览器会把 body 滚到输入框（overflow:hidden 仍可被
       // 程序化滚动），收起后滚动量残留 → 整页永久上移、顶部导航被裁。
       // 布局已由上方压缩自行露出输入框，这个滚动只会帮倒忙，一律归零
+      //（横向同理：触摸拖动残留 scrollLeft 会让整页左移、文字被屏边裁切）
       window.scrollTo(0, 0);
       document.documentElement.scrollTop = 0;
+      document.documentElement.scrollLeft = 0;
       document.body.scrollTop = 0;
+      document.body.scrollLeft = 0;
     };
     vv.addEventListener('resize', onVvResize);
     return () => vv.removeEventListener('resize', onVvResize);
@@ -78,10 +84,11 @@ export default function HeroLanding({
   return (
     <Box
       position="relative"
-      h="100vh"
       w="full"
       overflow="hidden"
-      style={kbViewport ? { height: `${kbViewport}px` } : undefined}
+      /* 大屏一体机：--app-vh 实测高度（见 device-profile）；手机/桌面回退 100vh。
+         键盘压缩态（仅手机启发式）仍直接以实测可见高覆盖 */
+      style={{ height: kbViewport ? `${kbViewport}px` : 'var(--app-vh, 100vh)' }}
       css={{
         // 移除背景样式，由Background组件处理
         fontFamily: "'Helvetica Neue', Arial, sans-serif",

@@ -30,6 +30,16 @@ import { useVAD } from '@/context/vad-context';
 import { useChatHistory } from '@/context/chat-history-context';
 import { useLive2DConfig } from '@/context/live2d-config-context';
 import { useSidebar } from '@/hooks/sidebar/use-sidebar';
+import { resolveApiBaseUrl } from '@/services/api-base';
+
+// 当前在连的后端地址（连接失败提示用；解析失败显示占位）
+const backendHost = (() => {
+  try {
+    return new URL(resolveApiBaseUrl()).host;
+  } catch {
+    return '未知地址';
+  }
+})();
 
 // 移除 emoji 表情符号，只保留纯文本
 function removeEmojiTags(text: string): string {
@@ -157,10 +167,11 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
       maxHeight={isPortraitBoard ? 'none' : { base: 'none', md: '75vh' }}
       minHeight={isPortraitBoard ? '0px' : { base: '0px', md: '500px' }}
     >
-      {/* Connection Status Alert */}
+      {/* Connection Status Alert（一体机现场排查：把实际在连的后端地址亮出来，
+          一眼区分"连哪儿失败"——网络不通/地址错/服务器没开） */}
       {wsState !== 'OPEN' && (
         <Alert status="warning" mb={4} title="正在连接服务器..." endElement={<Spinner size="sm" />}>
-          请确保后端服务器正在运行 (端口12393)
+          目标 {backendHost} · 请检查本机网络是否可达该地址
         </Alert>
       )}
 

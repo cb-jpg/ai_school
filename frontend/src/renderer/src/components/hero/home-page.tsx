@@ -85,9 +85,11 @@ export default function HomePage({
   return (
     <Box
       position="relative"
-      h="100vh"
       w="full"
       overflow="hidden"
+      /* 大屏一体机：--app-vh 由 device-profile 视口守卫实测写入（kiosk ROM 的
+         100vh 会缩水成半屏）；手机/桌面无该变量回退 100vh，行为不变 */
+      style={{ height: 'var(--app-vh, 100vh)' }}
       css={{
         fontFamily: "'Helvetica Neue', Arial, sans-serif",
       }}

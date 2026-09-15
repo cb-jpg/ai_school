@@ -12,10 +12,31 @@ const tokens = defineTokens({
     ]),
   ),
 });
-const system = createSystem(defaultConfig, { theme: { tokens } });
+// 大屏一体机适配（isLargeTouchViewport 判定见 utils/device-profile.ts）：
+// 一体机 WebView 视口宽=物理像素（≥768），默认断点会把一体机当"桌面端"，
+// 全部 md:/lg: 样式生效、手机端调好的布局与人物站位全部失效，UI 大乱。
+// 这里把桌面断点顶到不可达（sm 及以上永不命中），一体机全局走手机端(base)样式；
+// 手机（视口<768）本来就是 base，桌面/浏览器无触摸不受影响。
+const system = createSystem(defaultConfig, {
+  theme: {
+    tokens,
+    ...(IS_KIOSK
+      ? {
+          breakpoints: {
+            sm: '9991px',
+            md: '9992px',
+            lg: '9993px',
+            xl: '9994px',
+            '2xl': '9995px',
+          },
+        }
+      : {}),
+  },
+});
 import { useState, useEffect, useRef } from "react";
 // 导入工作台字体
 import "@/styles/admin-fonts.css";
+import { IS_KIOSK } from "@/utils/device-profile";
 // import Canvas from './components/canvas/canvas'; // Likely unused now
 import Footer from "./components/footer/footer";
 import { AiStateProvider } from "./context/ai-state-context";
@@ -45,6 +66,7 @@ import "@chatscope/chat-ui-kit-styles/dist/default/styles.min.css";
 import Background from "./components/canvas/background";
 import WebSocketStatus from "./components/canvas/ws-status";
 import Subtitle from "./components/canvas/subtitle";
+import KioskDiagnostics from "./components/canvas/kiosk-diagnostics";
 import { ModeProvider, useMode } from "./context/mode-context";
 import CampusKnowledge from "./components/campus/campus-knowledge";
 import { CampusTopicId, isCampusTopicId } from "./data/campus-knowledge";
@@ -207,14 +229,24 @@ function AppContent(): JSX.Element {
   // 顶部导航被裁（2026-09-09 真机实锤：body.scrollTop=47.7）。页面内滚动
   // 全部走各自的内部容器，body 一旦滚动立即归零。横向同理归零（竖屏大屏
   // 真机实锤：屏外设置抽屉撑出横向可滚空间，WebView 平移后左缘被裁）。
+  // 一体机触摸屏还会横向拖出 scrollLeft 残留（整页左移、左侧文字被屏边
+  // 裁掉半字），html/body 两个方向一起钉死。
   useEffect(() => {
-    const el = document.body;
-    const onScroll = () => {
-      if (el.scrollTop !== 0) el.scrollTop = 0;
-      if (el.scrollLeft !== 0) el.scrollLeft = 0;
+    const clamp = () => {
+      const de = document.documentElement;
+      const b = document.body;
+      if (de.scrollTop !== 0) de.scrollTop = 0;
+      if (de.scrollLeft !== 0) de.scrollLeft = 0;
+      if (b.scrollTop !== 0) b.scrollTop = 0;
+      if (b.scrollLeft !== 0) b.scrollLeft = 0;
     };
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => el.removeEventListener('scroll', onScroll);
+    document.body.addEventListener('scroll', clamp, { passive: true });
+    document.documentElement.addEventListener('scroll', clamp, { passive: true });
+    clamp();
+    return () => {
+      document.body.removeEventListener('scroll', clamp);
+      document.documentElement.removeEventListener('scroll', clamp);
+    };
   }, []);
 
   const live2dWindowFrameStyle = {
@@ -260,14 +292,14 @@ function AppContent(): JSX.Element {
         <Background splitLayout={!isHomeView} />
 
         {/* Live2D layer for hero route - 手机端/竖屏大屏全屏穿透画布；桌面端对话界面右侧 55%、
-            新首页全宽（人物居中） */}
+            新首页全宽（人物居中）。大屏一体机用 --app-vh 实测高（kiosk ROM 100vh 缩水） */}
         <Box
           position="absolute"
           top={0}
           right={0}
           width={isHomeView || isPortraitBoard ? "100%" : { base: "100%", md: "55%" }}
           height={{
-            base: "100vh",
+            base: IS_KIOSK ? "var(--app-vh, 100vh)" : "100vh",
             md: isElectron ? "calc(100vh - 30px)" : "100vh",
           }}
           zIndex={isPortraitBoard ? 15 : { base: 15, md: 1 }}
@@ -287,7 +319,7 @@ function AppContent(): JSX.Element {
             top={0}
             left={0}
             width="100%"
-            height={isElectron ? "calc(100vh - 30px)" : "100vh"}
+            height={IS_KIOSK ? "var(--app-vh, 100vh)" : (isElectron ? "calc(100vh - 30px)" : "100vh")}
             zIndex={2}
             pointerEvents="none"
           >
@@ -308,6 +340,10 @@ function AppContent(): JSX.Element {
             <WebSocketStatus />
           </Box>
         )}
+
+        {/* Kiosk 诊断悬浮层：一体机现场拍照即可读出视口/守卫值/WebView 版本/
+            连接状态/构建号（手机与桌面不渲染） */}
+        {IS_KIOSK && <KioskDiagnostics />}
 
         {/* Subtitle for hero page - 手机端对话卡片内已展示文本，隐藏；专题页/新首页隐藏 */}
         {!activeCampusTopic && !isHomeView && (

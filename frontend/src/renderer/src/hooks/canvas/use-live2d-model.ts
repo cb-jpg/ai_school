@@ -13,6 +13,7 @@ import { LAppLive2DManager } from '../../../WebSDK/src/lapplive2dmanager';
 import { initializeLive2D } from '@cubismsdksamples/main';
 import { useMode } from '@/context/mode-context';
 import { usePortraitBoard } from '@/hooks/utils/use-portrait-board';
+import { isPhoneStyleViewport } from '@/utils/device-profile';
 
 interface UseLive2DModelProps {
   modelInfo: ModelInfo | undefined;
@@ -21,7 +22,7 @@ interface UseLive2DModelProps {
    *  仅当触点命中模型（anyhitTest/isHitOnModel）才 preventDefault 拦截处理，
    *  其余触摸完全放行给下层 UI（消息滚动/按钮/输入框均可正常操作） */
   touchThrough?: boolean;
-  /** hero 页人物站位（仅手机竖屏适配生效）：center=首页；right=对话界面（两者站位现已一致） */
+  /** hero 页人物站位（手机 + 大屏一体机适配生效，见 isPhoneStyleViewport）：center=首页；right=对话界面（两者站位现已一致） */
   heroAlign?: 'center' | 'right';
 }
 
@@ -35,36 +36,42 @@ const TAP_DURATION_THRESHOLD_MS = 200; // Max duration for a tap
 const DRAG_DISTANCE_THRESHOLD_PX = 5; // Min distance to be considered a drag
 
 // hero 全屏穿透模式的模型初始适配参数（真机校准值，Hiyori/荣耀X60Pro）：
-// ⚠️ 竖屏画布下 Live2D 视图空间按【高度】等比映射（视图 X 只覆盖 ±0.475 屏宽），
-//    不是 ±1 对应全宽！换算：屏宽比例 f 处的 x_view = (2f-1)×0.475；
-//    屏高比例 g 处的 y_view = (1-2g)（y 上下翻转，负值=往下）。
+// ⚠️ 竖屏画布下 Live2D 视图空间按【高度】等比映射，视图 X 的 ±1 不对应全屏宽！
+//    屏宽比例 f 处 x_view = (2f-1)×画布宽高比（旧机 0.475 = 荣耀X60Pro 的宽高比；
+//    一体机如 1080×1920 是 0.5625，横屏 >1，必须按实际画布换算，否则人物横向跑偏）；
+//    屏高比例 g 处的 y_view = (1-2g)（y 上下翻转，负值=往下，±1 恒对应屏高，与宽高比无关）。
+// 横坐标按【屏宽比例】存（2026-09-14 由荣耀X60Pro 视图坐标反算：f = 0.5 + x_view/0.95），
+// 竖直位置/大小沿用屏高比例，任何宽高比下与手机校准值等价。
 // 首页与对话界面站位（2026-09-09 四轮微调）：
-//   首页 scale 0.88 ≈ 51% 屏高，x=0.22 ≈ 73% 屏宽（用户定：标题"成功"的"成"字正下方），
+//   首页 scale 0.88 ≈ 51% 屏高，横 73% 屏宽（用户定：标题"成功"的"成"字正下方），
 //     y=-0.12 ≈ 人物中心在 56% 屏高；
-//   对话界面 scale 0.80（比首页稍小），x=0.27 ≈ 78.4% 屏宽（用户要求再右移，给左侧聊天让位）。
+//   对话界面 scale 0.80（比首页稍小），横 78.4% 屏宽（用户要求再右移，给左侧聊天让位）。
 //   （聊天内容区右缩进 dialog-box 内已避开人物占位）
 // 验证用 scripts/cdp_fb_dump.py 抓帧缓冲（CDP 整页截图拍不到 GL 图层！）。换角色如大小不合适改这些常量。
 const HERO_FIT_FACTOR = 0.8;
 const HERO_CENTER_Y = -0.12;
-const HERO_OFFSET_X = 0.27;
+const HERO_OFFSET_F = 0.784; // 对话界面：78.4% 屏宽（原 x_view 0.27）
 const HOME_FIT_FACTOR = 0.88;
 const HOME_CENTER_Y = -0.12;
-const HOME_OFFSET_X = 0.22;
+const HOME_OFFSET_F = 0.732; // 首页：73% 屏宽（原 x_view 0.22）
 
-// 竖屏大屏（壁挂数字屏 1272×2800 / 竖放平板）站位初值（2026-09-15 桌面模拟定，
-// 待真机微调；换算同上——竖屏画布按高度等比映射，视图 X 覆盖 ±0.475 屏宽）：
+// 竖屏大屏（桌面竖窗/竖放平板，usePortraitBoard 命中的全尺寸视口）站位初值
+// （2026-09-15 桌面模拟定，待真机微调）。横坐标同样按【屏宽比例】存，由下方
+// 宽高比换算统一处理（1272×2800 模拟下换算：视图 x 0.34 ≈ 87.4% 屏宽）：
 //   首页：内容列(限宽 840 居中)在屏上半部，人物居中站下方展示区——
-//     fit 0.95 ≈ 55% 屏高，x=0 即屏宽 50%，y=-0.34 即人物中心 67% 屏高
+//     fit 0.95 ≈ 55% 屏高，50% 屏宽，y=-0.34 即人物中心 67% 屏高
 //     （避开上方文字块与底部"开始对话"按钮）；
-//   对话界面：对话卡 840 居中，人物右侧小比例——fit 0.6，x=0.34 ≈ 86% 屏宽
+//   对话界面：对话卡 840 居中，人物右侧小比例——fit 0.6，87.4% 屏宽
 //     （人物左缘轻压卡片右缘，与手机端"人物压卡片右缘"设计一致），
 //     y=-0.18 即人物中心 59% 屏高。
+// ⚠️ 大屏一体机不走这组：device-profile 已把一体机布局视口钉成手机宽(420)，
+//    usePortraitBoard(≥768) 不命中，一体机与手机共用上方真机校准值。
 const HERO_BOARD_FIT_FACTOR = 0.6;
 const HERO_BOARD_CENTER_Y = -0.18;
-const HERO_BOARD_OFFSET_X = 0.34;
+const HERO_BOARD_OFFSET_F = 0.874; // 对话界面：87.4% 屏宽（原视图坐标 x=0.34）
 const HOME_BOARD_FIT_FACTOR = 0.95;
 const HOME_BOARD_CENTER_Y = -0.34;
-const HOME_BOARD_OFFSET_X = 0;
+const HOME_BOARD_OFFSET_F = 0.5; // 首页：50% 屏宽（原视图坐标 x=0）
 
 function parseModelUrl(url: string): { baseUrl: string; modelDir: string; modelFileName: string } {
   try {
@@ -147,11 +154,12 @@ export const useLive2DModel = ({
 }: UseLive2DModelProps) => {
   // 站位换算在适配时使用；页面切换（首页↔对话界面）会触发重新适配到对应站位
   const isHomeAlign = heroAlign === 'center';
-  // 竖屏大屏（壁挂数字屏/竖放平板）换用大屏站位常量（人物比例与站位按大屏排版）
+  // 竖屏大屏（桌面竖窗/竖放平板的全尺寸视口）换用大屏站位常量（人物比例与
+  // 站位按大屏排版）；手机与一体机（420 视口）用真机校准的 手机 组常量
   const isBoard = usePortraitBoard();
-  const heroOffsetX = isBoard
-    ? (isHomeAlign ? HOME_BOARD_OFFSET_X : HERO_BOARD_OFFSET_X)
-    : (isHomeAlign ? HOME_OFFSET_X : HERO_OFFSET_X);
+  const heroOffsetF = isBoard
+    ? (isHomeAlign ? HOME_BOARD_OFFSET_F : HERO_BOARD_OFFSET_F)
+    : (isHomeAlign ? HOME_OFFSET_F : HERO_OFFSET_F);
   const heroFitFactor = isBoard
     ? (isHomeAlign ? HOME_BOARD_FIT_FACTOR : HERO_BOARD_FIT_FACTOR)
     : (isHomeAlign ? HOME_FIT_FACTOR : HERO_FIT_FACTOR);
@@ -272,10 +280,11 @@ export const useLive2DModel = ({
   // --- hero 全屏穿透：模型就绪后适配初始站位（缩放+站位），用户仍可拖/捏 ---
   useEffect(() => {
     if (!touchThrough) return undefined;
-    // 竖屏（手机 + 大屏竖屏）都做站位适配；横屏桌面保持默认布局不缩放。
-    // 原门槛是 innerWidth>=768 跳过，1272px 宽的竖屏数字屏被误判为桌面，
-    // 人物完全不做站位适配（SDK 默认居中默认比例），真机表现为下半屏无人
-    if (typeof window !== 'undefined' && !window.matchMedia('(orientation: portrait)').matches) return undefined;
+    // 手机 + 大屏一体机（触摸大屏，视口可任意宽）+ 桌面竖窗（竖屏大屏排版）
+    // 都做站位适配；横屏桌面保持默认布局不缩放。
+    // 原门槛是 innerWidth>=768 跳过，宽的竖屏数字屏被误判为桌面，人物完全
+    // 不做站位适配（SDK 默认居中默认比例），真机表现为下半屏无人
+    if (typeof window !== 'undefined' && !(isBoard || isPhoneStyleViewport())) return undefined;
     let cancelled = false;
     let outerStop: (() => void) | null = null;
 
@@ -302,11 +311,15 @@ export const useLive2DModel = ({
           if (Math.abs(ratio - 1) > 0.001) {
             matrix.scaleRelative(ratio, ratio);
           }
+          // 横坐标按实际画布宽高比换算（竖屏手机 0.475 / 一体机 0.5625 / 横屏 >1），
+          // 屏宽比例 f 处 x_view = (2f-1)×宽高比，人物落在与手机校准一致的屏宽比例处
+          const aspect = canvasEl.width / canvasEl.height;
+          const targetX = (2 * heroOffsetF - 1) * aspect;
           const arr = matrix.getArray();
-          arr[12] = heroOffsetX;
+          arr[12] = targetX;
           arr[13] = heroCenterY;
           matrix.setMatrix(arr);
-          modelPositionRef.current = { x: heroOffsetX, y: heroCenterY };
+          modelPositionRef.current = { x: targetX, y: heroCenterY };
         } catch (err) {
           console.error('[useLive2DModel] hero fit failed:', err);
         }
@@ -347,7 +360,7 @@ export const useLive2DModel = ({
     };
     // heroAlign 变化（首页右侧大站位 ↔ 对话界面右侧）时重新适配站位；
     // 已适配过时比例≈1 不再缩放，只平移到目标站位
-  }, [touchThrough, modelInfo?.url, heroAlign, heroOffsetX, heroFitFactor, heroCenterY]);
+  }, [touchThrough, modelInfo?.url, heroAlign, isBoard, heroOffsetF, heroFitFactor, heroCenterY]);
 
   const getCanvasScale = useCallback(() => {
     const canvas = document.getElementById('canvas') as HTMLCanvasElement;
