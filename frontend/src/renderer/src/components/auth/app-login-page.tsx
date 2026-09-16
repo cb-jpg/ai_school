@@ -36,7 +36,7 @@ export default function AppLoginPage() {
   return (
     <Box
       width="100vw"
-      height="100vh"
+      height="var(--app-vh, 100vh)"
       display="flex"
       flexDirection="column"
       alignItems="center"

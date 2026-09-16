@@ -337,7 +337,7 @@ export const ModernMainWorkspace: FC = () => {
     <Box
       width="full"
       bg="gray.50"
-      minH="100vh"
+      minH="var(--app-vh, 100vh)"
       fontFamily="Inter, sans-serif"
     >
       {/* 顶部欢迎区域 */}

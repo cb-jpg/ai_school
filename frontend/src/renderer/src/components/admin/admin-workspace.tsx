@@ -87,7 +87,7 @@ const AdminSidebar: FC<{
       bg="white"
       borderRight="1px solid"
       borderColor="gray.200"
-      height="100vh"
+      height="var(--app-vh, 100vh)"
       display="flex"
       flexDirection="column"
       transition="all 0.3s"
@@ -784,7 +784,7 @@ export const AdminWorkspace: FC = () => {
   return (
     <Box
       display="flex"
-      height="100vh"
+      height="var(--app-vh, 100vh)"
       backgroundColor="white"
       overflow="hidden"
       fontFamily="Inter, sans-serif"

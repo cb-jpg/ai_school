@@ -346,7 +346,7 @@ export const SystemLogs: FC = () => {
               whiteSpace="pre-wrap"
               wordBreak="break-all"
               rounded="lg"
-              maxHeight="calc(100vh - 380px)"
+              maxHeight="calc(var(--app-vh, 100vh) - 380px)"
               overflowY="auto"
             >
               {logLoading

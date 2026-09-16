@@ -28,6 +28,14 @@ export const isLargeTouchViewport = (): boolean => {
   return Math.min(window.innerWidth, window.innerHeight) >= 640;
 };
 
+// 桌面复现一体机：地址栏加 ?kiosk=1 强制走 kiosk 全部分支（断点顶飞/视口钉 420/
+// --app-vh 守卫/自动登录等），无需触摸大屏即可调试真机行为。仅 http(s) 页面生效
+// （Capacitor App 与 Electron 不受影响）。
+const KIOSK_QUERY_FORCED: boolean =
+  typeof window !== 'undefined' &&
+  ['http:', 'https:'].includes(window.location.protocol) &&
+  new URLSearchParams(window.location.search).get('kiosk') === '1';
+
 /** 是否按"手机竖屏"那套样式渲染（真手机 + 大屏一体机都算）。
  *  一体机复用手机端调好的布局与人物站位，不再走桌面断点。 */
 export const isPhoneStyleViewport = (): boolean => {
@@ -36,7 +44,7 @@ export const isPhoneStyleViewport = (): boolean => {
 };
 
 /** 模块加载时判定一次（WebView 里视口不会中途换设备；桌面预览固定 false） */
-export const IS_KIOSK = isLargeTouchViewport();
+export const IS_KIOSK = KIOSK_QUERY_FORCED || isLargeTouchViewport();
 
 // ── 大屏一体机视口缩放（2026-09-14 二轮适配）────────────────────────────
 // v1.7 只解决了"断点顶飞走手机样式"，但一体机密度 1.0 时视口宽=物理像素
@@ -50,10 +58,16 @@ export const IS_KIOSK = isLargeTouchViewport();
 //   屏宽/420≈2.57，文字按最终比例重排光栅化（同浏览器缩放，清晰不糊），
 //   站位/断点/键盘等全部手机既有逻辑原样生效。
 const KIOSK_LAYOUT_WIDTH = 420;
-/** 物理放大倍数 = 屏宽(DIP) / 布局视口宽；1080 屏 ≈ 2.571。 */
+/** 物理放大倍数 = 屏宽(DIP) / 布局视口宽；1080 屏 ≈ 2.571。
+ *  ?kiosk=1 调试模式没有"物理屏"概念，用窗口宽当基准（meta 改写前的
+ *  innerWidth），窗口多大就模拟多大的"一体机"。 */
+const kioskBaseWidth = (): number => {
+  if (typeof window === 'undefined') return 0;
+  return KIOSK_QUERY_FORCED ? window.innerWidth : (window.screen?.width ?? 0);
+};
 export const KIOSK_SCALE =
   IS_KIOSK && typeof window !== 'undefined'
-    ? window.screen.width / KIOSK_LAYOUT_WIDTH
+    ? kioskBaseWidth() / KIOSK_LAYOUT_WIDTH
     : 1;
 
 if (IS_KIOSK) {
@@ -100,7 +114,12 @@ const startKioskViewportGuard = (): void => {
 
   const apply = () => {
     const vvH = window.visualViewport?.height ?? 0;
-    const screenCssH = (window.screen?.height ?? 0) / KIOSK_SCALE;
+    // 真机用 screen.height（唯一不随 ROM 视口 bug 缩水的源）；?kiosk=1 调试
+    // 模式没有物理屏，按"布局视口 420 宽"等比换算窗口高（meta 生效后
+    // innerWidth=420、innerHeight 即 CSS 高，公式自然收敛为 innerHeight）
+    const screenCssH = KIOSK_QUERY_FORCED
+      ? (KIOSK_LAYOUT_WIDTH * window.innerHeight) / Math.max(1, window.innerWidth)
+      : (window.screen?.height ?? 0) / KIOSK_SCALE;
     // 视口缩放已生效（innerWidth 已变手机宽）时，结果再封顶到一整屏 CSS 高：
     // 兜住模块初始化早于 meta 重排、innerHeight 仍按物理像素上报的首帧
     //（否则首帧 --app-vh≈1850px，页面根部高出视口一倍半）

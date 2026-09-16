@@ -189,7 +189,7 @@ export const ModernSidebar: FC<{
     <Box
       as="aside"
       width={isCollapsed ? '80px' : '280px'}
-      height="100vh"
+      height="var(--app-vh, 100vh)"
       bg="white"
       borderRight="1px solid"
       borderColor="gray.200"

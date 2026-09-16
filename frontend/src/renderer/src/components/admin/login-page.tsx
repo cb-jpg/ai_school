@@ -35,7 +35,7 @@ export default function LoginPage() {
   return (
     <Box
       width="100vw"
-      height="100vh"
+      height="var(--app-vh, 100vh)"
       display="flex"
       alignItems="center"
       justifyContent="center"

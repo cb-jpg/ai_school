@@ -330,7 +330,7 @@ export const SchoolAdminLayout: FC<{
   return (
     <Box
       width="full"
-      height="100vh"
+      height="var(--app-vh, 100vh)"
       display="flex"
       className="school-background"
       fontFamily="Microsoft YaHei, SimHei, sans-serif"
@@ -354,7 +354,7 @@ export const SchoolAdminLayout: FC<{
       <Box
         as="aside"
         width={{ base: '280px', md: isCollapsed ? '80px' : '280px' }}
-        height="100vh"
+        height="var(--app-vh, 100vh)"
         bg="white"
         borderRight="1px solid"
         borderColor={schoolColors.gray200}
@@ -537,7 +537,7 @@ export const SchoolAdminLayout: FC<{
           flex:1 使其撑满剩余宽度（此前宽度塌成内容固有宽度，右侧大片空白） */}
       <Box
         ml={{ base: '0', md: isCollapsed ? '80px' : '280px' }}
-        height="100vh"
+        height="var(--app-vh, 100vh)"
         transition="margin-left 0.3s ease"
         display="flex"
         flexDirection="column"
