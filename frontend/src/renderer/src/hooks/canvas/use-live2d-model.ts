@@ -13,7 +13,7 @@ import { LAppLive2DManager } from '../../../WebSDK/src/lapplive2dmanager';
 import { initializeLive2D } from '@cubismsdksamples/main';
 import { useMode } from '@/context/mode-context';
 import { usePortraitBoard } from '@/hooks/utils/use-portrait-board';
-import { isPhoneStyleViewport } from '@/utils/device-profile';
+import { isPhoneStyleViewport, IS_KIOSK } from '@/utils/device-profile';
 
 interface UseLive2DModelProps {
   modelInfo: ModelInfo | undefined;
@@ -787,11 +787,58 @@ export const useLive2DModel = ({
     target.addEventListener('touchmove', onMove, { passive: false });
     target.addEventListener('touchend', onEnd, { passive: false });
     target.addEventListener('touchcancel', onCancel, { passive: false });
+
+    // 一体机红外屏兜底（仅 kiosk）：部分一体机触摸以鼠标事件送达（上报
+    // maxTouchPoints=2 但实际投递方式不一致），穿透模式只挂 touch 监听会
+    // 拖不动人物。命中模型的鼠标按下接管为拖动；捕获阶段拦截并吞掉其后
+    // 的 click，防止拖动/点按人物时误触下层按钮。
+    const winCleanups: Array<() => void> = [];
+    if (touchThrough && IS_KIOSK) {
+      let mouseSession = false;
+      let suppressClickUntil = 0;
+      const onMouseDown = (e: MouseEvent) => {
+        if (e.button !== 0) return;
+        if (!hitTestAt(e.clientX, e.clientY)) return;
+        mouseSession = true;
+        suppressClickUntil = 0;
+        e.preventDefault();
+        e.stopPropagation();
+        touchNativeRef.current.start(e.clientX, e.clientY);
+      };
+      const onMouseMove = (e: MouseEvent) => {
+        if (!mouseSession) return;
+        touchNativeRef.current.move(e.clientX, e.clientY);
+      };
+      const onMouseUp = (e: MouseEvent) => {
+        if (!mouseSession) return;
+        mouseSession = false;
+        suppressClickUntil = Date.now() + 350;
+        e.stopPropagation();
+        touchNativeRef.current.end(e.clientX, e.clientY);
+      };
+      const onClick = (e: MouseEvent) => {
+        if (Date.now() >= suppressClickUntil) return;
+        e.preventDefault();
+        e.stopPropagation();
+      };
+      window.addEventListener('mousedown', onMouseDown, true);
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp, true);
+      window.addEventListener('click', onClick, true);
+      winCleanups.push(
+        () => window.removeEventListener('mousedown', onMouseDown, true),
+        () => window.removeEventListener('mousemove', onMouseMove),
+        () => window.removeEventListener('mouseup', onMouseUp, true),
+        () => window.removeEventListener('click', onClick, true),
+      );
+    }
+
     return () => {
       target.removeEventListener('touchstart', onStart);
       target.removeEventListener('touchmove', onMove);
       target.removeEventListener('touchend', onEnd);
       target.removeEventListener('touchcancel', onCancel);
+      winCleanups.forEach((fn) => fn());
     };
   }, [canvasRef, getModelScale, applyPinchScale, setIsDragging, touchThrough]);
 

@@ -165,10 +165,17 @@ export const useLive2DResize = ({
     }
 
     try {
-      const containerBounds = containerRef.current?.getBoundingClientRect();
+      const containerEl = containerRef.current;
+      // 用 clientWidth/clientHeight（transform 前的布局尺寸）：kiosk 缩放
+      // 包装盒内 getBoundingClientRect 返回放大后的视觉尺寸（960 而非布局
+      // 420），写进 canvas.style 后在盒内再放大一遍 → 画布 2.29× 超出屏幕、
+      // 人物中心画到屏外（真机实锤）。clientWidth 恒为布局单位，不受影响。
       const { width, height } = isPet
         ? { width: window.innerWidth, height: window.innerHeight }
-        : containerBounds || { width: 0, height: 0 };
+        : {
+            width: containerEl?.clientWidth ?? 0,
+            height: containerEl?.clientHeight ?? 0,
+          };
 
       const lastDimensions = lastContainerDimensionsRef.current;
       const sidebarChanged = prevSidebarStateRef.current !== showSidebar;
@@ -183,7 +190,7 @@ export const useLive2DResize = ({
       lastContainerDimensionsRef.current = { width, height };
       prevSidebarStateRef.current = showSidebar;
 
-      if (!containerBounds && !isPet) {
+      if (!containerEl && !isPet) {
         console.warn('[Resize] Container bounds not available in window mode.');
       }
       if (width === 0 || height === 0) {

@@ -103,11 +103,20 @@ export const getKioskCssScale = (): number => {
 };
 
 if (IS_KIOSK) {
+  // 打 kiosk 标记类：index.css 用 html.kiosk 兜底 Chrome 95 丢 @layer 后
+  // 的按钮原生边框（recipe 全丢，详见 index.css 对应注释）
+  document.documentElement.classList.add('kiosk');
   // #root（index.css 里 overflow:hidden）同样可被程序化滚动：scrollIntoView
   // 滚不动内部容器时会转滚 #root，把整页顶出屏（2026-09-17 真机实锤：内容
   // 整体上移 450 布局 px）。clip 在 Chrome90+ 完全禁滚，hidden 挡不住程序滚动。
   const rootEl = document.getElementById('root');
-  if (rootEl) rootEl.style.overflow = 'clip';
+  if (rootEl) {
+    rootEl.style.overflow = 'clip';
+    // clip 会按 #root 自身高度裁剪：包装盒 420×app-vh 经 scale 放大后视觉
+    // 高度是 app-vh × css-scale，而 #root 自动高度只算布局值（transform 不
+    // 计入父盒高度）→ 真机实锤下半屏 56% 被裁成白屏。钉成视觉高度。
+    rootEl.style.height = 'calc(var(--app-vh, 100vh) * var(--kiosk-css-scale, 1))';
+  }
 
   const meta = document.querySelector('meta[name="viewport"]');
   if (meta) {

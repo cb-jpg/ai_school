@@ -4,11 +4,13 @@
  * 与专题页（campus-knowledge）顶部导航同款式：手机端一行横向滑动、桌面端居右换行，
  * 滑动与点击效果保持一致；首页与新页面均可复用。
  */
+import { useEffect, useRef } from 'react';
 import { Box, Button, Flex, HStack, Text } from '@chakra-ui/react';
 import { FiBookOpen, FiClock, FiAward, FiUsers } from 'react-icons/fi';
 import type { IconType } from 'react-icons';
 import { CampusTopic, CampusTopicId, campusTopics } from '@/data/campus-knowledge';
 import { usePortraitBoard } from '@/hooks/utils/use-portrait-board';
+import { IS_KIOSK } from '@/utils/device-profile';
 
 const swissFont = '"Helvetica Neue", Arial, sans-serif';
 const ink = '#121826';
@@ -83,6 +85,44 @@ export default function TopicTabRow({
 }: TopicTabRowProps) {
   // 竖屏大屏：整行按手机端"单行横滑"形态放大展示（内容列限宽内一行放不下时仍可滑）
   const isPortraitBoard = usePortraitBoard();
+
+  // 一体机兜底：Chrome 95 在 transform:scale() 包装盒内不认触摸横滑手势，
+  // overflowX:auto 的行真实手指划不动（CDP 完整手势可滚、原始触摸序列
+  // 不触发合成器滚动，2026-09-17 真机实锤）。kiosk 用 JS 拖滑兜底——真实
+  // 触摸事件必然送达监听器，直接改 scrollLeft；手机端原生惯性滚动不受影响。
+  const rowRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = rowRef.current;
+    if (!IS_KIOSK || !el) return undefined;
+    let startX = 0;
+    let startScroll = 0;
+    let active = false;
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) {
+        active = false;
+        return;
+      }
+      active = true;
+      startX = e.touches[0].clientX;
+      startScroll = el.scrollLeft;
+    };
+    const onMove = (e: TouchEvent) => {
+      if (!active || e.touches.length !== 1) return;
+      el.scrollLeft = startScroll - (e.touches[0].clientX - startX);
+    };
+    const onEnd = () => {
+      active = false;
+    };
+    el.addEventListener('touchstart', onStart, { passive: true, capture: true });
+    el.addEventListener('touchmove', onMove, { passive: true, capture: true });
+    el.addEventListener('touchend', onEnd, { passive: true, capture: true });
+    return () => {
+      el.removeEventListener('touchstart', onStart, true);
+      el.removeEventListener('touchmove', onMove, true);
+      el.removeEventListener('touchend', onEnd, true);
+    };
+  }, []);
+
   return (
     <Box
       flexShrink={0}
@@ -96,6 +136,7 @@ export default function TopicTabRow({
     >
       {/* 手机端/竖屏大屏一行横向滑动；桌面端保持换行布局（与专题页一致） */}
       <Flex
+        ref={rowRef}
         align="center"
         justify={isPortraitBoard ? 'flex-start' : { base: 'flex-start', lg: 'flex-end' }}
         gap={isPortraitBoard ? '10px' : '8px'}

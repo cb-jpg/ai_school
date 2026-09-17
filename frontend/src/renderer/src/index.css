@@ -157,6 +157,20 @@ body, html {
     background-color: var(--hover-bg-color, currentColor) !important;
 }
 
+/* ── 大屏一体机（Chrome 95 WebView）按钮兜底 ─────────────────────────
+   Chakra v3 的 recipe/variant 样式包在 @layer 里（Chrome 99+ 才解析），
+   一体机 WebView 是 Chrome 95：整段 @layer 规则被静默丢弃，button 只剩
+   浏览器原生样式（2px outset 灰边、灰底、方角）——真机表现为设置图标/
+   导航按钮"全都带黑框"，与手机端（现代内核、无边框）不一致。
+   html.kiosk 类由 device-profile.ts 判定一体机时添加；手机/桌面无此类，
+   规则不生效。动画麦克风按钮（.animated-button）自带边框样式，排除。 */
+html.kiosk button:not(.animated-button) {
+    -webkit-appearance: none;
+    border: 0;
+    background-color: transparent;
+    border-radius: 8px;
+}
+
 /* 悬停时文本颜色 - 确保在背景上可见 */
 .animated-button:not(:disabled):hover .text {
     color: white !important;
