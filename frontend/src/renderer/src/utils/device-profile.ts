@@ -13,19 +13,26 @@
  *        放大铺满物理屏（文字重排光栅化保持清晰）；dpr 钉成放大倍数使
  *        Live2D 画布按物理像素 1:1 渲染不发糊；--app-vh 守卫换算成 CSS px。
  *
- * 判定标准：触摸屏（maxTouchPoints>0）且视口短边 ≥640px —— 手机/平板之外
- * 的大屏触摸设备（kiosk）。桌面预览（Electron/浏览器）无触摸不受影响；
- * 手机（视口短边 <640）不受影响。
+ * 判定标准：视口短边 ≥640px，且触摸屏（maxTouchPoints>0）或竖屏下的
+ * 原生 App/粗指针兜底——部分一体机红外触控在 WebView 里不上报
+ * maxTouchPoints（=0），触摸以鼠标事件送达，不能只认这一条。桌面预览
+ * （Electron/浏览器）无触摸不受影响；手机（视口短边 <640）不受影响。
  */
 
-/** 视口短边 ≥640px 的触摸设备 ⇒ 大屏一体机（kiosk）。
+/** 视口短边 ≥640px 的大屏触摸/一体机设备 ⇒ kiosk。
  *  必须在下面的视口缩放（meta 改写）之前调用——改写后 innerWidth 变手机宽，
  *  该判定将不再成立（所以 IS_KIOSK 只在模块加载时求值一次）。 */
 export const isLargeTouchViewport = (): boolean => {
   if (typeof window === 'undefined') return false;
-  const touchPoints = navigator.maxTouchPoints ?? 0;
-  if (touchPoints <= 0) return false;
-  return Math.min(window.innerWidth, window.innerHeight) >= 640;
+  if (Math.min(window.innerWidth, window.innerHeight) < 640) return false;
+  if ((navigator.maxTouchPoints ?? 0) > 0) return true;
+  // 红外屏兜底（maxTouchPoints=0 的 55 寸竖屏实测）：原生 App(Capacitor)
+  // 或粗指针的竖屏大屏仍按 kiosk 处理。桌面浏览器无 Capacitor 且指针为
+  // fine，不会命中；横屏带鼠标的盒子（投影/电视盒）也不动，仍走桌面断点。
+  if (window.innerHeight <= window.innerWidth) return false;
+  const nativeApp = !!(window as { Capacitor?: { isNativePlatform?: () => boolean } })
+    .Capacitor?.isNativePlatform?.();
+  return nativeApp || window.matchMedia('(pointer: coarse)').matches;
 };
 
 // 桌面复现一体机：地址栏加 ?kiosk=1 强制走 kiosk 全部分支（断点顶飞/视口钉 420/
