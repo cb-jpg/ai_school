@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { IS_KIOSK } from '@/utils/device-profile';
 
 /**
  * 竖屏大屏检测（壁挂数字屏 / 竖放平板）：orientation=portrait 且宽度 ≥768。
@@ -22,5 +23,7 @@ export function usePortraitBoard(): boolean {
     return () => mq.removeEventListener('change', onChange);
   }, []);
 
-  return isBoard;
+  // 一体机 v2.0 采用“手机布局视口 + 物理放大”方案，必须直接复用手机端样式。
+  // 旧的 portrait-board 专属排版会把首页/对话页重新改成 840px 宽版，导致真机仍像桌面页。
+  return IS_KIOSK ? false : isBoard;
 }

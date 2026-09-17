@@ -36,7 +36,7 @@ const system = createSystem(defaultConfig, {
 import { useState, useEffect, useRef } from "react";
 // 导入工作台字体
 import "@/styles/admin-fonts.css";
-import { IS_KIOSK } from "@/utils/device-profile";
+import { IS_KIOSK, KIOSK_LAYOUT_WIDTH } from "@/utils/device-profile";
 // import Canvas from './components/canvas/canvas'; // Likely unused now
 import Footer from "./components/footer/footer";
 import { AiStateProvider } from "./context/ai-state-context";
@@ -279,7 +279,12 @@ function AppContent(): JSX.Element {
 
   // 全局登录门禁：未登录一律先进登录页（管理员/普通使用者同入口，账号由管理员派发）
   if (!authUser) {
-    return <AppLoginPage />;
+    return (
+      <>
+        <AppLoginPage />
+        {IS_KIOSK && <KioskDiagnostics />}
+      </>
+    );
   }
 
   // Show Hero Landing page on hero route (still wrapped in all providers)
@@ -543,45 +548,65 @@ function AdminPanelWrapper(): JSX.Element | null {
 
 // New component to access mode for global styles
 function AppWithGlobalStyles(): JSX.Element {
+  const content = (
+    <AuthProvider>
+    <CameraProvider>
+      <ScreenCaptureProvider>
+        <CharacterConfigProvider>
+          <ChatHistoryProvider>
+            <VolumeProvider>
+              <AiStateProvider>
+              <ProactiveSpeakProvider>
+                <Live2DConfigProvider>
+                  <SubtitleProvider>
+                    <VADProvider>
+                      <BgUrlProvider>
+                        <GroupProvider>
+                          <BrowserProvider>
+                            <KnowledgeProvider>
+                              <AdminProvider>
+                                <WebSocketHandler>
+                                  <Toaster />
+                                  <AppContent />
+                              </WebSocketHandler>
+                                <AdminPanelWrapper />
+                            </AdminProvider>
+                          </KnowledgeProvider>
+                        </BrowserProvider>
+                      </GroupProvider>
+                      </BgUrlProvider>
+                    </VADProvider>
+                  </SubtitleProvider>
+                </Live2DConfigProvider>
+              </ProactiveSpeakProvider>
+            </AiStateProvider>
+            </VolumeProvider>
+          </ChatHistoryProvider>
+        </CharacterConfigProvider>
+      </ScreenCaptureProvider>
+    </CameraProvider>
+    </AuthProvider>
+  );
+
+  if (IS_KIOSK) {
+    return (
+      <Box
+        width={`${KIOSK_LAYOUT_WIDTH}px`}
+        height="var(--app-vh, 100vh)"
+        transform="scale(var(--kiosk-css-scale, 1))"
+        transformOrigin="top left"
+        /* clip 而非 hidden：hidden 仍可被程序化滚动（scrollIntoView 会把整个
+           包装盒滚下去、内容顶出屏），clip 在 Chrome90+ 完全禁滚 */
+        style={{ overflow: 'clip' }}
+      >
+        {content}
+      </Box>
+    );
+  }
+
   return (
     <>
-      <AuthProvider>
-      <CameraProvider>
-        <ScreenCaptureProvider>
-          <CharacterConfigProvider>
-            <ChatHistoryProvider>
-              <VolumeProvider>
-                <AiStateProvider>
-                <ProactiveSpeakProvider>
-                  <Live2DConfigProvider>
-                    <SubtitleProvider>
-                      <VADProvider>
-                        <BgUrlProvider>
-                          <GroupProvider>
-                            <BrowserProvider>
-                              <KnowledgeProvider>
-                                <AdminProvider>
-                                  <WebSocketHandler>
-                                    <Toaster />
-                                    <AppContent />
-                                </WebSocketHandler>
-                                  <AdminPanelWrapper />
-                              </AdminProvider>
-                            </KnowledgeProvider>
-                          </BrowserProvider>
-                        </GroupProvider>
-                        </BgUrlProvider>
-                      </VADProvider>
-                    </SubtitleProvider>
-                  </Live2DConfigProvider>
-                </ProactiveSpeakProvider>
-              </AiStateProvider>
-              </VolumeProvider>
-            </ChatHistoryProvider>
-          </CharacterConfigProvider>
-        </ScreenCaptureProvider>
-      </CameraProvider>
-      </AuthProvider>
+      {content}
     </>
   );
 }

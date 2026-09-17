@@ -13,26 +13,42 @@
  *        放大铺满物理屏（文字重排光栅化保持清晰）；dpr 钉成放大倍数使
  *        Live2D 画布按物理像素 1:1 渲染不发糊；--app-vh 守卫换算成 CSS px。
  *
- * 判定标准：视口短边 ≥640px，且触摸屏（maxTouchPoints>0）或竖屏下的
- * 原生 App/粗指针兜底——部分一体机红外触控在 WebView 里不上报
- * maxTouchPoints（=0），触摸以鼠标事件送达，不能只认这一条。桌面预览
- * （Electron/浏览器）无触摸不受影响；手机（视口短边 <640）不受影响。
+ * 判定标准：视口/屏幕短边 ≥640px，且触摸屏（maxTouchPoints>0 或
+ * ontouchstart）或【竖屏下】的原生 App/粗指针兜底——部分一体机红外触控
+ * 在 WebView 里不上报 maxTouchPoints（=0），触摸以鼠标事件送达，不能只认
+ * 这一条。桌面预览（Electron/浏览器）无触摸不受影响；手机（短边 <640）
+ * 不受影响；横屏带鼠标的盒子（投影/电视盒）不走兜底，仍按桌面断点。
  */
 
-/** 视口短边 ≥640px 的大屏触摸/一体机设备 ⇒ kiosk。
+import { Capacitor } from '@capacitor/core';
+
+const isNativeApp = (): boolean => {
+  try {
+    return Capacitor.isNativePlatform();
+  } catch {
+    return false;
+  }
+};
+
+const largeScreenOrViewport = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const viewportShortSide = Math.min(window.innerWidth || 0, window.innerHeight || 0);
+  const screenShortSide = Math.min(window.screen?.width || 0, window.screen?.height || 0);
+  return Math.max(viewportShortSide, screenShortSide) >= 640;
+};
+
+/** 视口/屏幕短边 ≥640px 的大屏触摸/一体机设备 ⇒ kiosk。
  *  必须在下面的视口缩放（meta 改写）之前调用——改写后 innerWidth 变手机宽，
  *  该判定将不再成立（所以 IS_KIOSK 只在模块加载时求值一次）。 */
 export const isLargeTouchViewport = (): boolean => {
   if (typeof window === 'undefined') return false;
-  if (Math.min(window.innerWidth, window.innerHeight) < 640) return false;
-  if ((navigator.maxTouchPoints ?? 0) > 0) return true;
-  // 红外屏兜底（maxTouchPoints=0 的 55 寸竖屏实测）：原生 App(Capacitor)
-  // 或粗指针的竖屏大屏仍按 kiosk 处理。桌面浏览器无 Capacitor 且指针为
-  // fine，不会命中；横屏带鼠标的盒子（投影/电视盒）也不动，仍走桌面断点。
+  if (!largeScreenOrViewport()) return false;
+  // 电容屏正常上报触摸（55 寸真机实测 maxTouchPoints=2；ontouchstart 兜旧核）
+  const touchPoints = navigator.maxTouchPoints ?? 0;
+  if (touchPoints > 0 || 'ontouchstart' in window) return true;
+  // 红外屏兜底（maxTouchPoints=0 的 55 寸竖屏实测）：仅竖屏 + 原生App/粗指针
   if (window.innerHeight <= window.innerWidth) return false;
-  const nativeApp = !!(window as { Capacitor?: { isNativePlatform?: () => boolean } })
-    .Capacitor?.isNativePlatform?.();
-  return nativeApp || window.matchMedia('(pointer: coarse)').matches;
+  return isNativeApp() || window.matchMedia('(pointer: coarse)').matches;
 };
 
 // 桌面复现一体机：地址栏加 ?kiosk=1 强制走 kiosk 全部分支（断点顶飞/视口钉 420/
@@ -47,7 +63,7 @@ const KIOSK_QUERY_FORCED: boolean =
  *  一体机复用手机端调好的布局与人物站位，不再走桌面断点。 */
 export const isPhoneStyleViewport = (): boolean => {
   if (typeof window === 'undefined') return true;
-  return window.innerWidth < 768 || isLargeTouchViewport();
+  return window.innerWidth < 768 || IS_KIOSK;
 };
 
 /** 模块加载时判定一次（WebView 里视口不会中途换设备；桌面预览固定 false） */
@@ -64,7 +80,7 @@ export const IS_KIOSK = KIOSK_QUERY_FORCED || isLargeTouchViewport();
 //   <meta viewport width=420> ⇒ 以 420×~746 CSS px 排版，initial-scale=
 //   屏宽/420≈2.57，文字按最终比例重排光栅化（同浏览器缩放，清晰不糊），
 //   站位/断点/键盘等全部手机既有逻辑原样生效。
-const KIOSK_LAYOUT_WIDTH = 420;
+export const KIOSK_LAYOUT_WIDTH = 420;
 /** 物理放大倍数 = 屏宽(DIP) / 布局视口宽；1080 屏 ≈ 2.571。
  *  ?kiosk=1 调试模式没有"物理屏"概念，用窗口宽当基准（meta 改写前的
  *  innerWidth），窗口多大就模拟多大的"一体机"。 */
@@ -77,7 +93,22 @@ export const KIOSK_SCALE =
     ? kioskBaseWidth() / KIOSK_LAYOUT_WIDTH
     : 1;
 
+/**
+ * WebView 接受 width=420 后已经会把页面铺满屏幕，此时不能再做 CSS 放大。
+ * 只有运行时 meta viewport 被 ROM 忽略、innerWidth 仍是物理宽度时才启用兜底缩放。
+ */
+export const getKioskCssScale = (): number => {
+  if (!IS_KIOSK || typeof window === 'undefined') return 1;
+  return window.innerWidth <= KIOSK_LAYOUT_WIDTH + 1 ? 1 : KIOSK_SCALE;
+};
+
 if (IS_KIOSK) {
+  // #root（index.css 里 overflow:hidden）同样可被程序化滚动：scrollIntoView
+  // 滚不动内部容器时会转滚 #root，把整页顶出屏（2026-09-17 真机实锤：内容
+  // 整体上移 450 布局 px）。clip 在 Chrome90+ 完全禁滚，hidden 挡不住程序滚动。
+  const rootEl = document.getElementById('root');
+  if (rootEl) rootEl.style.overflow = 'clip';
+
   const meta = document.querySelector('meta[name="viewport"]');
   if (meta) {
     // ⚠️ 不能带 maximum-scale=1（v1.9 曾写入）：它会把 fit-width 的
@@ -121,21 +152,29 @@ const startKioskViewportGuard = (): void => {
 
   const apply = () => {
     const vvH = window.visualViewport?.height ?? 0;
+    const metaViewportEffective = window.innerWidth <= KIOSK_LAYOUT_WIDTH + 1;
+    const rawViewportHeight = Math.max(window.innerHeight, vvH);
     // 真机用 screen.height（唯一不随 ROM 视口 bug 缩水的源）；?kiosk=1 调试
     // 模式没有物理屏，按"布局视口 420 宽"等比换算窗口高（meta 生效后
     // innerWidth=420、innerHeight 即 CSS 高，公式自然收敛为 innerHeight）
     const screenCssH = KIOSK_QUERY_FORCED
       ? (KIOSK_LAYOUT_WIDTH * window.innerHeight) / Math.max(1, window.innerWidth)
       : (window.screen?.height ?? 0) / KIOSK_SCALE;
-    // 视口缩放已生效（innerWidth 已变手机宽）时，结果再封顶到一整屏 CSS 高：
-    // 兜住模块初始化早于 meta 重排、innerHeight 仍按物理像素上报的首帧
-    //（否则首帧 --app-vh≈1850px，页面根部高出视口一倍半）
-    const capped = window.innerWidth <= KIOSK_LAYOUT_WIDTH + 1;
+    // 部分一体机 WebView 不接受运行时 meta viewport 改写：innerWidth 仍是 960/1080，
+    // 但我们会在 App 外层用 CSS transform 强制按 420 宽布局。此时 --app-vh 必须
+    // 同步换算到 420 布局坐标，否则内部页面会把 1627px 当 CSS 高度再放大一遍。
+    const layoutViewportHeight = metaViewportEffective
+      ? rawViewportHeight
+      : rawViewportHeight / KIOSK_SCALE;
     const h = Math.min(
-      Math.max(window.innerHeight, vvH, screenCssH - 120),
-      capped ? screenCssH : Number.POSITIVE_INFINITY,
+      Math.max(layoutViewportHeight, screenCssH - 120),
+      screenCssH,
     );
     document.documentElement.style.setProperty('--app-vh', `${Math.round(h)}px`);
+    document.documentElement.style.setProperty(
+      '--kiosk-css-scale',
+      String(getKioskCssScale()),
+    );
   };
 
   window.addEventListener('resize', apply);

@@ -35,7 +35,9 @@ export default function AppLoginPage() {
 
   return (
     <Box
-      width="100vw"
+      /* 100% 而非 100vw：一体机 CSS transform 兜底模式下页面装在 420px 包装盒里，
+         100vw 会取到未钉住的物理视口宽（如 960），把表单中心挤出可见区 */
+      width="100%"
       height="var(--app-vh, 100vh)"
       display="flex"
       flexDirection="column"

@@ -12,10 +12,14 @@
 
 import { memo, useEffect, useState } from 'react';
 import { useWebSocket } from '@/context/websocket-context';
-import { KIOSK_SCALE } from '@/utils/device-profile';
+import {
+  getKioskCssScale,
+  KIOSK_LAYOUT_WIDTH,
+  KIOSK_SCALE,
+} from '@/utils/device-profile';
 
 // 与 APK导出 的体验版版本号保持一致（每次出新包手动同步）
-const APP_BUILD = 'v2.0';
+const APP_BUILD = 'v2.2-kiosk';
 
 const KioskDiagnostics = memo(() => {
   const { wsState } = useWebSocket();
@@ -34,6 +38,7 @@ const KioskDiagnostics = memo(() => {
         [
           `小石同学 ${APP_BUILD}`,
           `vp ${window.innerWidth}x${window.innerHeight}  vv ${Math.round(vv?.width ?? 0)}x${Math.round(vv?.height ?? 0)}`,
+          `layout ${KIOSK_LAYOUT_WIDTH}x${appVh || '?'}  cssScale ×${getKioskCssScale().toFixed(2)}`,
           `scr ${window.screen.width}x${window.screen.height}  scale ×${KIOSK_SCALE.toFixed(2)}  dpr ${window.devicePixelRatio}`,
           `appVh ${appVh || '(未设置)'}`,
           `scroll ${de.scrollLeft},${de.scrollTop} / ${b.scrollLeft},${b.scrollTop}`,
