@@ -105,3 +105,12 @@ data/runtime/
 
 # 知识库运行时数据（文档/索引/向量/分词缓存，首次运行自动生成）
 data/knowledge/
+
+# 一体机调试产物（APK 提取/凭据存档，勿入库）
+debug-0916/v22.apk
+debug-0916/v22-assets/
+debug-0916/kiosk-auth.json
+frontend/.env.web.local
+debug-0916/
+problems/
+tools/

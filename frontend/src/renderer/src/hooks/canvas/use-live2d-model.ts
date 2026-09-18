@@ -396,7 +396,8 @@ export const useLive2DModel = ({
     const y = e.clientY - rect.top; // Screen Y relative to canvas
 
     // --- Check if click is on model ---
-    const scale = canvas.width / canvas.clientWidth;
+    // kiosk：rect 是缩放后物理尺寸，clientWidth 是缩放前布局宽——按后者换算命中点会放大 2.29×
+    const scale = canvas.width / rect.width;
     const scaledX = x * scale;
     const scaledY = y * scale;
     const modelX = view._deviceToScreen.transformX(scaledX);
@@ -458,7 +459,8 @@ export const useLive2DModel = ({
       const currentY = e.clientY - rect.top; // Current screen Y relative to canvas
 
       // Convert screen delta to model delta
-      const scale = canvas.width / canvas.clientWidth;
+      // kiosk：rect 是缩放后物理尺寸，clientWidth 是缩放前布局宽——按后者换算命中点会放大 2.29×
+    const scale = canvas.width / rect.width;
       const startScaledX = dragStartPos.current.x * scale;
       const startScaledY = dragStartPos.current.y * scale;
       const startModelX = view._deviceToScreen.transformX(startScaledX);
@@ -497,7 +499,8 @@ export const useLive2DModel = ({
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
-      const scale = canvas.width / canvas.clientWidth;
+      // kiosk：rect 是缩放后物理尺寸，clientWidth 是缩放前布局宽——按后者换算命中点会放大 2.29×
+    const scale = canvas.width / rect.width;
       const scaledX = x * scale;
       const scaledY = y * scale;
       const modelX = view._deviceToScreen.transformX(scaledX);
@@ -546,7 +549,8 @@ export const useLive2DModel = ({
           // Use mouse down position for hit testing
           const canvas = canvasRef.current;
           const rect = canvas.getBoundingClientRect();
-          const scale = canvas.width / canvas.clientWidth;
+          // kiosk：rect 是缩放后物理尺寸，clientWidth 是缩放前布局宽——按后者换算命中点会放大 2.29×
+    const scale = canvas.width / rect.width;
           const downX = (mouseDownPosRef.current.x - rect.left) * scale;
           const downY = (mouseDownPosRef.current.y - rect.top) * scale;
           const modelX = view._deviceToScreen.transformX(downX);
@@ -671,7 +675,8 @@ export const useLive2DModel = ({
       const model = adapter?.getModel();
       if (!view || !model) return false;
       const rect = canvas.getBoundingClientRect();
-      const scale = canvas.width / canvas.clientWidth;
+      // kiosk：rect 是缩放后物理尺寸，clientWidth 是缩放前布局宽——按后者换算命中点会放大 2.29×
+    const scale = canvas.width / rect.width;
       const modelX = view._deviceToScreen.transformX((clientX - rect.left) * scale);
       const modelY = view._deviceToScreen.transformY((clientY - rect.top) * scale);
       return model.anyhitTest(modelX, modelY) !== null || model.isHitOnModel(modelX, modelY);

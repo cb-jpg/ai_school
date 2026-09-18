@@ -157,18 +157,102 @@ body, html {
     background-color: var(--hover-bg-color, currentColor) !important;
 }
 
-/* ── 大屏一体机（Chrome 95 WebView）按钮兜底 ─────────────────────────
-   Chakra v3 的 recipe/variant 样式包在 @layer 里（Chrome 99+ 才解析），
-   一体机 WebView 是 Chrome 95：整段 @layer 规则被静默丢弃，button 只剩
-   浏览器原生样式（2px outset 灰边、灰底、方角）——真机表现为设置图标/
-   导航按钮"全都带黑框"，与手机端（现代内核、无边框）不一致。
-   html.kiosk 类由 device-profile.ts 判定一体机时添加；手机/桌面无此类，
-   规则不生效。动画麦克风按钮（.animated-button）自带边框样式，排除。 */
-html.kiosk button:not(.animated-button) {
+/* ── 一体机登录页兜底（Chrome 95 丢 @layer + vw 取物理视口双重问题）──
+   Chakra 样式被丢后登录页只剩蓝底裸元素；卡片宽度 86vw 在 420px
+   transform 盒里按 960 物理视口计算，把整屏盖住。这里用 data-* 标记
+   + 原始 CSS（无嵌套/无变量/无 vw）按手机端设计稿逐项复刻。 */
+html.kiosk [data-login-root] {
+    width: 100%;
+    height: var(--app-vh, 100vh);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(160deg, #1a4d8f 0%, #2a6db5 55%, #4a90c9 100%);
+    font-family: "Microsoft YaHei", SimHei, sans-serif;
+    position: relative;
+    overflow: hidden;
+}
+html.kiosk [data-login-spot] {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+}
+html.kiosk [data-login-spot="1"] {
+    top: -15%;
+    right: -10%;
+    width: 55%;
+    height: 55%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.14) 0%, transparent 65%);
+}
+html.kiosk [data-login-spot="2"] {
+    bottom: -20%;
+    left: -15%;
+    width: 60%;
+    height: 60%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.10) 0%, transparent 60%);
+}
+html.kiosk [data-login-title] {
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: bold;
+    letter-spacing: 2px;
+}
+html.kiosk [data-login-sub] {
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 12px;
+}
+html.kiosk [data-login-card] {
+    width: 86%;
+    max-width: 380px;
+    background-color: #ffffff;
+    border-radius: 20px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+    padding: 24px;
+    position: relative;
+}
+html.kiosk [data-login-card-title] {
+    color: #1a4d8f;
+    font-size: 16px;
+    font-weight: bold;
+}
+html.kiosk [data-login-card-sub],
+html.kiosk [data-login-label] {
+    color: #64748b;
+    font-size: 12px;
+}
+html.kiosk [data-login-label] {
+    color: #475569;
+}
+html.kiosk input[data-login-input] {
     -webkit-appearance: none;
-    border: 0;
-    background-color: transparent;
+    height: 40px;
+    border: 1px solid #cbd5e1;
     border-radius: 8px;
+    background-color: #ffffff;
+    padding: 0 12px;
+    font-size: 14px;
+    color: #1a202c;
+    outline: none;
+    width: 100%;
+}
+html.kiosk [data-login-error] {
+    color: #c41e3a;
+    font-size: 12px;
+}
+html.kiosk button[data-login-submit] {
+    width: 100%;
+    height: 48px;
+    background-color: #1a4d8f;
+    color: #ffffff;
+    border-radius: 12px;
+    font-size: 16px;
+}
+html.kiosk [data-login-footnote] {
+    color: rgba(255, 255, 255, 0.65);
+    font-size: 12px;
+    margin-top: 24px;
+    position: relative;
 }
 
 /* 悬停时文本颜色 - 确保在背景上可见 */

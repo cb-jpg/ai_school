@@ -37,6 +37,7 @@ export default function AppLoginPage() {
     <Box
       /* 100% 而非 100vw：一体机 CSS transform 兜底模式下页面装在 420px 包装盒里，
          100vw 会取到未钉住的物理视口宽（如 960），把表单中心挤出可见区 */
+      data-login-root
       width="100%"
       height="var(--app-vh, 100vh)"
       display="flex"
@@ -50,6 +51,7 @@ export default function AppLoginPage() {
     >
       {/* 背景装饰光斑 */}
       <Box
+        data-login-spot="1"
         position="absolute"
         top="-15%"
         right="-10%"
@@ -60,6 +62,7 @@ export default function AppLoginPage() {
         pointerEvents="none"
       />
       <Box
+        data-login-spot="2"
         position="absolute"
         bottom="-20%"
         left="-15%"
@@ -72,6 +75,7 @@ export default function AppLoginPage() {
 
       <VStack gap="1" mb={{ base: 6, md: 8 }} position="relative">
         <Text
+          data-login-title
           fontSize={{ base: '2xl', md: '3xl' }}
           fontWeight="bold"
           color="white"
@@ -79,12 +83,13 @@ export default function AppLoginPage() {
         >
           AI 数字人
         </Text>
-        <Text fontSize={{ base: 'xs', md: 'sm' }} color="rgba(255,255,255,0.85)">
+        <Text data-login-sub fontSize={{ base: 'xs', md: 'sm' }} color="rgba(255,255,255,0.85)">
           佛山市南海区石实实验学校
         </Text>
       </VStack>
 
       <Box
+        data-login-card
         width={{ base: '86vw', md: '380px' }}
         maxWidth="380px"
         bg="white"
@@ -94,10 +99,10 @@ export default function AppLoginPage() {
         position="relative"
       >
         <VStack gap="1" mb="6" alignItems="start">
-          <Text fontSize="md" fontWeight="bold" color={schoolBlue}>
+          <Text data-login-card-title fontSize="md" fontWeight="bold" color={schoolBlue}>
             欢迎使用
           </Text>
-          <Text fontSize="xs" color="#64748b">
+          <Text data-login-card-sub fontSize="xs" color="#64748b">
             请输入管理员派发的账号密码登录
           </Text>
         </VStack>
@@ -105,8 +110,9 @@ export default function AppLoginPage() {
         <form onSubmit={handleSubmit}>
           <VStack gap="4" alignItems="stretch">
             <VStack gap="1" alignItems="start">
-              <Text fontSize="xs" color="#475569">用户名</Text>
+              <Text data-login-label fontSize="xs" color="#475569">用户名</Text>
               <Input
+                data-login-input
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="请输入用户名"
@@ -115,8 +121,9 @@ export default function AppLoginPage() {
               />
             </VStack>
             <VStack gap="1" alignItems="start">
-              <Text fontSize="xs" color="#475569">密码</Text>
+              <Text data-login-label fontSize="xs" color="#475569">密码</Text>
               <Input
+                data-login-input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -127,10 +134,11 @@ export default function AppLoginPage() {
             </VStack>
 
             {error && (
-              <Text fontSize="xs" color="#c41e3a">{error}</Text>
+              <Text data-login-error fontSize="xs" color="#c41e3a">{error}</Text>
             )}
 
             <Button
+              data-login-submit
               type="submit"
               width="full"
               background={schoolBlue}
@@ -148,6 +156,7 @@ export default function AppLoginPage() {
       </Box>
 
       <Text
+        data-login-footnote
         fontSize="xs"
         color="rgba(255,255,255,0.65)"
         mt={{ base: 6, md: 8 }}

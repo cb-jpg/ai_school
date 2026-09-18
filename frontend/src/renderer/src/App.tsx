@@ -66,7 +66,6 @@ import "@chatscope/chat-ui-kit-styles/dist/default/styles.min.css";
 import Background from "./components/canvas/background";
 import WebSocketStatus from "./components/canvas/ws-status";
 import Subtitle from "./components/canvas/subtitle";
-import KioskDiagnostics from "./components/canvas/kiosk-diagnostics";
 import { ModeProvider, useMode } from "./context/mode-context";
 import CampusKnowledge from "./components/campus/campus-knowledge";
 import { CampusTopicId, isCampusTopicId } from "./data/campus-knowledge";
@@ -279,12 +278,7 @@ function AppContent(): JSX.Element {
 
   // 全局登录门禁：未登录一律先进登录页（管理员/普通使用者同入口，账号由管理员派发）
   if (!authUser) {
-    return (
-      <>
-        <AppLoginPage />
-        {IS_KIOSK && <KioskDiagnostics />}
-      </>
-    );
+    return <AppLoginPage />;
   }
 
   // Show Hero Landing page on hero route (still wrapped in all providers)
@@ -345,10 +339,6 @@ function AppContent(): JSX.Element {
             <WebSocketStatus />
           </Box>
         )}
-
-        {/* Kiosk 诊断悬浮层：一体机现场拍照即可读出视口/守卫值/WebView 版本/
-            连接状态/构建号（手机与桌面不渲染） */}
-        {IS_KIOSK && <KioskDiagnostics />}
 
         {/* Subtitle for hero page - 手机端对话卡片内已展示文本，隐藏；专题页/新首页隐藏 */}
         {!activeCampusTopic && !isHomeView && (
