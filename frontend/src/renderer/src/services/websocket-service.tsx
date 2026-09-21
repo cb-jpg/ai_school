@@ -80,6 +80,8 @@ export interface MessageEvent {
   forwarded?: boolean;
   has_context?: boolean;
   doc_count?: number;
+  /** web-status：本次回答结合了联网检索结果（2026-09-20 需求 #4） */
+  used?: boolean;
   display_text?: DisplayText;
   live2d_model?: string;
   browser_view?: {
