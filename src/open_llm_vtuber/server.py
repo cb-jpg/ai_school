@@ -35,7 +35,8 @@ class AccessTokenMiddleware:
     令牌来源（任一即可）：?token= 查询参数 / X-Access-Token 头 / Bearer 头。
     """
 
-    PUBLIC_PREFIXES = ("/assets/", "/live2d-models", "/bg", "/avatars", "/web-tool", "/libs")
+    PUBLIC_PREFIXES = ("/assets/", "/live2d-models", "/bg", "/avatars", "/web-tool", "/libs",
+                       "/app-releases")
     PUBLIC_PATHS = ("/", "/favicon.ico", "/vite.svg", "/robots.txt")
 
     def __init__(self, app, access_token: str):
@@ -239,6 +240,17 @@ class WebSocketServer:
             "/web-tool",
             CORSStaticFiles(directory="web_tool", html=True),
             name="web_tool",
+        )
+
+        # App 在线更新（OTA）发布目录：manifest.json + web-<版本>.zip，
+        # 由 scripts/pub_ota.py 发布（内容=公开的 web 前端包，无需鉴权）。
+        # App 启动时比对 manifest.version_code 与本机构建号，弹窗/静默换包。
+        if not os.path.exists(os.path.join("data", "app-releases")):
+            os.makedirs(os.path.join("data", "app-releases"), exist_ok=True)
+        self.app.mount(
+            "/app-releases",
+            CORSStaticFiles(directory=os.path.join("data", "app-releases")),
+            name="app-releases",
         )
 
         # Prefer the reproducible web build from the v1.2.1 frontend source.

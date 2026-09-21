@@ -30,7 +30,9 @@ USERS_FILE = AUTH_DIR / "users.json"
 INITIAL_PASSWORD_FILE = AUTH_DIR / "initial_admin_password.txt"
 
 TOKEN_TTL_SECONDS = 12 * 3600
-VALID_ROLES = {"admin", "editor", "user"}
+# parent（家长）：权限与 user 相同（仅对话+浏览），但账号体系上独立一类，
+# 便于按身份区分统计与后续差异化配置（2026-09-20 需求 #6）
+VALID_ROLES = {"admin", "editor", "user", "parent"}
 
 # 用户名同时用作聊天历史目录名（chat_history/<conf>/users/<username>/），
 # 必须限制为文件系统安全字符，防路径穿越
@@ -218,10 +220,23 @@ async def require_user(request: Request) -> dict:
 
 
 async def require_staff(user: dict = Depends(require_user)) -> dict:
-    """知识库管理接口要求后台角色（admin 或 editor），普通 App 用户（user）不可用"""
+    """知识库管理接口要求后台角色（admin=最高权限管理员 或 editor=数据管理员），
+    普通使用者（user=学生 / parent=家长）不可用"""
     if user["role"] not in ("admin", "editor"):
         raise HTTPException(status_code=403, detail="需要后台管理权限")
     return user
+
+
+def ensure_can_modify(user: dict, entry) -> None:
+    """数据管理员（editor）只能修改/删除本账号上传的条目；admin 不受限。
+    历史遗留的无属主条目（created_by=None）同样仅 admin 可动。"""
+    if user["role"] == "admin":
+        return
+    if getattr(entry, "created_by", None) != user["username"]:
+        raise HTTPException(
+            status_code=403,
+            detail="数据管理员仅能修改/删除本账号上传的数据",
+        )
 
 
 async def require_admin(user: dict = Depends(require_user)) -> dict:
@@ -241,7 +256,7 @@ class LoginRequest(BaseModel):
 class CreateUserRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=64)
     password: str = Field(..., min_length=8, max_length=128)
-    role: str = Field(..., pattern="^(admin|editor|user)$")
+    role: str = Field(..., pattern="^(admin|editor|user|parent)$")
 
 
 class ChangePasswordRequest(BaseModel):

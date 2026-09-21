@@ -17,7 +17,7 @@ import {
 } from '@chakra-ui/react';
 import { Switch } from '@/components/ui/switch';
 import { BsMicFill, BsMic } from 'react-icons/bs';
-import { FiClock, FiPlus, FiHome } from 'react-icons/fi';
+import { FiClock, FiPlus, FiHome, FiPause } from 'react-icons/fi';
 import { IoSend } from 'react-icons/io5';
 import { Alert } from '@/components/ui/alert';
 import { useInterrupt } from '@/hooks/utils/use-interrupt';
@@ -220,6 +220,18 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
             border="1px solid"
             borderColor="rgba(226, 232, 240, 0.8)"
           >
+            {/* 暂停键：AI 播报中可点，停止当前播报（打断）；空闲时置灰不可点 */}
+            <IconButton
+              aria-label="暂停播报"
+              title="暂停播报"
+              size="sm"
+              variant="ghost"
+              disabled={aiState !== AiStateEnum.THINKING_SPEAKING}
+              color={aiState === AiStateEnum.THINKING_SPEAKING ? schoolColors.primary : schoolColors.textSecondary}
+              onClick={() => interrupt()}
+            >
+              <FiPause />
+            </IconButton>
             <IconButton
               aria-label="返回首页"
               size="sm"

@@ -16,22 +16,26 @@ const gray800 = '#1e293b';
 
 interface UserRow {
   username: string;
-  role: 'admin' | 'editor' | 'user';
+  role: 'admin' | 'editor' | 'user' | 'parent';
   created_at: number;
 }
 
-type CreateRole = 'user' | 'editor' | 'admin';
+type CreateRole = 'user' | 'parent' | 'editor' | 'admin';
 
+// 角色中文名（2026-09-20 需求 #6）：admin=最高权限管理员、editor=数据管理员
+//（仅能上传，不能动他人数据）、user=学生、parent=家长（会话数据与学生分开）
 const ROLE_LABELS: Record<CreateRole, string> = {
-  user: '普通用户',
-  editor: '编辑者',
-  admin: '管理员',
+  user: '学生',
+  parent: '家长',
+  editor: '数据管理员',
+  admin: '最高权限管理员',
 };
 
 const ROLE_BADGE_COLORS: Record<string, string> = {
   admin: schoolBlue,
   editor: gray600,
   user: '#2e8b57',
+  parent: '#b7791f',
 };
 
 export default function UserManagement() {
@@ -144,7 +148,7 @@ export default function UserManagement() {
             value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
           />
           <HStack gap="1">
-            {(['user', 'editor', 'admin'] as CreateRole[]).map((role) => (
+            {(['user', 'parent', 'editor', 'admin'] as CreateRole[]).map((role) => (
               <Button
                 key={role}
                 size="sm" variant={newRole === role ? 'solid' : 'outline'}

@@ -40,6 +40,8 @@ import fileUploadDialog from '@/utils/file-upload-dialog';
 // 校园实景背景（打包进前端，APK 离线可用；见 assets/school/）
 import bgCampusTrack from '@/assets/school/campus-track.jpg';
 import bgCampusGate from '@/assets/school/campus-gate.jpg';
+import bgCampusGym from '@/assets/school/campus-gym.jpg';
+import bgCampusArtFestival from '@/assets/school/campus-art-festival.jpg';
 
 // 学校配色方案
 const schoolColors = {
@@ -64,6 +66,8 @@ const BACKGROUNDS = [
   { id: 'upload', name: '上传图片', url: '' },
   { id: 'campus_track', name: '校园跑道（实景）', url: bgCampusTrack },
   { id: 'campus_gate', name: '校门（实景）', url: bgCampusGate },
+  { id: 'campus_gym', name: '体育馆（实景）', url: bgCampusGym },
+  { id: 'campus_art', name: '体艺节（实景）', url: bgCampusArtFestival },
   { id: 'school_building', name: '学校建筑', url: '/bg/school/campus_skyline.svg' },
   { id: 'library', name: '图书馆', url: '/bg/school/library_warm.svg' },
   { id: 'classroom', name: '教室', url: '/bg/school/classroom_bright.svg' },

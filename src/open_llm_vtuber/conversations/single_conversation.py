@@ -76,19 +76,35 @@ async def process_single_conversation(
         if images:
             logger.info(f"With {len(images)} images")
 
+        # 联网检索（2026-09-20 需求 #4）：时效/搜索类问题先起检索任务，与下面的 RAG 并行跑，
+        # RAG 完成后取结果；RAG 未命中时也兜底搜一次。全程 try 包裹，失败不拖开口。
+        web_block = ""
+        search_task: Optional[asyncio.Task] = None
+        try:
+            from ..knowledge.web_search import needs_web_search, web_search_context
+
+            if needs_web_search(input_text):
+                search_task = asyncio.create_task(web_search_context(input_text))
+        except Exception as e:
+            logger.warning(f"联网检索任务创建失败，跳过: {e}")
+
         # RAG 检索集成：检查是否需要从学校知识库（data/knowledge）检索相关信息
+        rag_hit_flag = False
+        rag_attempted = False  # 只有"确实做过 RAG 且未命中"才允许联网兜底，寒暄不搜
         try:
             from ..knowledge.rag_service import CHAT_TOP_K, get_rag_service
             rag_service = get_rag_service()
 
             if rag_service.needs_rag_retrieval(input_text):
                 logger.info("检测到学校相关问题，执行 RAG 检索...")
+                rag_attempted = True
                 rag_result = await rag_service.retrieve_and_enrich_input(
                     query=input_text,
                     top_k=CHAT_TOP_K,  # 调用点曾硬编码 6，会覆盖默认值——改它瘦身才生效
                 )
 
                 if rag_result.get("has_context"):
+                    rag_hit_flag = True
                     enriched_input_text = rag_result.get("enriched_query", input_text)
                     logger.info(f"RAG 检索成功，检索到 {len(rag_result.get('retrieved_docs', []))} 条相关资料")
 
@@ -104,6 +120,33 @@ async def process_single_conversation(
                 }, ensure_ascii=False))
         except Exception as e:
             logger.warning(f"RAG 检索失败，继续使用原始输入: {e}")
+
+        # 取联网检索结果：时效题（并行已跑完）直接收；其余 RAG 未命中时兜底搜一次
+        try:
+            if search_task is not None:
+                web_block = await asyncio.wait_for(search_task, timeout=6.0)
+            elif rag_attempted and not rag_hit_flag:
+                from ..knowledge.web_search import web_search_context
+
+                web_block = await asyncio.wait_for(
+                    web_search_context(input_text), timeout=6.0)
+            if web_block:
+                enriched_input_text = f"{enriched_input_text}\n\n{web_block}"
+                span = current_span()
+                if span is not None:
+                    span.set_once("web_hit", True)
+        except Exception as e:
+            logger.warning(f"联网检索结果获取失败，忽略: {e}")
+
+        # 联网检索状态推送（有结果才发，前端提示"已结合网上信息"）
+        if web_block:
+            try:
+                await websocket_send(json.dumps({
+                    "type": "web-status",
+                    "used": True,
+                }, ensure_ascii=False))
+            except Exception:
+                pass
 
         # Create batch input with enriched text (after RAG retrieval)
         batch_input = create_batch_input(

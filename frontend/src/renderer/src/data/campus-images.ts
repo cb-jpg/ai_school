@@ -1,12 +1,18 @@
 /**
  * 校园专题页图片配置
  * 素材来源：校方《数据清单》——《芝兰玉树》25周年画册（学生头像）、2024宣纸折页（校园照片）、
- * 荣誉牌匾照片、25周年校庆照片；已裁切压缩后打包进前端（assets/school/）。
+ * 荣誉牌匾照片、25周年校庆照片；2026-09-20 起校门/跑道/场馆照片换用校方重发的新实景
+ * （数据清单/小石同学/数据需求/4，2026 年拍摄）；已裁切压缩后打包进前端（assets/school/）。
  * 匹配策略：按 section 标题关键词匹配（本地静态数据与后端 API 数据的 id 可能不一致，标题更稳定）。
  */
 import bannerHistory from '@/assets/school/banner-history.jpg';
+import campusArtFestival from '@/assets/school/campus-art-festival.jpg';
+import campusChoirRoom from '@/assets/school/campus-choir-room.jpg';
 import campusGate from '@/assets/school/campus-gate.jpg';
+import campusGym from '@/assets/school/campus-gym.jpg';
+import campusInformaticsLab from '@/assets/school/campus-informatics-lab.jpg';
 import campusTrack from '@/assets/school/campus-track.jpg';
+import campusVexLab from '@/assets/school/campus-vex-lab.jpg';
 import honorFangzhen from '@/assets/school/honor-fangzhen.jpg';
 import honorGaozhiliang from '@/assets/school/honor-gaozhiliang.jpg';
 import honorJiankang from '@/assets/school/honor-jiankang.jpg';
@@ -64,6 +70,26 @@ const sectionRules: Array<{ keywords: string[]; image: SectionImage }> = [
   {
     keywords: ['鲲鹏', '英才'],
     image: { src: honorKunpeng, variant: 'card', caption: '南海区英才培养先进单位"鲲鹏奖"' },
+  },
+  {
+    keywords: ['机器人', 'VEX', '科创', '科技节'],
+    image: { src: campusVexLab, variant: 'card', caption: 'VEX机器人专训室（2026 校方实景）' },
+  },
+  {
+    keywords: ['合唱', '音乐', '合唱团'],
+    image: { src: campusChoirRoom, variant: 'card', caption: '合唱室（2026 校方实景）' },
+  },
+  {
+    keywords: ['编程', 'CSP', 'NOI', '专训'],
+    image: { src: campusInformaticsLab, variant: 'card', caption: '信息学专训室（2026 校方实景）' },
+  },
+  {
+    keywords: ['体艺节', '艺术节', '文艺汇演', '晚会'],
+    image: { src: campusArtFestival, variant: 'card', caption: '体艺节（2026 校方实景）' },
+  },
+  {
+    keywords: ['体育馆', '运动场', '体育'],
+    image: { src: campusGym, variant: 'card', caption: '体育馆（2026 校方实景）' },
   },
   {
     keywords: ['太平', '校区', '迁址', '概况'],

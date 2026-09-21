@@ -1,6 +1,7 @@
 /**
- * App 全局登录页（启动门禁）：所有用户（管理员/普通使用者）先登录再使用。
+ * App 全局登录页：管理员/数据管理员进后台、学生/家长进对话前登录。
  * 账号由管理员在管理后台"用户管理"中创建并派发。
+ * 浏览类页面（首页/专题页）不要求登录；匿名讲解时本页作为可取消浮层弹出（onCancel）。
  */
 import { useState } from 'react';
 import { Box, VStack, Text, Input, Button } from '@chakra-ui/react';
@@ -8,7 +9,12 @@ import { useAuth } from '@/context/auth-context';
 
 const schoolBlue = '#1a4d8f';
 
-export default function AppLoginPage() {
+interface AppLoginPageProps {
+  /** 作为浮层弹出时的"暂不登录"回调；提供时显示返回按钮 */
+  onCancel?: () => void;
+}
+
+export default function AppLoginPage({ onCancel }: AppLoginPageProps) {
   const { login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -151,6 +157,20 @@ export default function AppLoginPage() {
             >
               登 录
             </Button>
+
+            {/* 浮层模式（匿名讲解触发）：可暂不登录，返回继续浏览 */}
+            {onCancel && (
+              <Button
+                type="button"
+                variant="ghost"
+                width="full"
+                size="sm"
+                color="#64748b"
+                onClick={onCancel}
+              >
+                暂不登录，继续浏览
+              </Button>
+            )}
           </VStack>
         </form>
       </Box>

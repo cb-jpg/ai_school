@@ -84,6 +84,7 @@ import UnansweredQuestions from "./components/admin/unanswered-questions";
 import UserManagement from "./components/admin/user-management";
 import { CharacterConfig } from "./components/admin/character-config";
 import { usePortraitBoard } from "./hooks/utils/use-portrait-board";
+import { useOtaUpdate } from "./hooks/use-ota-update";
 
 // 定义路由类型
 type AppRoute = 'hero' | 'main' | 'campus' | 'main-admin';
@@ -140,12 +141,15 @@ function AppContent(): JSX.Element {
   const [currentRoute, setCurrentRoute] = useState<AppRoute>(() => getCurrentRoute());
   const [currentMainRoute, setCurrentMainRoute] = useState<MainRoute>(() => getCurrentMainRoute());
   const [heroView, setHeroView] = useState<HeroView>(() => readHeroView());
+  // 未登录用户在专题页点「讲解」时弹出的登录浮层（浏览不中断，登录后自动回到原页面）
+  const [authPrompt, setAuthPrompt] = useState(false);
   const { mode } = useMode();
   const { user: authUser } = useAuth();
   const isElectron = window.api !== undefined;
   // 竖屏大屏（壁挂数字屏/竖放平板）：hero 路由的画布层与文案样式走手机竖屏
   // 同款的全宽穿透形态，而非 md 档"右侧 55% / 低层级"的横屏布局
   const isPortraitBoard = usePortraitBoard();
+  useOtaUpdate(); // App 在线更新检查（手机弹窗 / kiosk 静默换包；浏览器端内部短路）
   const live2dContainerRef = useRef<HTMLDivElement>(null);
   const currentLayoutRef = useRef({ showSidebar, isFooterCollapsed });
   const previousLayoutRef = useRef<{ showSidebar: boolean; isFooterCollapsed: boolean } | null>(null);
@@ -276,10 +280,21 @@ function AppContent(): JSX.Element {
     zIndex: 15,
   };
 
-  // 全局登录门禁：未登录一律先进登录页（管理员/普通使用者同入口，账号由管理员派发）
-  if (!authUser) {
+  // 登录门禁（2026-09-20 需求 #6）：浏览类页面（新首页/校园专题页）不再强制登录，
+  // 进入「对话界面」才要求登录——家长/学生各用各的账号，会话数据按账号隔离。
+  const isHomeViewGate = currentRoute === 'hero' && heroView === 'home' && !activeCampusTopic;
+  const isTopicViewGate = currentRoute === 'hero' && !!activeCampusTopic;
+  const isDialogViewGate = currentRoute === 'hero' && !isHomeViewGate && !isTopicViewGate;
+  if (isDialogViewGate && !authUser) {
     return <AppLoginPage />;
   }
+
+  // 专题页匿名点「讲解」：登录浮层盖在当前页面上，可取消继续浏览
+  const authPromptOverlay = authPrompt && !authUser && (
+    <Box position="fixed" top={0} left={0} width="100vw" height="100vh" zIndex={100}>
+      <AppLoginPage onCancel={() => setAuthPrompt(false)} />
+    </Box>
+  );
 
   // Show Hero Landing page on hero route (still wrapped in all providers)
   if (currentRoute === 'hero') {
@@ -328,13 +343,15 @@ function AppContent(): JSX.Element {
                 onNavigate={navigateToCampusTopic}
                 onClose={closeCampusTopic}
                 mode="hero"
+                onRequireAuth={() => setAuthPrompt(true)}
               />
             </Box>
           </Box>
         )}
 
-        {/* WebSocketStatus indicator（专题页打开时隐藏，避免浮在专题页导航上） */}
-        {!activeCampusTopic && (
+        {/* WebSocketStatus indicator（专题页打开时隐藏，避免浮在专题页导航上；未登录时隐藏——
+            匿名浏览不连 WS，亮着红色断连提示反而困惑） */}
+        {!activeCampusTopic && authUser && (
           <Box position="absolute" top="20px" left="20px" zIndex={10}>
             <WebSocketStatus />
           </Box>
@@ -377,14 +394,18 @@ function AppContent(): JSX.Element {
             activeCampusTopic={activeCampusTopic}
           />
         )}
+
+        {/* 专题页匿名点「讲解」触发的登录浮层（盖在当前页面上，可取消） */}
+        {authPromptOverlay}
       </>
     );
   }
 
   // Admin workspace page - school themed management dashboard
   if (currentRoute === 'main-admin') {
-    // 登录守卫：管理后台仅 admin / editor 可进入；普通使用者（user）无权限
-    if (!authUser || authUser.role === 'user') {
+    // 登录守卫：管理后台仅 admin（最高权限管理员）/ editor（数据管理员）可进入；
+    // 学生（user）/ 家长（parent）无权限
+    if (!authUser || (authUser.role !== 'admin' && authUser.role !== 'editor')) {
       return <AppLoginPage />;
     }
 

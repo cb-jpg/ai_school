@@ -24,6 +24,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useWebSocket } from '@/context/websocket-context';
 import { useAiState } from '@/context/ai-state-context';
 import { useSubtitle } from '@/context/subtitle-context';
+import { useAuth } from '@/context/auth-context';
 import { useInterrupt } from '@/hooks/utils/use-interrupt';
 import {
   CampusKnowledgeSection,
@@ -41,6 +42,8 @@ interface CampusKnowledgeProps {
   onClose: () => void;
   onStartConsultation?: () => void;  // 新增：开始对话的回调
   mode?: 'hero' | 'main';
+  /** 未登录用户点「讲解」时回调（hero 路由弹出登录浮层；需求 #6：浏览免登录、互动先登录） */
+  onRequireAuth?: () => void;
 }
 
 const topicIcons: Record<CampusTopicId, IconType> = {
@@ -234,7 +237,9 @@ export default function CampusKnowledge({
   onClose,
   onStartConsultation,
   mode = 'main',
+  onRequireAuth,
 }: CampusKnowledgeProps) {
+  const { user: authUser } = useAuth();
   const { sendMessage, wsState } = useWebSocket();
   const { aiState, setAiState } = useAiState();
   const { subtitleText, setSubtitleText } = useSubtitle();
@@ -252,6 +257,16 @@ export default function CampusKnowledge({
   const narrate = useCallback((title: string, segments: string[]) => {
     const cleanedSegments = segments.map((segment) => segment.trim()).filter(Boolean);
     if (cleanedSegments.length === 0) return;
+
+    // 匿名浏览时点「讲解」：先登录（讲解即数字人对话，会话按账号隔离）
+    if (!authUser) {
+      if (onRequireAuth) {
+        onRequireAuth();
+      } else {
+        setNarrationError('请先登录后再使用语音讲解。');
+      }
+      return;
+    }
 
     if (wsState !== 'OPEN') {
       setNarrationError('讲解服务尚未连接，请稍后重试。');
@@ -274,7 +289,7 @@ export default function CampusKnowledge({
     setNarrationError('');
     setSubtitleText(`正在准备讲解：${title}`);
     setAiState('thinking-speaking');
-  }, [aiState, interrupt, sendMessage, setAiState, setSubtitleText, wsState]);
+  }, [aiState, authUser, interrupt, onRequireAuth, sendMessage, setAiState, setSubtitleText, wsState]);
 
   const stopNarration = useCallback(() => {
     interrupt();

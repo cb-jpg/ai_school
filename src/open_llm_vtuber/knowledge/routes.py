@@ -7,7 +7,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from loguru import logger
 
-from .auth import require_staff
+from .auth import require_staff, ensure_can_modify
 from .audit import record as audit_record
 from .audit import bump_counter
 from .audit import list_entries as audit_list_entries
@@ -139,7 +139,8 @@ async def create_knowledge(request: KnowledgeCreateRequest, _user: dict = Depend
             content=request.content,
             category=request.category,
             tags=request.tags,
-            summary=request.summary
+            summary=request.summary,
+            created_by=_user["username"],
         )
 
         # Save entry
@@ -167,6 +168,12 @@ async def update_knowledge(
 ):
     """Update a knowledge entry"""
     try:
+        # 数据管理员只能改自己上传的条目（admin 不受限）
+        _existing = crud.get(entry_id)
+        if _existing is None:
+            raise HTTPException(status_code=404, detail="Knowledge entry not found")
+        ensure_can_modify(_user, _existing)
+
         # Update only provided fields
         update_data = {}
         if request.title is not None:
@@ -205,6 +212,10 @@ async def delete_knowledge(entry_id: str, _user: dict = Depends(require_staff)):
         existing = crud.get(entry_id)
         title = existing.title if existing else ""
 
+        # 数据管理员只能删自己上传的条目（admin 不受限）；条目不存在走下方 404
+        if existing is not None:
+            ensure_can_modify(_user, existing)
+
         success = crud.delete(entry_id)
         if not success:
             raise HTTPException(status_code=404, detail="Knowledge entry not found")
@@ -227,6 +238,21 @@ async def delete_knowledge(entry_id: str, _user: dict = Depends(require_staff)):
 async def bulk_operation(request: BulkOperationRequest, _user: dict = Depends(require_staff)):
     """Perform bulk operations on multiple entries"""
     try:
+        # 数据管理员只能对本账号上传的条目做删除/发布/归档（admin 不受限）
+        if _user["role"] != "admin":
+            allowed = {
+                eid for eid in request.entry_ids
+                if (e := crud.get(eid)) is not None and e.created_by == _user["username"]
+            }
+            denied = len(request.entry_ids) - len(allowed)
+            if denied:
+                audit_record(
+                    _user["username"], "bulk-denied", "",
+                    f"批量 {request.operation}",
+                    f"{denied} 条非本账号数据被拒绝操作",
+                )
+            request.entry_ids = [eid for eid in request.entry_ids if eid in allowed]
+
         if request.operation == "delete":
             results = crud.bulk_delete(request.entry_ids)
             # Remove from vector store
@@ -315,7 +341,8 @@ async def upload_file(
             file_path=str(file_path),
             title=title,
             category=category_enum,
-            tags=tag_list
+            tags=tag_list,
+            created_by=_user["username"],
         )
 
         if entry.status == KnowledgeStatus.ERROR:
@@ -374,7 +401,8 @@ async def add_url(request: UrlAddRequest, _user: dict = Depends(require_staff)):
             url=request.url,
             title=request.title,
             category=request.category,
-            tags=request.tags
+            tags=request.tags,
+            created_by=_user["username"],
         )
 
         if entry.status == KnowledgeStatus.ERROR:

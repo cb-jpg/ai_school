@@ -1,8 +1,30 @@
 import { defineConfig, normalizePath } from 'vite';
 import path from 'path';
+import fs from 'fs';
 import react from '@vitejs/plugin-react-swc';
 
+// 从 android/app/build.gradle 读原生包版本，作为前端构建期常量注入（单一版本源）。
+// OTA 检查用 __APP_BUILD__（versionCode）与服务器 manifest.version_code 比大小。
+function readAndroidVersion(): { build: number; name: string } {
+  try {
+    const gradle = fs.readFileSync(
+      path.resolve(__dirname, 'android/app/build.gradle'),
+      'utf-8',
+    );
+    const code = gradle.match(/versionCode\s+(\d+)/)?.[1];
+    const name = gradle.match(/versionName\s+"([^"]+)"/)?.[1];
+    if (code && name) return { build: parseInt(code, 10), name };
+  } catch { /* 非 Android 环境或文件缺失时用兜底值 */ }
+  return { build: 0, name: 'dev' };
+}
+
+const androidVersion = readAndroidVersion();
+
 const createConfig = async (outDir: string) => ({
+  define: {
+    __APP_BUILD__: JSON.stringify(androidVersion.build),
+    __APP_VERSION__: JSON.stringify(androidVersion.name),
+  },
   plugins: [
     (await import('vite-plugin-static-copy')).viteStaticCopy({
       targets: [

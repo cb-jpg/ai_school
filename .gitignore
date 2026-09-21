@@ -114,3 +114,13 @@ frontend/.env.web.local
 debug-0916/
 problems/
 tools/
+
+# 灌库凭据与提取缓存（勿入库）
+scripts/knowledge_data/.seed_auth
+scripts/knowledge_data/extract_cache_v2/
+scripts/knowledge_data/*.bak-*
+scripts/extracted_v2.json
+scripts/merged_v2.json
+
+# 调试截图（本地产物，勿入库）
+screenshots/

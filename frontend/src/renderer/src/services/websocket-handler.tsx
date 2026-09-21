@@ -161,6 +161,16 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
           });
         }
         break;
+      case 'web-status':
+        // 联网检索（2026-09-20 需求 #4）：本次回答结合了网上最新信息
+        if (message.used) {
+          toaster.create({
+            title: '已结合网上最新信息作答',
+            type: 'info',
+            duration: 2500,
+          });
+        }
+        break;
       case 'config-files':
         if (message.configs) {
           setConfigFiles(message.configs);
