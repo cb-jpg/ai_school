@@ -124,3 +124,6 @@ scripts/merged_v2.json
 
 # 调试截图（本地产物，勿入库）
 screenshots/
+
+# 灌库清单含学生/家长 PII（手机号/家长姓名工作单位），只留服务器本地，勿入库
+scripts/knowledge_data/*.json
