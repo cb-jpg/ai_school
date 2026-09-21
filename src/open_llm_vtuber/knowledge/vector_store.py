@@ -3,6 +3,7 @@ Vector store for knowledge base chunks.
 Supports both text-based and vector-based similarity search.
 """
 import json
+import threading
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional, Any, Iterable
 from loguru import logger
@@ -61,6 +62,10 @@ class VectorStore:
         self._g_bm25: Optional["BM25Okapi"] = None
         self._g_vec_chunks: List[Chunk] = []
         self._g_vec_matrix: Optional[np.ndarray] = None
+        # 重建锁：无锁时并发首查会同时在半建状态上检索（2026-09-21 校验踩坑：
+        # 4 线程并发首查期间部分查询退化成纯向量路径，BM25/标题加成全丢，
+        # 同一查询时中时不中）
+        self._g_lock = threading.Lock()
 
         # jieba 词典首次加载约 1 秒，放在启动期而不是首次查询
         if BM25_AVAILABLE:
@@ -135,13 +140,24 @@ class VectorStore:
 
     def invalidate_global_index(self) -> None:
         """条目增删改索引后调用，使全库检索索引失效"""
-        self._g_entry_key = None
-        self._g_index_mtime = None
-        self._g_built = False
-        self._g_all_chunks = []
-        self._g_bm25 = None
-        self._g_vec_chunks = []
-        self._g_vec_matrix = None
+        with self._g_lock:
+            self._g_entry_key = None
+            self._g_index_mtime = None
+            self._g_built = False
+            self._g_all_chunks = []
+            self._g_bm25 = None
+            self._g_vec_chunks = []
+            self._g_vec_matrix = None
+            self._g_title_by_entry = {}
+            self._g_title_chunk_ids = {}
+
+    def _load_entry_titles(self) -> Dict[str, str]:
+        """读 index.json 里的 {条目id: 标题}，供标题子串精确匹配加成"""
+        try:
+            raw = json.loads(self.knowledge_dir.joinpath("index.json").read_text(encoding="utf-8"))
+            return {eid: e.get("title", "") for eid, e in raw.items() if isinstance(e, dict)}
+        except Exception:
+            return {}
 
     def _ensure_global_index(self, entry_ids: Iterable[str]) -> None:
         """确保全库索引就绪：条目集合或 index.json mtime 变化时重建"""
@@ -153,6 +169,11 @@ class VectorStore:
         chunks: List[Chunk] = []
         for entry_id in key:
             chunks.extend(self.load_entry_chunks(entry_id))
+
+        self._g_title_by_entry = self._load_entry_titles()
+        self._g_title_chunk_ids: Dict[str, List[str]] = {}
+        for c in chunks:
+            self._g_title_chunk_ids.setdefault(c.source_id, []).append(c.id)
 
         if self.use_embeddings and self.embedding_model:
             self._ensure_embeddings(chunks)
@@ -199,7 +220,8 @@ class VectorStore:
 
         上报分数仍为余弦相似度，与 rag_service 低置信阈值语义保持一致。
         """
-        self._ensure_global_index(entry_ids)
+        with self._g_lock:
+            self._ensure_global_index(entry_ids)
 
         has_vectors = self._g_vec_matrix is not None and len(self._g_vec_chunks) > 0
         if has_vectors and self._g_bm25 is not None:
@@ -262,6 +284,10 @@ class VectorStore:
         """
         vector_ranking, cosine_by_id = self._global_vector_ranking(query)
         bm25_ranking = self._global_bm25_ranking(query)
+        # BM25 名次表：查询嵌入失败时（GPU 被占 CUDA OOM 等）幸存块没有
+        # 真实余弦、全部记 0.0，若无次级排序键，top_k 截断会退化为按块
+        # 存储顺序随机挤掉 BM25 精确命中（2026-09-21 检索校验发现）
+        bm25_rank_by_id = {c.id: i for i, c in enumerate(bm25_ranking)}
 
         rrf: Dict[str, float] = {}
         for ranking in (vector_ranking, bm25_ranking):
@@ -269,17 +295,58 @@ class VectorStore:
                 rrf[chunk.id] = rrf.get(chunk.id, 0.0) + 1.0 / (RRF_K + rank)
 
         by_id = {c.id: c for c in self._g_all_chunks}
-        bm25_top = {c.id for c in bm25_ranking[:top_k]}
+
+        # 候选池 = RRF 融合前列 ∪ 全部 BM25 命中 ∪ 向量路前列，不随 top_k
+        # 截断（旧版融合窗和 BM25 保留窗都取 top_k，同一查询不同 top_k 结果
+        # 不成前缀，且小 top_k 时关键词命中被挤出候选——2026-09-21 校验：
+        # 「学校的电话是多少」top_k=5 查不到「学校联系方式」，top_k=20 却第 1）。
+        # 候选变多不影响顶部质量：低余弦的候选排序时沉底（见 _order_key）。
+        candidate_ids: Dict[str, None] = {}
+        for chunk_id, _ in sorted(rrf.items(), key=lambda x: x[1], reverse=True)[: max(top_k * 2, 20)]:
+            candidate_ids.setdefault(chunk_id, None)
+        for chunk in bm25_ranking:
+            candidate_ids.setdefault(chunk.id, None)
+        for chunk in vector_ranking[:top_k]:
+            candidate_ids.setdefault(chunk.id, None)
 
         survivors: List[Tuple[Chunk, float]] = []
-        fused = sorted(rrf.items(), key=lambda x: x[1], reverse=True)
-        for chunk_id, _ in fused[: top_k * 2]:
+        for chunk_id in candidate_ids:
             cosine = cosine_by_id.get(chunk_id, 0.0)
-            # 保留：余弦过阈值，或 BM25 路前列命中
-            if cosine >= min_score or chunk_id in bm25_top:
+            # 保留：余弦过阈值，或 BM25 有任意命中
+            if cosine >= min_score or chunk_id in bm25_rank_by_id:
                 survivors.append((by_id[chunk_id], cosine))
 
-        survivors.sort(key=lambda x: x[1], reverse=True)
+        # 主序仍是余弦降序（rag_service 低置信阈值依赖此语义，见 docstring），
+        # 在其上叠加 BM25 名次加成：只影响排序、不改上报分数。背景：同模板
+        # 条目（如成批的学生推荐表）和泛主题大条目余弦普遍 0.7+，精确词命中
+        # 的目标块余弦反而被压下去（2026-09-21 校验实测：查"陈雨桐"top20 全是
+        # 别的学生条目；"学校概况"bm25 第 0 名却进不了 top5）；BM25 对精确词
+        # 的判断恰好补这个短板。加成幅度按检索实测校准：需盖过 ~0.75 的泛主题
+        # 余弦、且 rank0 与 rank1 拉开 ~0.08 才能让目标条目进对话上下文
+        # （CHAT_TOP_K 量级）。加成只给余弦已达阈值的块，低置信判定不受影响；
+        # 无余弦（查询嵌入失败 OOM 等）的块之间退回按 BM25 名次排。
+        # 标题子串精确命中加成：查询包含标题，或（≥2 字的）查询被标题包含。
+        # 短标题（如"学校简介"）经分词后常与正文碎片失配，BM25/余弦都可能
+        # 压不过同主题大条目，子串匹配是最稳的精确信号；同批命中的条目之间
+        # 相对次序仍由余弦决定。
+        q = query.strip()
+        tb_ids: set = set()
+        if len(q) >= 2:
+            for eid, t in self._g_title_by_entry.items():
+                if t and (t in q or q in t):
+                    tb_ids.update(self._g_title_chunk_ids.get(eid, ()))
+
+        def _order_key(item: Tuple[Chunk, float]):
+            chunk, cosine = item
+            rank = bm25_rank_by_id.get(chunk.id)
+            if cosine >= min_score:
+                bonus = 0.25 / (1 + 0.5 * rank) if rank is not None else 0.0
+                if chunk.id in tb_ids:
+                    bonus += 0.3
+                return (1, cosine + bonus, 0.0)
+            return (0, 0.0, float(-rank) if rank is not None else 0.0)
+
+        survivors.sort(key=_order_key, reverse=True)
         return survivors[:top_k]
 
     def index_chunks(self, entry_id: str, chunks: List[Chunk]) -> bool:

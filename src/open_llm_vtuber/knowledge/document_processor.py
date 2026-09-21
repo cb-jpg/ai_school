@@ -87,7 +87,7 @@ class DocumentProcessor:
                 raise ValueError("Extracted text is too short or empty")
 
             # Create chunks
-            chunks = self._chunk_text(text_content)
+            chunks = self._chunk_text(text_content, title=title)
 
             # Create knowledge entry
             entry = KnowledgeEntry(
@@ -185,7 +185,7 @@ class DocumentProcessor:
                 raise ValueError("Extracted web content is too short or empty")
 
             # Create chunks
-            chunks = self._chunk_text(text_content)
+            chunks = self._chunk_text(text_content, title=title)
 
             # Create knowledge entry
             entry = KnowledgeEntry(
@@ -263,7 +263,7 @@ class DocumentProcessor:
 
         try:
             # Create chunks
-            chunks = self._chunk_text(content)
+            chunks = self._chunk_text(content, title=title)
 
             # Create knowledge entry
             entry = KnowledgeEntry(
@@ -378,7 +378,7 @@ class DocumentProcessor:
             start = max(end - self.chunk_overlap, start + 1)
         return parts
 
-    def _chunk_text(self, text: str) -> List[Chunk]:
+    def _chunk_text(self, text: str, title: str = "") -> List[Chunk]:
         """
         Split text into chunks for vectorization.
 
@@ -386,8 +386,14 @@ class DocumentProcessor:
         不能把换行压成空格后整篇按句读切（会切碎记录且产生大量重复块）。
         单行超 chunk_size 时再按句读切分（见 _split_long_line）。
 
+        每块前缀条目标题（2026-09-21 检索覆盖校验后加入）：入库内容里
+        大量条目的特征词只在标题（人名/荣誉名/图片资料说明），正文是
+        表格行或占位文本——块里没标题时标题词检索必然漏。前缀让向量
+        与 BM25 两路都能命中标题词，对正文检索无副作用。
+
         Args:
             text: Text to chunk
+            title: Entry title，作为每块上下文前缀（空串则不加）
 
         Returns:
             List of Chunk objects
@@ -399,7 +405,7 @@ class DocumentProcessor:
             nonlocal buf
             if buf:
                 chunks.append(Chunk(
-                    content=buf,
+                    content=f"{title}\n{buf}" if title else buf,
                     source_id="",  # Will be set when entry is created
                     chunk_index=len(chunks),
                 ))
@@ -413,7 +419,7 @@ class DocumentProcessor:
                 for piece in self._split_long_line(line):
                     flush()
                     chunks.append(Chunk(
-                        content=piece,
+                        content=f"{title}\n{piece}" if title else piece,
                         source_id="",  # Will be set when entry is created
                         chunk_index=len(chunks),
                     ))

@@ -6,6 +6,7 @@ from typing import List, Optional, Dict, Any
 from loguru import logger
 from pathlib import Path
 import json
+import os
 import threading
 import numpy as np
 
@@ -344,6 +345,10 @@ def get_embedding_model(
     """
     global _embedding_model
     if _embedding_model is None:
+        # OLLV_EMBED_DEVICE 强制指定设备。默认 auto 会上 GPU，而本部署的
+        # GPU 与同事任务共用、长期贴满（2026-09-21 单日 324 次查询嵌入
+        # CUDA OOM，RAG 静默退化），模型很小，锁 CPU 反而稳定。
+        device = device or os.getenv("OLLV_EMBED_DEVICE") or None
         _embedding_model = CachedEmbeddingModel(
             model_name=model_name,
             device=device,
