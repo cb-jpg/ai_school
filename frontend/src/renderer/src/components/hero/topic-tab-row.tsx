@@ -11,13 +11,7 @@ import type { IconType } from 'react-icons';
 import { CampusTopic, CampusTopicId, campusTopics } from '@/data/campus-knowledge';
 import { usePortraitBoard } from '@/hooks/utils/use-portrait-board';
 import { IS_KIOSK } from '@/utils/device-profile';
-
-const swissFont = '"Helvetica Neue", Arial, sans-serif';
-const ink = '#121826';
-const blue = '#002FA7';
-const blueWash = '#E8EEFF';
-const hairline = '#E5E7EB';
-const paper = '#FFFFFF';
+import { swissFont, siteTheme } from './site-theme';
 
 const topicIcons: Record<CampusTopicId, IconType> = {
   intro: FiBookOpen,
@@ -30,10 +24,10 @@ export function TopicTabButton({
   topic,
   active,
   onClick,
-  // 主题色：默认专题蓝；首页门户化后传校旗红（2026-09-21 官网化改版）
-  activeBg = blue,
-  hoverWash = blueWash,
-  hoverInk = blue,
+  // 主题色：全站官网化后默认石实绛红（2026-09-21 全站改版）
+  activeBg = siteTheme.red,
+  hoverWash = siteTheme.redWash,
+  hoverInk = siteTheme.red,
 }: {
   topic: CampusTopic;
   active: boolean;
@@ -55,7 +49,7 @@ export function TopicTabButton({
       px={isPortraitBoard ? '20px' : { base: '12px', lg: '16px' }}
       borderRadius="md"
       background={active ? activeBg : 'transparent'}
-      color={active ? 'white' : ink}
+      color={active ? 'white' : siteTheme.navy}
       fontFamily={swissFont}
       fontWeight="500"
       fontSize={isPortraitBoard ? '19px' : 'sm'}
@@ -135,10 +129,10 @@ export default function TopicTabRow({
       flexShrink={0}
       px={isPortraitBoard ? '20px' : { base: '12px', md: '20px', lg: '24px' }}
       py={isPortraitBoard ? '12px' : { base: '8px', md: '10px' }}
-      background={paper}
+      background={siteTheme.paper}
       // 2026-09-21 官网化改版：由悬浮卡片改为红横带下的通栏白导航条（省实式）
       borderBottom="1px solid"
-      borderColor={hairline}
+      borderColor={siteTheme.hairline}
     >
       {/* 手机端/竖屏大屏一行横向滑动；桌面端保持换行布局（与专题页一致） */}
       <Flex

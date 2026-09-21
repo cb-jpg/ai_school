@@ -35,6 +35,8 @@ import {
   demoSchool,
 } from '@/data/campus-knowledge';
 import { imageForSection, topicBanners } from '@/data/campus-images';
+import { swissFont, siteTheme } from '../hero/site-theme';
+import { usePortraitBoard } from '@/hooks/utils/use-portrait-board';
 
 interface CampusKnowledgeProps {
   activeTopicId: CampusTopicId | null;
@@ -53,14 +55,15 @@ const topicIcons: Record<CampusTopicId, IconType> = {
   'role-models': FiUsers,
 };
 
-const swissFont = '"Helvetica Neue", Arial, sans-serif';
-const ink = '#121826';
-const muted = '#586174';
-const hairline = '#E5E7EB';
-const paper = '#FFFFFF';
-const surface = '#FAFAFA';
-const blue = '#002FA7';
-const blueWash = '#E8EEFF';
+/* 全站官网化（2026-09-21）：颜色统一取自石实 IP 官方主题（site-theme.ts）——
+   绛红主色 / 藏青墨色 / 青绿点缀 / 米白纸感底 */
+const ink = siteTheme.navy;
+const muted = siteTheme.textBody;
+const hairline = siteTheme.hairline;
+const paper = siteTheme.paper;
+const surface = '#FBF8F3';
+const accent = siteTheme.red;
+const accentWash = siteTheme.redWash;
 
 const buildNarrationId = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -86,14 +89,14 @@ function TopicNavigationButton({
       height="40px"
       px={{ base: '12px', lg: '16px' }}
       borderRadius="md"
-      background={active ? blue : 'transparent'}
+      background={active ? accent : 'transparent'}
       color={active ? 'white' : ink}
       fontFamily={swissFont}
       fontWeight="500"
       fontSize="sm"
       _hover={{
-        background: active ? blue : blueWash,
-        color: active ? 'white' : blue,
+        background: active ? accent : accentWash,
+        color: active ? 'white' : accent,
       }}
       transition="all 200ms ease"
     >
@@ -131,7 +134,7 @@ function KnowledgeSectionCard({
         {/* Index Number */}
         <Box width={{ base: 'auto', md: '60px' }} flexShrink={0} mb={{ base: '4', md: '0' }}>
           <Text
-            color={blue}
+            color={accent}
             fontSize="24px"
             lineHeight="1"
             fontWeight="700"
@@ -155,12 +158,12 @@ function KnowledgeSectionCard({
               height="36px"
               px="4"
               borderRadius="md"
-              background={blue}
+              background={accent}
               color="white"
               fontFamily={swissFont}
               fontWeight="500"
               fontSize="sm"
-              _hover={{ background: 'rgba(0, 47, 167, 0.9)' }}
+              _hover={{ background: siteTheme.redDark }}
               _disabled={{ opacity: 0.5, cursor: 'not-allowed' }}
             >
               <FiMic size={14} style={{ marginRight: '6px' }} />
@@ -178,7 +181,7 @@ function KnowledgeSectionCard({
               <Flex gap="3" flexWrap="wrap">
                 {section.facts.map((fact, idx) => (
                   <Flex key={idx} align="flex-start" gap="2">
-                    <Box mt="2" width="4" height="4" flexShrink={0} background={blue} borderRadius="full" />
+                    <Box mt="2" width="4" height="4" flexShrink={0} background={accent} borderRadius="full" />
                     <Text color={muted} fontSize="13px" lineHeight="1.6">
                       {fact}
                     </Text>
@@ -248,6 +251,8 @@ export default function CampusKnowledge({
   const activeTopic = activeTopicId ? campusTopicMap[activeTopicId] : null;
   const isSpeaking = aiState === 'thinking-speaking';
   const isHeroMode = mode === 'hero';
+  // 竖屏大屏（壁挂数字屏）：页头更高，内容卡起点相应下移
+  const isPortraitBoard = usePortraitBoard();
 
   // Debug logging
   useEffect(() => {
@@ -326,10 +331,15 @@ export default function CampusKnowledge({
 
   return (
     /* 根容器：纵向 flex（导航卡 + 内容面板），结构上保证两者永不互相遮挡。
-       手机端整体避开学校顶部导航栏(~86px)；桌面端维持原视觉位置。 */
+       hero 路由（2026-09-21 全站官网化）：页面导航已由 SiteHeader（hero-landing
+       渲染，绛红横带+白色栏目导航条）承担，本组件整体避开页头高度
+       （base≈106px / lg≈122px / 竖屏大屏≈158px）；main 模式（Electron 工作台）
+       维持原内部导航卡与位置。 */
     <Box
       position="absolute"
-      top={{ base: '92px', lg: '16px' }}
+      top={isHeroMode
+        ? (isPortraitBoard ? '164px' : { base: '112px', lg: '128px' })
+        : { base: '92px', lg: '16px' }}
       left={{ base: '12px', lg: '24px' }}
       right={{ base: '12px', lg: '24px' }}
       bottom={{ base: '12px', lg: '24px' }}
@@ -339,7 +349,8 @@ export default function CampusKnowledge({
       zIndex={30}
       fontFamily={swissFont}
     >
-      {/* Navigation Bar */}
+      {/* Navigation Bar（仅 main 模式：hero 模式的导航在 SiteHeader） */}
+      {!isHeroMode && (
       <Box
         data-testid="campus-navigation"
         flexShrink={0}
@@ -354,7 +365,7 @@ export default function CampusKnowledge({
         {/* 手机端隐藏 logo 行（顶部学校导航栏已有校名），只保留一行 tab */}
         <Flex align="center" justify="space-between" gap="16px" flexWrap="wrap" display={{ base: 'none', md: 'flex' }}>
           <Flex align="center" gap="16px">
-            <Box width="40px" height="40px" background={blue} color={paper} display="grid" placeItems="center" borderRadius="lg">
+            <Box width="40px" height="40px" background={accent} color={paper} display="grid" placeItems="center" borderRadius="lg">
               <FiBookOpen size={20} />
             </Box>
             <Box>
@@ -393,7 +404,7 @@ export default function CampusKnowledge({
               fontWeight="500"
               fontSize="sm"
               flexShrink={0}
-              _hover={{ background: blueWash, color: blue }}
+              _hover={{ background: accentWash, color: accent }}
               transition="all 200ms ease"
             >
               <HStack gap="8px">
@@ -422,7 +433,7 @@ export default function CampusKnowledge({
                 fontFamily={swissFont}
                 fontWeight="500"
                 fontSize="sm"
-                _hover={{ background: blueWash, color: blue }}
+                _hover={{ background: accentWash, color: accent }}
               >
                 <FiMessageCircle size={16} style={{ marginRight: '8px' }} />
                 对话
@@ -430,6 +441,7 @@ export default function CampusKnowledge({
             )}
         </Flex>
       </Box>
+      )}
 
       {activeTopic && (
         <Box
@@ -471,10 +483,10 @@ export default function CampusKnowledge({
               mb={{ base: '20px', md: '24px' }}
               p={{ base: '20px', md: '24px' }}
             >
-              {/* Badge */}
-              <Box mb="6">
+              {/* Badge（青绿眉行：石实 IP 次点缀色） */}
+              <Box mb="4">
                 <Text
-                  color={blue}
+                  color={siteTheme.teal}
                   fontSize={{ base: '12px', md: '14px' }}
                   fontWeight="600"
                   letterSpacing="0.05em"
@@ -484,7 +496,7 @@ export default function CampusKnowledge({
                 </Text>
               </Box>
 
-              {/* Title */}
+              {/* Title：标题下短红下划线（省实官网板块标题式） */}
               <Text
                 data-testid="campus-topic-title"
                 color={ink}
@@ -492,10 +504,11 @@ export default function CampusKnowledge({
                 lineHeight="1.1"
                 fontWeight="700"
                 letterSpacing="-0.02em"
-                mb="6"
+                mb="3"
               >
                 {activeTopic.title}
               </Text>
+              <Box mb="5" width="64px" height="4px" bg={accent} />
 
               {/* Subtitle */}
               <Text
@@ -508,9 +521,17 @@ export default function CampusKnowledge({
                 {activeTopic.subtitle}
               </Text>
 
-              {/* 专题配图横幅（校方素材，见 campus-images.ts） */}
+              {/* 专题配图横幅（校方素材，见 campus-images.ts；绛红底边呼应官网 banner） */}
               {topicBanners[activeTopic.id] && (
-                <Box mb="6" borderRadius="lg" overflow="hidden" border="1px solid" borderColor={hairline}>
+                <Box
+                  mb="6"
+                  borderRadius="lg"
+                  overflow="hidden"
+                  border="1px solid"
+                  borderBottom="3px solid"
+                  borderColor={hairline}
+                  borderBottomColor={accent}
+                >
                   <Image
                     src={topicBanners[activeTopic.id]}
                     alt={`${activeTopic.navLabel}配图`}
@@ -527,7 +548,7 @@ export default function CampusKnowledge({
                 {activeTopic.stats.map((stat) => (
                   <Box key={stat.label}>
                     <Text
-                      color={blue}
+                      color={accent}
                       fontSize={{ base: '24px', md: '28px' }}
                       lineHeight="1"
                       fontWeight="700"
@@ -550,12 +571,12 @@ export default function CampusKnowledge({
                   height="44px"
                   px="6"
                   borderRadius="md"
-                  background={blue}
+                  background={accent}
                   color="white"
                   fontFamily={swissFont}
                   fontWeight="500"
                   fontSize="sm"
-                  _hover={{ background: 'rgba(0, 47, 167, 0.9)' }}
+                  _hover={{ background: siteTheme.redDark }}
                   _disabled={{ opacity: 0.5, cursor: 'not-allowed' }}
                 >
                   <FiPlay size={16} style={{ marginRight: '8px' }} />
@@ -582,13 +603,13 @@ export default function CampusKnowledge({
               {/* Sections */}
               <Box>
                 <Text
-                  color={ink}
+                  color={accent}
                   fontSize="16px"
                   fontWeight="700"
                   mb="6"
                   pb="4"
                   borderBottom="2px solid"
-                  borderColor={ink}
+                  borderColor={accent}
                 >
                   内容索引
                 </Text>
@@ -607,13 +628,13 @@ export default function CampusKnowledge({
               {activeTopic.sources.length > 0 && (
                 <Box mt="8">
                   <Text
-                    color={ink}
+                    color={accent}
                     fontSize="14px"
                     fontWeight="700"
                     mb="4"
                     pb="4"
                     borderBottom="1px solid"
-                    borderColor={hairline}
+                    borderColor={accent}
                   >
                     参考来源
                   </Text>
@@ -628,11 +649,11 @@ export default function CampusKnowledge({
                         py="3"
                         px="4"
                         borderRadius="md"
-                        _hover={{ background: surface, color: blue }}
+                        _hover={{ background: accentWash, color: accent }}
                         transition="background 160ms ease"
                       >
                         <Flex align="flex-start" gap="8px">
-                          <Text color={blue} fontSize="12px" fontWeight="700" fontFamily={swissFont}>
+                          <Text color={accent} fontSize="12px" fontWeight="700" fontFamily={swissFont}>
                             {String(index + 1).padStart(2, '0')}
                           </Text>
                           <Box minWidth="0">
@@ -676,8 +697,8 @@ export default function CampusKnowledge({
           zIndex={40}
         >
           <Flex align="center" justify="center" gap="6px" mb="2px">
-            <Box width="7px" height="7px" borderRadius="full" background={blue} />
-            <Text color={blue} fontSize="11px" fontWeight="600" letterSpacing="0.08em">
+            <Box width="7px" height="7px" borderRadius="full" background={accent} />
+            <Text color={accent} fontSize="11px" fontWeight="600" letterSpacing="0.08em">
               正在讲解
             </Text>
           </Flex>

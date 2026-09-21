@@ -1,27 +1,21 @@
 /**
  * Hero Landing Page Component
  * 对话界面（#/hero）- 由原首页迁移而来
- * 明亮简洁风格设计，直接显示对话界面；导航入口（学校简介/对话界面等）
- * 在桌面端中部导航与手机端右上角下拉菜单中，默认进入的新首页见 home-page.tsx
+ * 2026-09-21 全站官网化：页头换 SiteHeader（绛红校名横带 + 白色通栏栏目导航条，
+ * 与首页/专题页同款）；打开专题页时同一页头切换激活项，专题内容由
+ * CampusKnowledge 覆盖层渲染（本组件此时只保留页头）。
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { Box, Flex, IconButton } from '@chakra-ui/react';
-import { FiSettings } from 'react-icons/fi';
-import Navbar from './navbar';
-import MobileMenu from './mobile-menu';
+import { Box, Flex } from '@chakra-ui/react';
+import SiteHeader from './site-header';
 import DialogBox from './dialog-box';
 import HeroSidebar from './hero-sidebar';
 import { SCHOOL_CONFIG } from './school-config';
+import { swissFont } from './site-theme';
 import { usePortraitBoard } from '@/hooks/utils/use-portrait-board';
 import { CampusTopicId } from '@/data/campus-knowledge';
 import { IS_KIOSK } from '@/utils/device-profile';
-
-// 学校配色方案 - 基于石实实验学校的设计
-const schoolColors = {
-  primary: '#1E5494',    // 深蓝色，代表知识和专业
-  white: '#FFFFFF',
-};
 
 interface HeroLandingProps {
   activeCampusTopic: CampusTopicId | null;
@@ -30,18 +24,9 @@ interface HeroLandingProps {
 export default function HeroLanding({
   activeCampusTopic
 }: HeroLandingProps) {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // 竖屏大屏：对话卡限宽 840 居中、铺满高度（手机竖屏同款形态放大），人物右侧小站位
   const isPortraitBoard = usePortraitBoard();
-
-  const handleMobileMenuToggle = () => {
-    setMobileMenuOpen(!mobileMenuOpen);
-  };
-
-  const closeMobileMenu = () => {
-    setMobileMenuOpen(false);
-  };
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -82,7 +67,8 @@ export default function HeroLanding({
   }, []);
 
   return (
-    <Box
+    <Flex
+      direction="column"
       position="relative"
       w="full"
       overflow="hidden"
@@ -91,66 +77,42 @@ export default function HeroLanding({
       style={{ height: kbViewport ? `${kbViewport}px` : 'var(--app-vh, 100vh)' }}
       css={{
         // 移除背景样式，由Background组件处理
-        fontFamily: "'Helvetica Neue', Arial, sans-serif",
+        fontFamily: swissFont,
       }}
     >
-      {/* Navigation Bar */}
-      <Navbar
-        schoolName={SCHOOL_CONFIG.name}
-        navigation={SCHOOL_CONFIG.navigation}
-        onMobileMenuToggle={handleMobileMenuToggle}
-        mobileMenuOpen={mobileMenuOpen}
-        onSettingsToggle={toggleSidebar}
-      />
+      {/* 共享页头：绛红校名横带 + 白色通栏栏目导航条（与首页/专题页同款）。
+          打开专题页时激活项切到当前专题，专题内容由 CampusKnowledge 覆盖层渲染；
+          z30 盖过 Live2D 穿透层(15)，手机端人物不会压住页头（原 Navbar 同层级） */}
+      <Box position="relative" zIndex={30} flexShrink={0}>
+        <SiteHeader
+          activeNav={activeCampusTopic ?? 'dialog'}
+          onNavigateTopic={(topicId) => {
+            window.location.hash = `#/campus/${topicId}`;
+          }}
+          onGoChat={() => {
+            window.location.hash = '#/hero';
+          }}
+          onOpenSettings={toggleSidebar}
+        />
+      </Box>
 
-      {/* 设置按钮 - 打开右侧侧栏（手机端已移入导航栏，竖屏大屏同；专题页打开时隐藏，避免浮在专题页上） */}
+      {/* Main Content Area - 直接显示对话界面（竖屏大屏：对话卡限宽 840 居中）。
+          页头已在文档流中，不再需要旧绝对定位 Navbar 的 pt 让位。
+          专题页打开时本区为空（内容在覆盖层）。 */}
       {!activeCampusTopic && (
-        <Box
-          position="absolute"
-          top={{ base: 20, md: 24 }}
-          right={{ base: 4, md: 8, lg: 12 }}
-          zIndex={20}
-          display={isPortraitBoard ? 'none' : { base: 'none', md: 'block' }}
+        <Flex
+          flex="1"
+          minHeight={0}
+          alignItems="center"
+          justifyContent={isPortraitBoard ? 'center' : undefined}
+          px={isPortraitBoard ? '24px' : { base: 3, md: 12, lg: 16 }}
+          /* 手机端：人物右侧大站位与首页一致（Live2D 全屏穿透层），对话卡贴导航栏下方、
+             占据整宽（人物本体压在卡片右缘上方，输入行 z20 保持可点）；竖屏大屏同形态 */
+          pt={isPortraitBoard ? '12px' : { base: 2, md: 4 }}
+          pb={isPortraitBoard ? 10 : { base: 4, md: 16 }}
         >
-          <IconButton
-            aria-label="设置"
-            size="lg"
-            rounded="full"
-            shadow="md"
-            onClick={toggleSidebar}
-            bg={schoolColors.white}
-            color={schoolColors.primary}
-            _hover={{
-              bg: schoolColors.primary,
-              color: 'white',
-            }}
-          >
-            <FiSettings />
-          </IconButton>
-        </Box>
-      )}
-
-      {/* Mobile Menu */}
-      <MobileMenu
-        isOpen={mobileMenuOpen}
-        onClose={closeMobileMenu}
-        navigation={SCHOOL_CONFIG.navigation}
-      />
-
-      {/* Main Content Area - 直接显示对话界面（竖屏大屏：对话卡限宽 840 居中） */}
-      <Flex
-        h="full"
-        alignItems="center"
-        justifyContent={isPortraitBoard ? 'center' : undefined}
-        px={isPortraitBoard ? '24px' : { base: 3, md: 12, lg: 16 }}
-        /* 手机端：人物右侧大站位与首页一致（Live2D 全屏穿透层），对话卡贴导航栏下方、
-           占据整宽（人物本体压在卡片右缘上方，输入行 z20 保持可点）；竖屏大屏同形态 */
-        pt={isPortraitBoard ? '150px' : { base: '88px', md: 24 }}
-        pb={isPortraitBoard ? 10 : { base: 4, md: 16 }}
-      >
-        {/* 对话界面：不再特意在右侧留白给人物（展示功能已由新首页承担），
-           对话卡恢复正常宽度：手机端满宽，桌面端 680px 常规阅读宽度，竖屏大屏 840px 居中 */}
-        {!activeCampusTopic && (
+          {/* 对话界面：不再特意在右侧留白给人物（展示功能已由新首页承担），
+             对话卡恢复正常宽度：手机端满宽，桌面端 680px 常规阅读宽度，竖屏大屏 840px 居中 */}
           <Box
             flex="1"
             maxWidth={isPortraitBoard ? '840px' : { base: '100%', md: '680px' }}
@@ -165,14 +127,14 @@ export default function HeroLanding({
               />
             </Box>
           </Box>
-        )}
-      </Flex>
+        </Flex>
+      )}
 
       {/* 右侧设置侧栏 */}
       <HeroSidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
-    </Box>
+    </Flex>
   );
 }

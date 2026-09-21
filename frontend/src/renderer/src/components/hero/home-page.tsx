@@ -1,11 +1,11 @@
 /**
  * Home Page Component
- * 学校数字人首页（官网化改版，2026-09-21）
- * 视觉基调对齐省实式官网：红色校名横带（"石"字圆章 + 楷体校名 + 英文副标）
- *       → 白色通栏栏目导航条（首页 + 四大专题 + 对话入口）→ 米白渐变内容区。
- * 布局：红横带 → 导航条（可横滑）→ 左上学校简介块（渐变融入背景，
- *       校名/理念标题可延展到人物侧，其余内容左侧窄栏多换行）→
- *       右侧偏大 Live2D 数字人（穿透画布）→ 底部"开始对话"进入对话界面（#/hero）
+ * 学校数字人首页（官网化改版，2026-09-21；同日全站改版换石实官方绛红主题）
+ * 视觉基调对齐省实式官网 + 石实 IP 官方色（见 site-theme.ts）：
+ * 绛红校名横带（"石"字圆章 + 楷体校名 + 英文副标）→ 白色通栏栏目导航条
+ * → 米白渐变内容区（学校简介+理念+亮点）→ 新闻/公告栏目（示例数据）→
+ * 右侧偏大 Live2D 数字人 → 底部"开始对话"进入对话界面（#/hero）。
+ * 页头（横带+导航条）由 SiteHeader 提供，与专题页/对话页同款。
  * 人物站位/大小由 use-live2d-model.ts 的 HOME_* 常量控制（右侧 78% 屏宽）。
  * 竖屏大屏（壁挂数字屏/竖放平板，portrait ≥768）：改为内容列限宽 840 居中 +
  *       字号按视口放大 + 人物居中站下方展示区（HOME_BOARD_* 常量），
@@ -13,41 +13,50 @@
  */
 
 import { useState } from 'react';
-import { Box, Button, Flex, HStack, Text } from '@chakra-ui/react';
-import { FiMessageCircle, FiHome, FiSettings } from 'react-icons/fi';
+import { Box, Flex, HStack, Text } from '@chakra-ui/react';
+import { FiMessageCircle } from 'react-icons/fi';
 import HeroSidebar from './hero-sidebar';
-import TopicTabRow from './topic-tab-row';
-import { SCHOOL_CONFIG } from './school-config';
+import SiteHeader from './site-header';
+import { kaiFont, swissFont, siteTheme } from './site-theme';
 import { useInterrupt } from '@/hooks/utils/use-interrupt';
 import { usePortraitBoard } from '@/hooks/utils/use-portrait-board';
 import { CampusTopicId } from '@/data/campus-knowledge';
-
-// 官网化配色：校旗红（红横带/激活态/主按钮）+ 墨灰正文 + 米白纸感底
-const siteColors = {
-  red: '#9B1B22',
-  redDark: '#7A1218',
-  redWash: '#F6E8E8',
-  wash: '#FAF7F2',
-  white: '#FFFFFF',
-};
-
-// 文字层级（与专题页一致的墨灰色系）
-const textColors = {
-  text: '#1F2937',          // 主要文字（深灰）
-  textBody: '#4B5563',      // 正文（中灰）
-  textSecondary: '#6B7280', // 次要文字（浅灰）
-};
-
-const kaiFont = "'STKaiti','KaiTi','楷体','Noto Serif SC',serif";
-const swissFont = '"Helvetica Neue", Arial, sans-serif';
+import { PORTAL_ANNOUNCEMENTS, PORTAL_NEWS } from '@/data/portal-content';
 
 // 亮点数据：南方+《佛山唯一！保送北大！》——"石实实验学校近年来第13位
 // 因信息学特长保送进入清北的学子"，校领导最认可的硬成果
 const HIGHLIGHT_COUNT = '13';
 
+// 新闻/公告栏目：占位数据（事件真实、细节未获校方审核），首页展示前 3 条
+const NEWS_COUNT = 3;
+const ANNOUNCE_COUNT = 3;
+
 interface HomePageProps {
   /** 进入指定专题页（由 App 提供，走 hash 路由） */
   onNavigateTopic?: (topicId: CampusTopicId) => void;
+}
+
+/** 板块标题：红字 + 短红下划线（省实官网式） */
+function SectionTitle({ children, isPortraitBoard }: { children: string; isPortraitBoard: boolean }) {
+  return (
+    <Box mb={isPortraitBoard ? 3 : 2}>
+      <Text
+        as="span"
+        color={siteTheme.red}
+        fontWeight="bold"
+        fontSize={isPortraitBoard ? '24px' : { base: '14px', md: '16px' }}
+        letterSpacing="0.04em"
+      >
+        {children}
+      </Text>
+      <Box
+        mt="3px"
+        width={isPortraitBoard ? '56px' : '36px'}
+        height={isPortraitBoard ? '4px' : '3px'}
+        bg={siteTheme.red}
+      />
+    </Box>
+  );
 }
 
 export default function HomePage({
@@ -56,10 +65,6 @@ export default function HomePage({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { interrupt } = useInterrupt();
   const isPortraitBoard = usePortraitBoard();
-
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
-  };
 
   // 进入对话界面：先打断可能进行中的播报，再切路由
   const goChat = () => {
@@ -76,11 +81,6 @@ export default function HomePage({
     window.location.hash = `#/campus/${topicId}`;
   };
 
-  const goAdmin = () => {
-    interrupt();
-    window.location.hash = '#/main';
-  };
-
   return (
     <Box
       position="relative"
@@ -91,11 +91,10 @@ export default function HomePage({
       style={{ height: 'var(--app-vh, 100vh)' }}
       css={{
         fontFamily: swissFont,
-        background: siteColors.wash,
+        background: siteTheme.wash,
       }}
     >
-      {/* Content Column：z20 盖过 Live2D 穿透层(15)；红横带与导航条入文档流，
-          不再需要悬浮导航的 pt 让位。
+      {/* Content Column：z20 盖过 Live2D 穿透层(15)；页头入文档流，无需 pt 让位。
           竖屏大屏：整列限宽 840 居中（防 1272+ 宽拉伸），人物改居中站下方 */}
       <Flex
         direction="column"
@@ -106,151 +105,12 @@ export default function HomePage({
         maxWidth={isPortraitBoard ? '840px' : undefined}
         mx={isPortraitBoard ? 'auto' : undefined}
       >
-        {/* 红色校名横带（省实式官网头部）："石"字圆章 + 楷体校名 + 英文副标；
-            右侧后台入口 + 设置齿轮（HeroSidebar 触发） */}
-        <Flex
-          align="center"
-          justify="space-between"
-          gap={isPortraitBoard ? 4 : { base: 2, md: 3 }}
-          bg={siteColors.red}
-          color={siteColors.white}
-          px={isPortraitBoard ? 6 : { base: 3, md: 5 }}
-          py={isPortraitBoard ? '14px' : { base: '7px', md: '10px' }}
-          flexShrink={0}
-        >
-          <HStack
-            gap={isPortraitBoard ? '14px' : { base: '10px', md: '14px' }}
-            align="center"
-            minW={0}
-          >
-            {/* "石"字圆章 */}
-            <Box
-              flexShrink={0}
-              display="flex"
-              alignItems="center"
-              justifyContent="center"
-              width={isPortraitBoard ? '52px' : { base: '36px', md: '42px' }}
-              height={isPortraitBoard ? '52px' : { base: '36px', md: '42px' }}
-              borderRadius="full"
-              border="2px solid rgba(255, 255, 255, 0.85)"
-              fontFamily={kaiFont}
-              fontWeight="bold"
-              fontSize={isPortraitBoard ? '28px' : { base: '19px', md: '23px' }}
-              lineHeight="1"
-            >
-              石
-            </Box>
-            <Box minW={0}>
-              <Text
-                fontFamily={kaiFont}
-                fontWeight="bold"
-                fontSize={isPortraitBoard ? '28px' : { base: '17px', md: '22px' }}
-                letterSpacing="0.08em"
-                lineHeight="1.15"
-                whiteSpace="nowrap"
-              >
-                {SCHOOL_CONFIG.name}
-              </Text>
-              <Text
-                display={isPortraitBoard ? 'block' : { base: 'none', md: 'block' }}
-                fontSize={isPortraitBoard ? '13px' : { base: '8.5px', md: '10px' }}
-                letterSpacing="0.22em"
-                opacity={0.85}
-                mt="2px"
-                whiteSpace="nowrap"
-              >
-                SHISHI EXPERIMENTAL SCHOOL · 扬长教育 人人出彩
-              </Text>
-            </Box>
-          </HStack>
-
-          <HStack gap={isPortraitBoard ? 3 : 2} flexShrink={0}>
-            {/* 后台管理：进入管理界面（#/main，未登录由 App 登录门禁接管） */}
-            <Box
-              as="button"
-              onClick={goAdmin}
-              aria-label="进入后台管理"
-              display={isPortraitBoard ? 'block' : { base: 'none', md: 'block' }}
-              fontSize={isPortraitBoard ? '18px' : { base: '12.5px', md: '13px' }}
-              opacity={0.92}
-              px={isPortraitBoard ? 3 : 2}
-              py={1}
-              borderRadius="md"
-              whiteSpace="nowrap"
-              transition="all 0.2s ease"
-              _hover={{ opacity: 1, background: 'rgba(255, 255, 255, 0.14)' }}
-            >
-              后台管理
-            </Box>
-            {/* 设置齿轮：打开 HeroSidebar（模型/语音等设置） */}
-            <Box
-              as="button"
-              onClick={toggleSidebar}
-              aria-label="打开设置"
-              display="flex"
-              alignItems="center"
-              justifyContent="center"
-              p={isPortraitBoard ? '10px' : '7px'}
-              borderRadius="full"
-              transition="all 0.2s ease"
-              _hover={{ background: 'rgba(255, 255, 255, 0.16)' }}
-            >
-              <FiSettings size={isPortraitBoard ? 26 : 18} />
-            </Box>
-          </HStack>
-        </Flex>
-
-        {/* 白色通栏栏目导航条：行首"首页"（红色激活态）与专题页一致，
-            行尾附"对话"入口；手机端/竖屏大屏横向滑动（kiosk 兜底在组件内） */}
-        <TopicTabRow
+        {/* 共享页头：绛红校名横带 + 白色通栏栏目导航条（与专题页/对话页同款） */}
+        <SiteHeader
+          activeNav="home"
           onNavigateTopic={goTopic}
-          leading={
-            <Button
-              data-testid="campus-nav-home"
-              aria-label="回到学校首页"
-              aria-current="page"
-              onClick={() => {
-                interrupt();
-                window.location.hash = '#/home';
-              }}
-              height={isPortraitBoard ? '54px' : '40px'}
-              px={isPortraitBoard ? '20px' : { base: '12px', lg: '16px' }}
-              borderRadius="md"
-              /* 首页上此按钮恒为当前页：红底白字（官网化激活态） */
-              background={siteColors.red}
-              color="white"
-              fontFamily={swissFont}
-              fontWeight="500"
-              fontSize={isPortraitBoard ? '19px' : 'sm'}
-              flexShrink={0}
-              _hover={{ background: siteColors.red, color: 'white' }}
-              transition="all 200ms ease"
-            >
-              <HStack gap={isPortraitBoard ? '10px' : '8px'}>
-                <FiHome size={isPortraitBoard ? 22 : 16} />
-                <Text>首页</Text>
-              </HStack>
-            </Button>
-          }
-          trailing={
-            <Button
-              aria-label="进入对话界面"
-              onClick={goChat}
-              height={isPortraitBoard ? '54px' : '40px'}
-              px={isPortraitBoard ? '20px' : '16px'}
-              borderRadius="md"
-              variant="ghost"
-              flexShrink={0}
-              color="#586174"
-              fontFamily={swissFont}
-              fontWeight="500"
-              fontSize={isPortraitBoard ? '19px' : 'sm'}
-              _hover={{ background: siteColors.redWash, color: siteColors.red }}
-            >
-              <FiMessageCircle size={isPortraitBoard ? 22 : 16} style={{ marginRight: '8px' }} />
-              对话
-            </Button>
-          }
+          onGoChat={goChat}
+          onOpenSettings={() => setSidebarOpen(!sidebarOpen)}
         />
 
         {/* 学校简介块：无卡片边框，横向渐变右淡出（米白纸感基调），与背景融为一体。
@@ -260,8 +120,8 @@ export default function HomePage({
             竖屏大屏：人物在下方居中，本块字号按视口放大（clamp 随屏宽 768~2160 连续缩放） */}
         <Box
           alignSelf="stretch"
-          mt={isPortraitBoard ? 6 : { base: 2, md: 4 }}
-          py={isPortraitBoard ? 8 : { base: 3, md: 5 }}
+          mt={isPortraitBoard ? 4 : { base: 1, md: 2 }}
+          py={isPortraitBoard ? 6 : { base: 2, md: 3 }}
           pl={isPortraitBoard ? 8 : { base: 4, md: 12, lg: 16 }}
           pr={isPortraitBoard ? 10 : { base: 6, md: 10 }}
           background="linear-gradient(100deg, rgba(250, 247, 242, 0.95) 0%, rgba(250, 247, 242, 0.75) 32%, rgba(250, 247, 242, 0) 62%)"
@@ -269,7 +129,7 @@ export default function HomePage({
           {/* 宽区：校名 + 办学理念（延伸到右侧） */}
           <Box maxW={{ base: 'none', md: '760px' }}>
             <Text
-              color={siteColors.red}
+              color={siteTheme.red}
               fontSize={isPortraitBoard ? '18px' : { base: '11px', md: '13px' }}
               fontWeight="600"
               letterSpacing="0.15em"
@@ -280,8 +140,8 @@ export default function HomePage({
             </Text>
 
             <Text
-              mt={isPortraitBoard ? 4 : { base: 2, md: 2.5 }}
-              color={textColors.text}
+              mt={isPortraitBoard ? 3 : { base: 1.5, md: 2 }}
+              color={siteTheme.navy}
               fontFamily={kaiFont}
               fontSize={isPortraitBoard ? 'clamp(40px, 3.8vw, 56px)' : { base: '19px', md: '30px', lg: '34px' }}
               fontWeight="bold"
@@ -295,8 +155,8 @@ export default function HomePage({
           {/* 窄栏：其余内容多换行（右侧留给人物；竖屏大屏人物在下方，放宽到 640 保阅读行长） */}
           <Box maxW={isPortraitBoard ? '640px' : { base: '212px', md: '520px' }}>
             <Text
-              mt={isPortraitBoard ? 5 : { base: 2, md: 2 }}
-              color={textColors.textBody}
+              mt={isPortraitBoard ? 4 : { base: 1.5, md: 2 }}
+              color={siteTheme.textBody}
               fontFamily={kaiFont}
               fontSize={isPortraitBoard ? '22px' : { base: '13px', md: '15px' }}
               lineHeight="1.7"
@@ -311,9 +171,9 @@ export default function HomePage({
             </Text>
 
             {/* 亮点一：清北保送（据南方+公开报道） */}
-            <Flex mt={isPortraitBoard ? 8 : { base: 4, md: 4 }} align="center" gap={isPortraitBoard ? 6 : { base: 3, md: 4 }}>
+            <Flex mt={isPortraitBoard ? 6 : { base: 3, md: 3 }} align="center" gap={isPortraitBoard ? 6 : { base: 3, md: 4 }}>
               <Text
-                color={siteColors.red}
+                color={siteTheme.red}
                 fontSize={isPortraitBoard ? 'clamp(56px, 5.5vw, 76px)' : { base: '44px', md: '52px' }}
                 fontWeight="bold"
                 lineHeight="1"
@@ -323,7 +183,7 @@ export default function HomePage({
               </Text>
               <Box maxW={{ base: '140px', md: 'none' }}>
                 <Text
-                  color={textColors.text}
+                  color={siteTheme.navy}
                   fontSize={isPortraitBoard ? '24px' : { base: '14px', md: '17px' }}
                   fontWeight="semibold"
                   lineHeight="1.5"
@@ -335,7 +195,7 @@ export default function HomePage({
                 </Text>
                 <Text
                   mt="3px"
-                  color={textColors.textSecondary}
+                  color={siteTheme.textSecondary}
                   fontSize={isPortraitBoard ? '16px' : { base: '10px', md: '12px' }}
                   lineHeight="1.5"
                 >
@@ -345,9 +205,9 @@ export default function HomePage({
             </Flex>
 
             {/* 亮点二：扬长课程（学生视角的特色） */}
-            <Flex mt={isPortraitBoard ? 6 : { base: 3, md: 3 }} align="center" gap={isPortraitBoard ? 6 : { base: 3, md: 4 }}>
+            <Flex mt={isPortraitBoard ? 4 : { base: 2, md: 2 }} align="center" gap={isPortraitBoard ? 6 : { base: 3, md: 4 }}>
               <Text
-                color={siteColors.red}
+                color={siteTheme.red}
                 fontSize={isPortraitBoard ? 'clamp(48px, 4.2vw, 64px)' : { base: '30px', md: '40px' }}
                 fontWeight="bold"
                 lineHeight="1"
@@ -357,7 +217,7 @@ export default function HomePage({
               </Text>
               <Box maxW={{ base: '132px', md: 'none' }}>
                 <Text
-                  color={textColors.text}
+                  color={siteTheme.navy}
                   fontSize={isPortraitBoard ? '24px' : { base: '14px', md: '17px' }}
                   fontWeight="semibold"
                   lineHeight="1.5"
@@ -366,7 +226,7 @@ export default function HomePage({
                 </Text>
                 <Text
                   mt="3px"
-                  color={textColors.textSecondary}
+                  color={siteTheme.textSecondary}
                   fontSize={isPortraitBoard ? '16px' : { base: '10px', md: '12px' }}
                   lineHeight="1.5"
                 >
@@ -377,19 +237,141 @@ export default function HomePage({
 
             {/* 分隔细线（收束亮点区） */}
             <Box
-              mt={isPortraitBoard ? 8 : { base: 4, md: 4 }}
+              mt={isPortraitBoard ? 6 : { base: 3, md: 3 }}
               width={isPortraitBoard ? '96px' : '64px'}
               height={isPortraitBoard ? '3px' : '2px'}
-              bg="rgba(155, 27, 34, 0.35)"
+              bg="rgba(144, 27, 53, 0.35)"
             />
           </Box>
         </Box>
+
+        {/* 新闻/公告栏目：省实官网式两栏（示例数据，事件真实、细节待校方审核）。
+            全端双列；手机端每列收紧到 2 条可见（第 3 条 md 起显示）并隐藏
+            分类/面向对象小字，保证定高页面里"开始对话"仍在首屏内 */}
+        <Flex
+          px={isPortraitBoard ? 8 : { base: 4, md: 12, lg: 16 }}
+          pr={isPortraitBoard ? 10 : { base: 5, md: 10 }}
+          mt={isPortraitBoard ? 4 : { base: 2, md: 3 }}
+          gap={isPortraitBoard ? 10 : { base: 4, md: 10 }}
+          direction="row"
+        >
+          {/* 学校新闻：红日期 + 标题 + 分类（荣誉喜报用青绿 chip） */}
+          <Box flex={isPortraitBoard ? '1.2' : '1.15'} minW={0}>
+            <SectionTitle isPortraitBoard={isPortraitBoard}>学校新闻</SectionTitle>
+            {PORTAL_NEWS.slice(0, NEWS_COUNT).map((item, idx) => (
+              <Flex
+                key={item.id}
+                align="flex-start"
+                gap={isPortraitBoard ? 4 : { base: 2, md: 3 }}
+                py={isPortraitBoard ? '10px' : { base: '3px', md: '5px' }}
+                borderBottom="1px dashed"
+                borderColor={siteTheme.hairline}
+                display={idx === NEWS_COUNT - 1 && !isPortraitBoard
+                  ? { base: 'none', md: 'flex' }
+                  : 'flex'}
+              >
+                <Text
+                  color={siteTheme.red}
+                  fontSize={isPortraitBoard ? '17px' : { base: '10px', md: '12px' }}
+                  fontWeight="600"
+                  fontFamily={swissFont}
+                  flexShrink={0}
+                  pt="1px"
+                >
+                  {item.date}
+                </Text>
+                <Text
+                  color={siteTheme.textBody}
+                  fontSize={isPortraitBoard ? '19px' : { base: '11px', md: '13px' }}
+                  lineHeight="1.5"
+                  lineClamp={1}
+                  flex="1"
+                  minW={0}
+                >
+                  {item.title}
+                </Text>
+                <Box
+                  flexShrink={0}
+                  px={isPortraitBoard ? '10px' : '6px'}
+                  py="1px"
+                  borderRadius="sm"
+                  fontSize={isPortraitBoard ? '14px' : { base: '9.5px', md: '10px' }}
+                  display={isPortraitBoard ? 'block' : { base: 'none', md: 'block' }}
+                  background={item.category === '荣誉喜报' ? siteTheme.tealWash : siteTheme.redWash}
+                  color={item.category === '荣誉喜报' ? siteTheme.teal : siteTheme.red}
+                >
+                  {item.category}
+                </Box>
+              </Flex>
+            ))}
+          </Box>
+
+          {/* 公告与通知：红wash 日期 chip + 标题 + 面向对象 */}
+          <Box flex="1" minW={0}>
+            <SectionTitle isPortraitBoard={isPortraitBoard}>公告与通知</SectionTitle>
+            {PORTAL_ANNOUNCEMENTS.slice(0, ANNOUNCE_COUNT).map((item, idx) => (
+              <Flex
+                key={item.id}
+                align="flex-start"
+                gap={isPortraitBoard ? 4 : { base: 2, md: 3 }}
+                py={isPortraitBoard ? '10px' : { base: '3px', md: '5px' }}
+                borderBottom="1px dashed"
+                borderColor={siteTheme.hairline}
+                display={idx === ANNOUNCE_COUNT - 1 && !isPortraitBoard
+                  ? { base: 'none', md: 'flex' }
+                  : 'flex'}
+              >
+                <Box
+                  flexShrink={0}
+                  px={isPortraitBoard ? '10px' : '6px'}
+                  py="1px"
+                  borderRadius="sm"
+                  background={siteTheme.redWash}
+                  color={siteTheme.red}
+                  fontSize={isPortraitBoard ? '14px' : { base: '9px', md: '10.5px' }}
+                  fontWeight="600"
+                  fontFamily={swissFont}
+                  mt="1px"
+                >
+                  {item.date}
+                </Box>
+                <Box flex="1" minW={0}>
+                  <Text
+                    color={siteTheme.textBody}
+                    fontSize={isPortraitBoard ? '19px' : { base: '11px', md: '13px' }}
+                    lineHeight="1.5"
+                    lineClamp={1}
+                  >
+                    {item.title}
+                  </Text>
+                </Box>
+                <Text
+                  flexShrink={0}
+                  color={siteTheme.textSecondary}
+                  fontSize={isPortraitBoard ? '14px' : { base: '9.5px', md: '10.5px' }}
+                  pt="2px"
+                  display={isPortraitBoard ? 'block' : { base: 'none', md: 'block' }}
+                >
+                  {item.audience}
+                </Text>
+              </Flex>
+            ))}
+          </Box>
+        </Flex>
+        <Text
+          px={isPortraitBoard ? 8 : { base: 4, md: 12, lg: 16 }}
+          mt={isPortraitBoard ? 2 : 1}
+          color={siteTheme.textSecondary}
+          fontSize={isPortraitBoard ? '14px' : { base: '9.5px', md: '10.5px' }}
+        >
+          新闻与公告为示例数据（事件来自公开报道），正式内容待校方审核后由后台发布流替换
+        </Text>
 
         {/* 右侧留白：Live2D 数字人（右侧偏大站位）在此区域展示，画布由 App 渲染 */}
         <Box flex={1} minHeight={0} />
 
         {/* 开始对话：主行动按钮，进入对话界面（竖屏大屏：远距触控，按钮同步放大） */}
-        <Box flexShrink={0} pb={isPortraitBoard ? 10 : { base: 2, md: 4 }} textAlign="center">
+        <Box flexShrink={0} pb={isPortraitBoard ? 8 : { base: 2, md: 3 }} textAlign="center">
           <HStack justify="center">
             <Box
               as="button"
@@ -402,23 +384,23 @@ export default function HomePage({
               height={isPortraitBoard ? '84px' : { base: '54px', md: '60px' }}
               px={isPortraitBoard ? 24 : { base: 10, md: 16 }}
               rounded="full"
-              bg={siteColors.red}
-              color={siteColors.white}
+              bg={siteTheme.red}
+              color={siteTheme.paper}
               fontSize={isPortraitBoard ? '26px' : { base: 'lg', md: 'xl' }}
               fontWeight="semibold"
-              boxShadow="0 10px 30px rgba(155, 27, 34, 0.35)"
+              boxShadow="0 10px 30px rgba(144, 27, 53, 0.35)"
               transition="all 0.2s ease"
-              _hover={{ bg: siteColors.redDark, transform: 'translateY(-2px)' }}
+              _hover={{ bg: siteTheme.redDark, transform: 'translateY(-2px)' }}
               _active={{ transform: 'scale(0.97)' }}
             >
               <FiMessageCircle size={isPortraitBoard ? 30 : 20} />
               开始对话
             </Box>
           </HStack>
-          <HStack justify="center" mt={isPortraitBoard ? 5 : { base: 2, md: 3 }}>
+          <HStack justify="center" mt={isPortraitBoard ? 4 : { base: 1.5, md: 2 }}>
             <Text
               fontSize={isPortraitBoard ? '17px' : { base: '11px', md: '12.5px' }}
-              color={textColors.textBody}
+              color={siteTheme.textBody}
               bg="rgba(255, 255, 255, 0.62)"
               px={isPortraitBoard ? 5 : 3}
               py={isPortraitBoard ? 2 : 1}
