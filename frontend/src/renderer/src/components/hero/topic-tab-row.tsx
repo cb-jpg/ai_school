@@ -30,10 +30,17 @@ export function TopicTabButton({
   topic,
   active,
   onClick,
+  // 主题色：默认专题蓝；首页门户化后传校旗红（2026-09-21 官网化改版）
+  activeBg = blue,
+  hoverWash = blueWash,
+  hoverInk = blue,
 }: {
   topic: CampusTopic;
   active: boolean;
   onClick: () => void;
+  activeBg?: string;
+  hoverWash?: string;
+  hoverInk?: string;
 }) {
   const Icon = topicIcons[topic.id];
   // 竖屏大屏：按钮放大（壁挂数字屏远距离触控/观看）
@@ -47,15 +54,15 @@ export function TopicTabButton({
       height={isPortraitBoard ? '54px' : '40px'}
       px={isPortraitBoard ? '20px' : { base: '12px', lg: '16px' }}
       borderRadius="md"
-      background={active ? blue : 'transparent'}
+      background={active ? activeBg : 'transparent'}
       color={active ? 'white' : ink}
       fontFamily={swissFont}
       fontWeight="500"
       fontSize={isPortraitBoard ? '19px' : 'sm'}
       flexShrink={0}
       _hover={{
-        background: active ? blue : blueWash,
-        color: active ? 'white' : blue,
+        background: active ? activeBg : hoverWash,
+        color: active ? 'white' : hoverInk,
       }}
       transition="all 200ms ease"
     >
@@ -127,11 +134,10 @@ export default function TopicTabRow({
     <Box
       flexShrink={0}
       px={isPortraitBoard ? '20px' : { base: '12px', md: '20px', lg: '24px' }}
-      py={isPortraitBoard ? '14px' : { base: '10px', md: '20px' }}
+      py={isPortraitBoard ? '12px' : { base: '8px', md: '10px' }}
       background={paper}
-      borderRadius="lg"
-      boxShadow="sm"
-      border="1px solid"
+      // 2026-09-21 官网化改版：由悬浮卡片改为红横带下的通栏白导航条（省实式）
+      borderBottom="1px solid"
       borderColor={hairline}
     >
       {/* 手机端/竖屏大屏一行横向滑动；桌面端保持换行布局（与专题页一致） */}

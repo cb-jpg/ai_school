@@ -85,21 +85,8 @@ import UserManagement from "./components/admin/user-management";
 import { CharacterConfig } from "./components/admin/character-config";
 import { usePortraitBoard } from "./hooks/utils/use-portrait-board";
 import { useOtaUpdate } from "./hooks/use-ota-update";
-// eslint-disable-next-line import/no-extraneous-dependencies, import/newline-after-import
-import { Capacitor } from '@capacitor/core';
-import PortalPage from "./components/portal/portal-page";
-
-/** App（Capacitor 原生）判定：官网门户页只面向浏览器访客，原生端默认路由不变 */
-const isNativeApp = (): boolean => {
-  try {
-    return Capacitor.isNativePlatform();
-  } catch {
-    return false;
-  }
-};
-
 // 定义路由类型
-type AppRoute = 'hero' | 'main' | 'campus' | 'main-admin' | 'portal';
+type AppRoute = 'hero' | 'main' | 'campus' | 'main-admin';
 type MainRoute = 'dashboard' | 'test-conversation' | 'knowledge-admin' | 'workspace' | string;
 // hero 模式下的两个页面：home=新首页（默认），chat=对话界面（原首页迁移至 #/hero）
 type HeroView = 'home' | 'chat';
@@ -108,21 +95,15 @@ const getCurrentRoute = (): AppRoute => {
   if (typeof window === 'undefined') return 'main-admin';
   const hash = window.location.hash;
 
-  // 官网门户页（2026-09-20 需求 #5）：仅浏览器（非原生 App）端生效——
-  //   空 hash / #/ / #/portal 进门户页；纯锚点（#about 等，不带 /）是门户页
-  //   内部滚动定位，同样留在门户页。原生 App 空 hash 仍进数字人首页，行为不变。
-  if (!isNativeApp()) {
-    if (hash === '' || hash === '#/' || hash === '#/portal') return 'portal';
-    if (!hash.startsWith('#/')) return 'portal';
-  }
-
   // Main admin workspace routes
   if (hash.startsWith('#/main') || hash === '#/main' || hash === '#/main/') {
     return 'main-admin';
   }
 
   // Hero landing page route - include campus routes as hero mode
-  if (hash === '#/home' || hash === '#/hero' || hash === '#/landing' || hash === '' || hash === '#/' || hash.startsWith('#/campus/')) {
+  // #/portal 是 09-20 版独立门户页的旧链接，官网化改版（2026-09-21）后门户
+  // 即新首页本身，旧链接兼容落到首页
+  if (hash === '#/home' || hash === '#/hero' || hash === '#/landing' || hash === '#/portal' || hash === '' || hash === '#/' || hash.startsWith('#/campus/')) {
     return 'hero';
   }
 
@@ -418,26 +399,6 @@ function AppContent(): JSX.Element {
         {/* 专题页匿名点「讲解」触发的登录浮层（盖在当前页面上，可取消） */}
         {authPromptOverlay}
       </>
-    );
-  }
-
-  // 官网门户页（浏览器端默认入口）：不连 WS、无 Live2D/背景层，自带整页滚动容器
-  // （App 根组件已锁 body 滚动，门户页是普通网页式长页面，故在内部容器里滚）
-  if (currentRoute === 'portal') {
-    return (
-      <Box
-        position="fixed"
-        top={0}
-        left={0}
-        width="100vw"
-        height="100vh"
-        overflowY="auto"
-        bg="#FAF7F2"
-        zIndex={1}
-      >
-        <PortalPage onLogin={() => setAuthPrompt(true)} />
-        {authPromptOverlay}
-      </Box>
     );
   }
 
