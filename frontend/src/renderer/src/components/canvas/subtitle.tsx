@@ -3,6 +3,7 @@ import { memo } from 'react';
 import { canvasStyles } from './canvas-styles';
 import { useSubtitleDisplay } from '@/hooks/canvas/use-subtitle-display';
 import { useSubtitle } from '@/context/subtitle-context';
+import { siteTheme } from '@/components/hero/site-theme';
 
 // Type definitions
 interface SubtitleTextProps {
@@ -35,7 +36,7 @@ const Subtitle = memo((): JSX.Element | null => {
       backgroundColor="transparent"
     >
       <Text
-        color="#1E5494"
+        color={siteTheme.navy}
         fontSize={{ base: 'md', md: 'lg' }}
         textAlign="center"
         lineHeight="1.6"

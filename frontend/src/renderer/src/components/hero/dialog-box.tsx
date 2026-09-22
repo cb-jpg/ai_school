@@ -31,6 +31,22 @@ import { useChatHistory } from '@/context/chat-history-context';
 import { useLive2DConfig } from '@/context/live2d-config-context';
 import { useSidebar } from '@/hooks/sidebar/use-sidebar';
 import { resolveApiBaseUrl } from '@/services/api-base';
+import { siteTheme } from './site-theme';
+
+// 全站官网主题（site-theme.ts 石实IP官方色）语义别名：
+// primary=绛红（用户气泡/发送键/焦点）、secondary=青绿（录音中）、纸感暖底
+const schoolColors = {
+  bg: siteTheme.wash,
+  primary: siteTheme.red,
+  secondary: siteTheme.teal,
+  accent: siteTheme.redWash,
+  text: siteTheme.navy,
+  textSecondary: siteTheme.textSecondary,
+  border: siteTheme.hairline,
+  white: siteTheme.paper,
+  userBubble: siteTheme.red,
+  assistantBubble: siteTheme.wash,
+};
 
 // 当前在连的后端地址（连接失败提示用；解析失败显示占位）
 const backendHost = (() => {
@@ -47,19 +63,7 @@ function removeEmojiTags(text: string): string {
   return text.replace(/\[[a-z_]+\]/gi, '');
 }
 
-// 学校配色方案 - 基于石实实验学校的设计
-const schoolColors = {
-  bg: '#F5F7FA',        // 浅灰背景，简洁明了
-  primary: '#1E5494',    // 深蓝色，代表知识和专业
-  secondary: '#FF6B35',  // 暖橙色，代表活力和成长
-  accent: '#E8F0FE',     // 浅蓝色，用于高亮
-  text: '#2D3748',       // 深灰色，主要文字
-  textSecondary: '#718096', // 浅灰色，次要文字
-  border: '#E2E8F0',     // 边框颜色
-  white: '#FFFFFF',
-  userBubble: '#1E5494', // 用户消息气泡
-  assistantBubble: '#F3F4F6', // AI回复气泡
-};
+// （配色已并入文件头部的 schoolColors，统一取自 site-theme.ts）
 
 interface DialogBoxProps {
   description: string;
@@ -152,8 +156,8 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
     if (modelLoading) return '#ECC94B'; // 黄色
     if (!modelInfo && wsState === 'OPEN') return '#DD6B20'; // 橙色
     switch (aiState) {
-      case AiStateEnum.THINKING_SPEAKING: return '#1E5494'; // 深蓝色
-      case AiStateEnum.LISTENING: return '#FF6B35'; // 暖橙色
+      case AiStateEnum.THINKING_SPEAKING: return schoolColors.primary; // 绛红
+      case AiStateEnum.LISTENING: return schoolColors.secondary; // 青绿
       case AiStateEnum.IDLE: return '#48BB78'; // 绿色
       default: return '#718096'; // 灰色
     }
@@ -416,7 +420,7 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
             _focus={{
               borderColor: schoolColors.primary,
               outline: 'none',
-              boxShadow: '0 0 0 2px rgba(0, 47, 167, 0.1)'
+              boxShadow: '0 0 0 2px rgba(144, 27, 53, 0.12)'
             }}
           />
 
@@ -439,7 +443,7 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
               alignItems="center"
               justifyContent="center"
               transition="all 0.2s ease"
-              _hover={{ bg: '#1A4280' }}
+              _hover={{ bg: siteTheme.redDark }}
               _active={{ transform: 'translateY(-50%) scale(0.92)' }}
               style={{ cursor: 'pointer' }}
             >
@@ -473,7 +477,7 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
               alignItems="center"
               justifyContent="center"
               transition="all 0.2s ease"
-              _hover={{ bg: micOn ? '#E55A2D' : '#1A4280' }}
+              _hover={{ bg: siteTheme.redDark }}
               _active={{ transform: 'translateY(-50%) scale(0.92)' }}
               style={{ cursor: 'pointer' }}
             >

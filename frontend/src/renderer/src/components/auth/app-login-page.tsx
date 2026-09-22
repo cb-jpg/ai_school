@@ -6,8 +6,10 @@
 import { useState } from 'react';
 import { Box, VStack, Text, Input, Button } from '@chakra-ui/react';
 import { useAuth } from '@/context/auth-context';
+import { siteTheme, swissFont } from '@/components/hero/site-theme';
 
-const schoolBlue = '#1a4d8f';
+// 全站官网主题（site-theme.ts）：绛红主色，渐变到按压深一档
+const brand = siteTheme.red;
 
 interface AppLoginPageProps {
   /** 作为浮层弹出时的"暂不登录"回调；提供时显示返回按钮 */
@@ -50,8 +52,8 @@ export default function AppLoginPage({ onCancel }: AppLoginPageProps) {
       flexDirection="column"
       alignItems="center"
       justifyContent="center"
-      background={`linear-gradient(160deg, ${schoolBlue} 0%, #2a6db5 55%, #4a90c9 100%)`}
-      fontFamily="Microsoft YaHei, SimHei, sans-serif"
+      background={`linear-gradient(160deg, ${brand} 0%, #7C1730 52%, ${siteTheme.redDark} 100%)`}
+      fontFamily={swissFont}
       position="relative"
       overflow="hidden"
     >
@@ -105,7 +107,7 @@ export default function AppLoginPage({ onCancel }: AppLoginPageProps) {
         position="relative"
       >
         <VStack gap="1" mb="6" alignItems="start">
-          <Text data-login-card-title fontSize="md" fontWeight="bold" color={schoolBlue}>
+          <Text data-login-card-title fontSize="md" fontWeight="bold" color={brand}>
             欢迎使用
           </Text>
           <Text data-login-card-sub fontSize="xs" color="#64748b">
@@ -147,9 +149,9 @@ export default function AppLoginPage({ onCancel }: AppLoginPageProps) {
               data-login-submit
               type="submit"
               width="full"
-              background={schoolBlue}
+              background={brand}
               color="white"
-              _hover={{ background: '#0f3a6e' }}
+              _hover={{ background: siteTheme.redDark }}
               size="lg"
               borderRadius="12px"
               loading={submitting}

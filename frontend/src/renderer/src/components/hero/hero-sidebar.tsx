@@ -37,23 +37,26 @@ import { useLive2dModels } from '@/hooks/live2d/use-live2d-models';
 import type { Live2dCharacter } from '@/services/live2d-models-api';
 import { toaster } from '@/components/ui/toaster';
 import fileUploadDialog from '@/utils/file-upload-dialog';
+import { siteTheme } from './site-theme';
 // 校园实景背景（打包进前端，APK 离线可用；见 assets/school/）
 import bgCampusTrack from '@/assets/school/campus-track.jpg';
 import bgCampusGate from '@/assets/school/campus-gate.jpg';
 import bgCampusGym from '@/assets/school/campus-gym.jpg';
 import bgCampusArtFestival from '@/assets/school/campus-art-festival.jpg';
 
-// 学校配色方案
+// 面板配色统一走全站官网主题（site-theme.ts 石实IP官方色），此处仅做语义别名：
+// primary=绛红（标题栏/选中态/主按钮）、secondary=青绿（次点缀徽标）、
+// accent=绛红淡洗（hover/选中底）、纸感底与米调分隔线随全站
 const schoolColors = {
-  bg: '#F5F7FA',
-  primary: '#1E5494',
-  secondary: '#FF6B35',
-  accent: '#E8F0FE',
-  text: '#2D3748',
-  textSecondary: '#718096',
-  border: '#E2E8F0',
-  white: '#FFFFFF',
-  gray50: '#F7FAFC',
+  bg: siteTheme.wash,
+  primary: siteTheme.red,
+  secondary: siteTheme.teal,
+  accent: siteTheme.redWash,
+  text: siteTheme.navy,
+  textSecondary: siteTheme.textSecondary,
+  border: siteTheme.hairline,
+  white: siteTheme.paper,
+  gray50: siteTheme.wash,
 };
 
 // 数字人角色列表改为运行时从后端 /api/live2d-models/info 获取（见 useLive2dModels）
@@ -525,9 +528,10 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
               {/* 创建新对话按钮 */}
               <Button
                 size="sm"
-                colorScheme="blue"
-                variant="outline"
                 width="full"
+                background={schoolColors.primary}
+                color="white"
+                _hover={{ background: siteTheme.redDark }}
                 onClick={handleNewConversation}
               >
                 <FiPlus />
