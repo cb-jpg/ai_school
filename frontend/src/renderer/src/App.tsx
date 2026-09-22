@@ -393,7 +393,11 @@ function AppContent(): JSX.Element {
              桌面端：画布不拦截鼠标（与历史行为一致）。 */
           pointerEvents="none"
         >
-          <Live2D showSidebar={false} touchThrough heroAlign={isHomeView ? 'center' : 'right'} />
+          <Live2D
+            showSidebar={false}
+            touchThrough
+            heroAlign={isHomeView ? 'center' : (activeColumn || isNewsActive) ? 'column' : 'right'}
+          />
         </Box>
 
         {/* CampusKnowledge overlay for topic pages（官网 v2 后旧专题链接已映射到
@@ -420,10 +424,11 @@ function AppContent(): JSX.Element {
           </Box>
         )}
 
-        {/* 栏目页/新闻中心的共享页头（App 级渲染，z30 盖过画布）；
+        {/* 栏目页/新闻中心的共享页头（App 级渲染；z40 须压过页面根 z30——
+            两者同为 z30 时页面在 DOM 靠后会把下拉面板盖住，用户反馈过）；
             首页与对话页的页头由各自组件内部渲染 */}
         {(activeColumn || isNewsActive) && (
-          <Box position="absolute" top={0} left={0} width="100%" zIndex={30}>
+          <Box position="absolute" top={0} left={0} width="100%" zIndex={40}>
             <SiteHeader
               activeNav={activeColumn ? activeColumn.column : 'news'}
               onNavigateColumn={goColumnArticle}

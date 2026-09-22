@@ -233,7 +233,7 @@ export default function ColumnPage({
         borderRadius="lg"
         overflow="hidden"
         position="relative"
-        height={{ base: '88px', lg: '132px' }}
+        height={{ base: '108px', lg: '168px' }}
         border="1px solid"
         borderBottom="3px solid"
         borderColor={hairline}
@@ -245,6 +245,7 @@ export default function ColumnPage({
           width="100%"
           height="100%"
           objectFit="cover"
+          objectPosition="center 35%"
           display="block"
         />
         <Box

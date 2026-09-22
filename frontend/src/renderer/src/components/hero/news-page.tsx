@@ -125,11 +125,18 @@ export default function NewsPage({ onNavigateHome }: NewsPageProps) {
       zIndex={30}
       fontFamily={swissFont}
     >
-      <Box
-        flex="1"
-        minHeight="0"
+      {/* lg+ 内容行收在左 58%（与栏目页同构）：列表卡 + 右侧栏并列，
+          右 42% 留透明给 Live2D 人物（页面根 z30 压过画布 z1，卡片铺进右区会挡住人物） */}
+      <Flex
         alignSelf={{ base: 'stretch', lg: 'flex-start' }}
         width={{ base: '100%', lg: '58%' }}
+        height={{ lg: '100%' }}
+        gap={{ base: '8px', lg: '12px' }}
+        alignItems="stretch"
+      >
+      <Box
+        flex="1"
+        minWidth="0"
         background={paper}
         borderRadius="lg"
         border="1px solid"
@@ -222,21 +229,16 @@ export default function NewsPage({ onNavigateHome }: NewsPageProps) {
         </Box>
       </Box>
 
-      {/* 右侧栏（lg+）：图说石实 + 联系方式 */}
+      {/* 右侧栏（lg+）：图说石实 + 联系方式（列表卡右侧并列，不出内容行） */}
       <Flex
         display={{ base: 'none', lg: 'flex' }}
-        position="absolute"
-        right="0"
-        top="0"
-        width="calc(42% - 14px)"
-        height="100%"
+        width="34%"
+        flexShrink={0}
         flexDirection="column"
         gap="12px"
-        maxWidth="380px"
-        pointerEvents="none"
+        overflowY="auto"
       >
         <Box
-          pointerEvents="auto"
           background={paper}
           borderRadius="lg"
           border="1px solid"
@@ -271,7 +273,6 @@ export default function NewsPage({ onNavigateHome }: NewsPageProps) {
 
         <Box
           data-testid="news-contact-card"
-          pointerEvents="auto"
           background={paper}
           borderRadius="lg"
           border="1px solid"
@@ -303,7 +304,6 @@ export default function NewsPage({ onNavigateHome }: NewsPageProps) {
         </Box>
 
         <Button
-          pointerEvents="auto"
           variant="outline"
           height="40px"
           borderRadius="md"
@@ -317,6 +317,7 @@ export default function NewsPage({ onNavigateHome }: NewsPageProps) {
         >
           返回首页
         </Button>
+      </Flex>
       </Flex>
     </Box>
   );

@@ -17,8 +17,9 @@ interface Live2DProps {
   showSidebar?: boolean;
   /** 全屏穿透模式（hero 页）：画布不拦截触摸，交互由 window 级 hitTest 处理 */
   touchThrough?: boolean;
-  /** hero 页人物站位：center=新首页（居中）；right=对话界面（右侧，默认） */
-  heroAlign?: 'center' | 'right';
+  /** hero 页人物站位：center=新首页（banner 右侧）；column=栏目/新闻页
+   *  （桌面：banner 之下内容区右侧）；right=对话界面（桌面恢复默认居中，默认值） */
+  heroAlign?: 'center' | 'right' | 'column';
 }
 
 export const Live2D = memo(

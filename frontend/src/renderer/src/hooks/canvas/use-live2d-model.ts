@@ -22,8 +22,10 @@ interface UseLive2DModelProps {
    *  仅当触点命中模型（anyhitTest/isHitOnModel）才 preventDefault 拦截处理，
    *  其余触摸完全放行给下层 UI（消息滚动/按钮/输入框均可正常操作） */
   touchThrough?: boolean;
-  /** hero 页人物站位（手机 + 大屏一体机适配生效，见 isPhoneStyleViewport）：center=首页；right=对话界面（两者站位现已一致） */
-  heroAlign?: 'center' | 'right';
+  /** hero 页人物站位（手机 + 大屏一体机适配生效，见 isPhoneStyleViewport）：
+   *  center=首页（banner 右侧）；column=栏目/新闻页（桌面：banner 之下内容区右侧）；
+   *  right=对话界面（桌面恢复加载默认居中；两者站位在手机/一体机上一致） */
+  heroAlign?: 'center' | 'right' | 'column';
 }
 
 interface Position {
@@ -63,6 +65,15 @@ const HOME_OFFSET_F = 0.732; // 首页：73% 屏宽（原 x_view 0.22）
 const HOME_BANNER_FIT_FACTOR = 0.5;
 const HOME_BANNER_CENTER_Y = 0.34;
 const HOME_BANNER_OFFSET_F = 0.72;
+
+// 桌面栏目/新闻页站位（2026-09-22 官网 v2 用户反馈修正）：画布是右侧 55% 竖条、
+// 页面顶部有 ~128+132px 的不透明栏目 banner 条（页面 z30 盖过画布 z1）。人物若按
+// 加载默认（满高居中）站，头肩正好被 banner 条盖住——用户反馈"照片挡到人物"。
+// 改为：默认缩放 ×0.66、中线降到 64% 画布高（banner 条之下的内容区）、x 居画布
+// 中线（≈72.5% 屏宽，内容卡右缘之外）。
+const COLUMN_DESKTOP_SCALE_MUL = 0.66;
+const COLUMN_DESKTOP_CENTER_Y = -0.28;
+const COLUMN_DESKTOP_X_VIEW = 0;
 
 // 竖屏大屏（桌面竖窗/竖放平板，usePortraitBoard 命中的全尺寸视口）站位初值
 // （2026-09-15 桌面模拟定，待真机微调）。横坐标同样按【屏宽比例】存，由下方
@@ -166,15 +177,6 @@ export const useLive2DModel = ({
   // 竖屏大屏（桌面竖窗/竖放平板的全尺寸视口）换用大屏站位常量（人物比例与
   // 站位按大屏排版）；手机与一体机（420 视口）用真机校准的 手机 组常量
   const isBoard = usePortraitBoard();
-  const heroOffsetF = isBoard
-    ? (isHomeAlign ? HOME_BOARD_OFFSET_F : HERO_BOARD_OFFSET_F)
-    : (isHomeAlign ? HOME_BANNER_OFFSET_F : HERO_OFFSET_F);
-  const heroFitFactor = isBoard
-    ? (isHomeAlign ? HOME_BOARD_FIT_FACTOR : HERO_BOARD_FIT_FACTOR)
-    : (isHomeAlign ? HOME_BANNER_FIT_FACTOR : HERO_FIT_FACTOR);
-  const heroCenterY = isBoard
-    ? (isHomeAlign ? HOME_BOARD_CENTER_Y : HERO_BOARD_CENTER_Y)
-    : (isHomeAlign ? HOME_BANNER_CENTER_Y : HERO_CENTER_Y);
   const { mode } = useMode();
   const isPet = mode === 'pet';
   const [isDragging, setIsDragging] = useState(false);
@@ -182,6 +184,10 @@ export const useLive2DModel = ({
   const dragStartPos = useRef<Position>({ x: 0, y: 0 }); // Screen coordinates at drag start
   const modelStartPos = useRef<Position>({ x: 0, y: 0 }); // Model coordinates at drag start
   const modelPositionRef = useRef<Position>({ x: 0, y: 0 });
+  // 加载默认缩放捕获（桌面对话/栏目页"恢复默认"的目标值）：模型实例首次就绪时记一次，
+  // 换模型（实例身份变化）自动重新捕获
+  const baseScaleRef = useRef<number | null>(null);
+  const baseModelRef = useRef<{ _modelMatrix?: unknown } | null>(null);
   const prevModelUrlRef = useRef<string | null>(null);
   const isHoveringModelRef = useRef(false);
   const electronApi = (window as any).electron;
@@ -286,15 +292,45 @@ export const useLive2DModel = ({
     return () => clearTimeout(timer);
   }, [modelInfo?.url, getModelPosition]);
 
-  // --- hero 全屏穿透：模型就绪后适配初始站位（缩放+站位），用户仍可拖/捏 ---
+  // --- hero 全屏穿透：模型就绪后适配到【当前页面】的目标站位（缩放+位置），用户仍可拖/捏 ---
+  // 所有页面形态都归位（2026-09-22 官网 v2 用户反馈"每个页面人物位置偏移"的修复）：
+  // 此前桌面端对话/栏目/新闻页直接跳过适配，从首页带过来的 banner 站位（小、高）
+  // 会残留到后续页面。现在按 heroAlign 选目标：
+  //   竖屏大屏(board) → HOME_BOARD_*/HERO_BOARD_*；
+  //   手机·一体机(phoneStyle) → 首页 HOME_BANNER_* / 其余 HERO_*；
+  //   桌面首页(center) → HOME_BANNER_*（banner 右侧）；
+  //   桌面栏目·新闻(column) → 加载默认缩放×COLUMN_DESKTOP_SCALE_MUL、banner 条之下；
+  //   桌面对话(right) → 恢复加载默认居中（v1 形态）。
+  // "加载默认缩放"在模型实例首次就绪时捕获（换模型按实例识别自动重新捕获）。
   useEffect(() => {
     if (!touchThrough) return undefined;
-    // 手机 + 大屏一体机（触摸大屏，视口可任意宽）+ 桌面竖窗（竖屏大屏排版）
-    // + 首页 hero banner 形态的横屏桌面（人物站 banner 右侧）都做站位适配；
-    // 横屏桌面的对话界面保持默认布局不缩放。
-    // 原门槛是 innerWidth>=768 跳过，宽的竖屏数字屏被误判为桌面，人物完全
-    // 不做站位适配（SDK 默认居中默认比例），真机表现为下半屏无人
-    if (typeof window !== 'undefined' && !(isBoard || isPhoneStyleViewport() || isHomeAlign)) return undefined;
+    const isColumnAlign = heroAlign === 'column';
+    // 目标站位：fitFactor（绝对视图缩放）与 xScreenFrac（屏宽比例，须全宽画布）
+    // 为一组；桌面右侧 55% 画布（对话/栏目/新闻）改用 baseScaleMul×默认缩放与
+    // 视图坐标 xViewStatic/yView
+    let fitFactor: number | null = null;
+    let xScreenFrac = 0.5;
+    let baseScaleMul = 1;
+    let xViewStatic = 0;
+    let yView = 0;
+    if (isBoard) {
+      fitFactor = isHomeAlign ? HOME_BOARD_FIT_FACTOR : HERO_BOARD_FIT_FACTOR;
+      xScreenFrac = isHomeAlign ? HOME_BOARD_OFFSET_F : HERO_BOARD_OFFSET_F;
+      yView = isHomeAlign ? HOME_BOARD_CENTER_Y : HERO_BOARD_CENTER_Y;
+    } else if (isPhoneStyleViewport()) {
+      fitFactor = isHomeAlign ? HOME_BANNER_FIT_FACTOR : HERO_FIT_FACTOR;
+      xScreenFrac = isHomeAlign ? HOME_BANNER_OFFSET_F : HERO_OFFSET_F;
+      yView = isHomeAlign ? HOME_BANNER_CENTER_Y : HERO_CENTER_Y;
+    } else if (isHomeAlign) {
+      fitFactor = HOME_BANNER_FIT_FACTOR;
+      xScreenFrac = HOME_BANNER_OFFSET_F;
+      yView = HOME_BANNER_CENTER_Y;
+    } else if (isColumnAlign) {
+      baseScaleMul = COLUMN_DESKTOP_SCALE_MUL;
+      xViewStatic = COLUMN_DESKTOP_X_VIEW;
+      yView = COLUMN_DESKTOP_CENTER_Y;
+    }
+    // 桌面对话（else 隐含）：baseScaleMul=1 / x=0 / y=0 → 恢复加载默认居中
     let cancelled = false;
     let outerStop: (() => void) | null = null;
 
@@ -322,19 +358,28 @@ export const useLive2DModel = ({
           // 先按当前实际画布尺寸重算投影（重建后可能按过渡尺寸建过投影），再适配站位
           LAppDelegate.getInstance()?.onResize?.();
           const current = matrix.getScaleX?.() || matrix.getArray()[0] || 1;
-          const ratio = heroFitFactor / current;
+          // 加载默认缩放捕获：模型实例首次就绪的此刻即默认态（任何适配之前）
+          if (baseModelRef.current !== model) {
+            baseModelRef.current = model;
+            baseScaleRef.current = current;
+          }
+          const base = baseScaleRef.current || 1;
+          const targetScale = fitFactor !== null ? fitFactor : base * baseScaleMul;
+          const ratio = targetScale / current;
           if (Math.abs(ratio - 1) > 0.001) {
             matrix.scaleRelative(ratio, ratio);
           }
-          // 横坐标按实际画布宽高比换算（竖屏手机 0.475 / 一体机 0.5625 / 横屏 >1），
-          // 屏宽比例 f 处 x_view = (2f-1)×宽高比，人物落在与手机校准一致的屏宽比例处
-          const aspect = canvasEl.width / canvasEl.height;
-          const targetX = (2 * heroOffsetF - 1) * aspect;
+          if (fitFactor !== null) {
+            // 横坐标按实际画布宽高比换算（竖屏手机 0.475 / 一体机 0.5625 / 横屏 >1），
+            // 屏宽比例 f 处 x_view = (2f-1)×宽高比，人物落在与手机校准一致的屏宽比例处
+            const aspect = canvasEl.width / canvasEl.height;
+            xViewStatic = (2 * xScreenFrac - 1) * aspect;
+          }
           const arr = matrix.getArray();
-          arr[12] = targetX;
-          arr[13] = heroCenterY;
+          arr[12] = xViewStatic;
+          arr[13] = yView;
           matrix.setMatrix(arr);
-          modelPositionRef.current = { x: targetX, y: heroCenterY };
+          modelPositionRef.current = { x: xViewStatic, y: yView };
         } catch (err) {
           console.error('[useLive2DModel] hero fit failed:', err);
         }
@@ -373,9 +418,9 @@ export const useLive2DModel = ({
       window.removeEventListener('live2d-rebound', onRebound);
       window.removeEventListener('hashchange', onHashChange);
     };
-    // heroAlign 变化（首页右侧大站位 ↔ 对话界面右侧）时重新适配站位；
+    // heroAlign 变化（首页 ↔ 对话 ↔ 栏目/新闻）时重新适配站位；
     // 已适配过时比例≈1 不再缩放，只平移到目标站位
-  }, [touchThrough, modelInfo?.url, heroAlign, isBoard, heroOffsetF, heroFitFactor, heroCenterY]);
+  }, [touchThrough, modelInfo?.url, heroAlign, isBoard, isHomeAlign]);
 
   const getCanvasScale = useCallback(() => {
     const canvas = document.getElementById('canvas') as HTMLCanvasElement;
