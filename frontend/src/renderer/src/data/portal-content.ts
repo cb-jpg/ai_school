@@ -5,7 +5,8 @@
  * - 照片/荣誉/优秀学生/联系方式：全部来自校方提供的真实资料（数据清单、2026 新实景照片、
  *   宣纸折页），与 App 内知识库同源。
  * - 「学校新闻」「公告与通知」目前为**占位示例**（条目基于知识库真实事件，日期可能不精确），
- *   正式上线前请校方宣传审核替换。
+ *   正式上线前请校方宣传审核替换。其中 n1/n4/n6 已附上核实的政府/媒体直链，可点击跳转；
+ *   其余条目暂无直链（公众号永久链接需校方在微信内复制提供），渲染为不可点击。
  * - 未来接入学校通知（需求 #5 规划）：服务器侧由公众号同步/后台发布（三期，见
  *   docs/微信公众号接入说明.md 落地节奏），前端只需把本文件的静态数组替换为
  *   `GET /api/portal/content` 之类的接口数据，页面结构不变。字段已按接口形态设计。
@@ -35,8 +36,12 @@ export interface NewsItem {
   /** YYYY-MM-DD 或 YYYY-MM（占位数据允许只到月） */
   date: string;
   category: '校园新闻' | '荣誉喜报' | '媒体聚焦';
-  /** 未来接口：文章详情链接（公众号图文或官网详情页） */
+  /** 文章详情链接。已核实的政府/媒体直链（nanhai.gov.cn、南方+）已填；
+   * 公众号文章永久链接需在微信内复制，待校方提供（B 路线）。
+   * 无 url 的条目渲染为不可点击。 */
   url?: string;
+  /** 链接来源名称（如"南方+"、"南海区教育局"） */
+  source?: string;
 }
 
 export interface AnnouncementItem {
@@ -52,9 +57,11 @@ export interface AnnouncementItem {
 export const PORTAL_NEWS: NewsItem[] = [
   {
     id: 'n1',
-    title: '13名学子凭信息学特长保送清华大学、北京大学',
-    date: '2026-03',
+    title: '佛山唯一！13名学子凭信息学特长保送清华大学、北京大学',
+    date: '2025-06-30',
     category: '荣誉喜报',
+    url: 'https://static.nfnews.com/content/202506/30/c11454630.html',
+    source: '南方+（南方日报）',
   },
   {
     id: 'n2',
@@ -71,12 +78,14 @@ export const PORTAL_NEWS: NewsItem[] = [
   {
     id: 'n4',
     title: '获评国家防震减灾科普示范学校（全市唯一）',
-    date: '2026-01',
+    date: '2024-02-25',
     category: '荣誉喜报',
+    url: 'https://www.nanhai.gov.cn/fsnhq/bmdh/zfbm/qyjj/xxgkml/gzdt/content/post_5908947.html',
+    source: '南海区应急管理局',
   },
   {
     id: 'n5',
-    title: '25周年校庆画册《芝兰玉树》发布，两万余名校友共叙情谊',
+    title: '25周年校庆晚会举行，两万余名校友共叙情谊',
     date: '2025-11',
     category: '校园新闻',
   },
@@ -85,6 +94,8 @@ export const PORTAL_NEWS: NewsItem[] = [
     title: '南海区教育局媒体系列报道：扬长教育、人人出彩',
     date: '2026-04',
     category: '媒体聚焦',
+    url: 'https://www.nanhai.gov.cn/fsnhq/bmdh/zfbm/qjyj/xxgkml/gzdt/content/post_6945094.html',
+    source: '南海区教育局',
   },
 ];
 

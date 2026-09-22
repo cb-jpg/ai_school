@@ -36,7 +36,7 @@ class AccessTokenMiddleware:
     """
 
     PUBLIC_PREFIXES = ("/assets/", "/live2d-models", "/bg", "/avatars", "/web-tool", "/libs",
-                       "/app-releases")
+                       "/app-releases", "/media/")
     PUBLIC_PATHS = ("/", "/favicon.ico", "/vite.svg", "/robots.txt")
 
     def __init__(self, app, access_token: str):
@@ -252,6 +252,16 @@ class WebSocketServer:
             CORSStaticFiles(directory=os.path.join("data", "app-releases")),
             name="app-releases",
         )
+
+        # 官网媒体目录（2026-09-21 官网 v2）：校庆视频等站点媒体，
+        # 前端栏目页 <video> 直接引用 /media/<文件名>（APK 不打包，匿名可看）。
+        # 目录不存在时跳过挂载（本地开发无媒体文件不报错）。
+        if os.path.isdir("media"):
+            self.app.mount(
+                "/media",
+                CORSStaticFiles(directory="media"),
+                name="media",
+            )
 
         # Prefer the reproducible web build from the v1.2.1 frontend source.
         # Keep the checked-in deployment artifact as a fallback for upstream checkouts.

@@ -23,6 +23,7 @@ import { useGroup } from '@/context/group-context';
 import { useInterrupt } from '@/hooks/utils/use-interrupt';
 import { useBrowser } from '@/context/browser-context';
 import { useAuth } from '@/context/auth-context';
+import { fetchLive2dModels } from '@/services/live2d-models-api';
 
 function WebSocketHandler({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
@@ -381,6 +382,39 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
     prevUsernameRef.current = authUsername;
     wsService.connect(wsUrl);
   }, [wsUrl, authUsername]);
+
+  // 匿名模型展示（2026-09-22 官网 v2）：上方门禁未登录不连 WebSocket，model_info
+  // 无从下发，公开页（首页 banner 人物）会按空配置拼出 undefined 模型路径。
+  // 匿名会话改走公开的 /live2d-models/info 直接取默认角色展示——仅展示不对话
+  // （对话仍须登录）。登录后 WS 正常下发 model_info 覆盖（同模型则不重载）。
+  useEffect(() => {
+    if (authUsername) return undefined; // 登录态走 WS set-model-and-conf
+    let cancelled = false;
+    fetchLive2dModels()
+      .then((characters) => {
+        if (cancelled || characters.length === 0) return;
+        // 默认角色与服务器当前角色一致（站位校准/表情映射都按 hiyori_pro 调）；
+        // 列表里没有时退回第一项
+        const character =
+          characters.find((item) => item.id === 'hiyori_pro') ?? characters[0];
+        setModelInfo({
+          name: character.id,
+          url: character.modelPath,
+          kScale: character.kScale,
+          initialXshift: character.initialXshift,
+          initialYshift: character.initialYshift,
+          idleMotionGroupName: character.idleMotionGroupName,
+          emotionMap: character.emotionMap,
+          tapMotions: character.tapMotions,
+        });
+      })
+      .catch((error) => {
+        console.warn('[WebSocket] anonymous model fallback failed:', error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authUsername, setModelInfo]);
 
   useEffect(() => {
     const stateSubscription = wsService.onStateChange((state) => {

@@ -2,8 +2,8 @@
  * Hero Landing Page Component
  * 对话界面（#/hero）- 由原首页迁移而来
  * 2026-09-21 全站官网化：页头换 SiteHeader（绛红校名横带 + 白色通栏栏目导航条，
- * 与首页/专题页同款）；打开专题页时同一页头切换激活项，专题内容由
- * CampusKnowledge 覆盖层渲染（本组件此时只保留页头）。
+ * 与首页/栏目页/新闻中心同款）；同日官网 v2 后本页只承担对话界面——栏目/新闻
+ * 已迁往独立路由（#/campus/<栏目>/<文章>、#/news），由 App 直接渲染对应页面。
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -80,14 +80,18 @@ export default function HeroLanding({
         fontFamily: swissFont,
       }}
     >
-      {/* 共享页头：绛红校名横带 + 白色通栏栏目导航条（与首页/专题页同款）。
-          打开专题页时激活项切到当前专题，专题内容由 CampusKnowledge 覆盖层渲染；
-          z30 盖过 Live2D 穿透层(15)，手机端人物不会压住页头（原 Navbar 同层级） */}
+      {/* 共享页头：绛红校名横带 + 白色通栏栏目导航条（与首页/栏目页/新闻中心同款）。
+          2026-09-21 官网 v2：栏目/新闻页改为独立路由（#/campus/<栏目>/<文章>、#/news），
+          本页只承担对话界面，激活项恒为「对话」；z30 盖过 Live2D 穿透层(15)，
+          手机端人物不会压住页头（原 Navbar 同层级） */}
       <Box position="relative" zIndex={30} flexShrink={0}>
         <SiteHeader
-          activeNav={activeCampusTopic ?? 'dialog'}
-          onNavigateTopic={(topicId) => {
-            window.location.hash = `#/campus/${topicId}`;
+          activeNav="dialog"
+          onNavigateColumn={(columnId, articleId) => {
+            window.location.hash = `#/campus/${columnId}${articleId ? `/${articleId}` : ''}`;
+          }}
+          onNavigateNews={() => {
+            window.location.hash = '#/news';
           }}
           onGoChat={() => {
             window.location.hash = '#/hero';

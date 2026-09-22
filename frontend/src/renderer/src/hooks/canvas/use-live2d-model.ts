@@ -55,6 +55,15 @@ const HOME_FIT_FACTOR = 0.88;
 const HOME_CENTER_Y = -0.12;
 const HOME_OFFSET_F = 0.732; // 首页：73% 屏宽（原 x_view 0.22）
 
+// 首页 hero banner 站位（2026-09-21 简化版省实改版）：手机/一体机（base 组）与
+// 横屏桌面（新增适配，banner 形态改版后原默认居中站位会撞左侧红面板）都让人物
+// 站在首页顶部 banner 照片右侧（用户手绘红圈位置）。banner 区 = 页头(~114px)
+// + 40vh：fit 0.5 ≈ 29% 屏高，y=+0.34 → 人物中心在 33% 屏高（banner 中部），
+// 底部落在 banner 下缘之上；x≈72% 屏宽（左侧红面板占 48%~56%，互不遮挡）。
+const HOME_BANNER_FIT_FACTOR = 0.5;
+const HOME_BANNER_CENTER_Y = 0.34;
+const HOME_BANNER_OFFSET_F = 0.72;
+
 // 竖屏大屏（桌面竖窗/竖放平板，usePortraitBoard 命中的全尺寸视口）站位初值
 // （2026-09-15 桌面模拟定，待真机微调）。横坐标同样按【屏宽比例】存，由下方
 // 宽高比换算统一处理（1272×2800 模拟下换算：视图 x 0.34 ≈ 87.4% 屏宽）：
@@ -159,13 +168,13 @@ export const useLive2DModel = ({
   const isBoard = usePortraitBoard();
   const heroOffsetF = isBoard
     ? (isHomeAlign ? HOME_BOARD_OFFSET_F : HERO_BOARD_OFFSET_F)
-    : (isHomeAlign ? HOME_OFFSET_F : HERO_OFFSET_F);
+    : (isHomeAlign ? HOME_BANNER_OFFSET_F : HERO_OFFSET_F);
   const heroFitFactor = isBoard
     ? (isHomeAlign ? HOME_BOARD_FIT_FACTOR : HERO_BOARD_FIT_FACTOR)
-    : (isHomeAlign ? HOME_FIT_FACTOR : HERO_FIT_FACTOR);
+    : (isHomeAlign ? HOME_BANNER_FIT_FACTOR : HERO_FIT_FACTOR);
   const heroCenterY = isBoard
     ? (isHomeAlign ? HOME_BOARD_CENTER_Y : HERO_BOARD_CENTER_Y)
-    : (isHomeAlign ? HOME_CENTER_Y : HERO_CENTER_Y);
+    : (isHomeAlign ? HOME_BANNER_CENTER_Y : HERO_CENTER_Y);
   const { mode } = useMode();
   const isPet = mode === 'pet';
   const [isDragging, setIsDragging] = useState(false);
@@ -281,10 +290,11 @@ export const useLive2DModel = ({
   useEffect(() => {
     if (!touchThrough) return undefined;
     // 手机 + 大屏一体机（触摸大屏，视口可任意宽）+ 桌面竖窗（竖屏大屏排版）
-    // 都做站位适配；横屏桌面保持默认布局不缩放。
+    // + 首页 hero banner 形态的横屏桌面（人物站 banner 右侧）都做站位适配；
+    // 横屏桌面的对话界面保持默认布局不缩放。
     // 原门槛是 innerWidth>=768 跳过，宽的竖屏数字屏被误判为桌面，人物完全
     // 不做站位适配（SDK 默认居中默认比例），真机表现为下半屏无人
-    if (typeof window !== 'undefined' && !(isBoard || isPhoneStyleViewport())) return undefined;
+    if (typeof window !== 'undefined' && !(isBoard || isPhoneStyleViewport() || isHomeAlign)) return undefined;
     let cancelled = false;
     let outerStop: (() => void) | null = null;
 
@@ -298,9 +308,14 @@ export const useLive2DModel = ({
         const model = (window as any).getLAppAdapter?.()?.getModel?.();
         const matrix = model?._modelMatrix;
         if (!matrix) return;
-        // canvas 位图未初始化（默认 300x150）时投影会按小画布计算，等 resize 完成
+        // canvas 位图未初始化（默认 300x150）时投影会按小画布计算，等 resize 完成。
+        // 就绪判据 = 位图宽达到 clientWidth×dpr（2026-09-22 改：旧判据
+        // `width <= clientWidth` 在 dpr=1 的桌面浏览器上永远成立，首页 banner
+        // 站位适配被跳过，人物停在默认居中位）。
         const canvasEl = document.getElementById('canvas') as HTMLCanvasElement | null;
-        if (!canvasEl || canvasEl.width <= canvasEl.clientWidth) return;
+        if (!canvasEl) return;
+        const expectedW = Math.round(canvasEl.clientWidth * (window.devicePixelRatio || 1));
+        if (canvasEl.width < expectedW - 1) return;
         clearInterval(poll);
         clearTimeout(stop);
         try {

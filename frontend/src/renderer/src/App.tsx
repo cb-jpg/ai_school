@@ -68,9 +68,20 @@ import WebSocketStatus from "./components/canvas/ws-status";
 import Subtitle from "./components/canvas/subtitle";
 import { ModeProvider, useMode } from "./context/mode-context";
 import CampusKnowledge from "./components/campus/campus-knowledge";
+import ColumnPage from "./components/campus/column-page";
 import { CampusTopicId, isCampusTopicId } from "./data/campus-knowledge";
+import {
+  SiteColumnId,
+  siteColumnMap,
+  isSiteColumnId,
+  findArticle,
+  LEGACY_TOPIC_MAP,
+} from "./data/site-columns";
 import HeroLanding from "./components/hero/hero-landing";
 import HomePage from "./components/hero/home-page";
+import NewsPage from "./components/hero/news-page";
+import SiteHeader from "./components/hero/site-header";
+import HeroSidebar from "./components/hero/hero-sidebar";
 import KnowledgeAdmin from "./components/admin/knowledge-admin";
 import { DocumentKnowledge } from "./components/admin/document-knowledge";
 import { SystemLogs } from "./components/admin/system-logs";
@@ -102,8 +113,8 @@ const getCurrentRoute = (): AppRoute => {
 
   // Hero landing page route - include campus routes as hero mode
   // #/portal 是 09-20 版独立门户页的旧链接，官网化改版（2026-09-21）后门户
-  // 即新首页本身，旧链接兼容落到首页
-  if (hash === '#/home' || hash === '#/hero' || hash === '#/landing' || hash === '#/portal' || hash === '' || hash === '#/' || hash.startsWith('#/campus/')) {
+  // 即新首页本身，旧链接兼容落到首页；#/news 为新闻中心（官网 v2）
+  if (hash === '#/home' || hash === '#/hero' || hash === '#/landing' || hash === '#/portal' || hash === '#/news' || hash === '' || hash === '#/' || hash.startsWith('#/campus/')) {
     return 'hero';
   }
 
@@ -133,12 +144,49 @@ const readCampusTopicFromLocation = (): CampusTopicId | null => {
   return isCampusTopicId(topicId) ? topicId : null;
 };
 
+// 官网 v2（2026-09-21）：栏目页路由 #/campus/<栏目>/<文章>。
+// 文章段缺省/非法时回落到该栏目第一篇；旧专题链接（#/campus/intro 等）
+// 经 LEGACY_TOPIC_MAP 映射到新栏目+文章，不白屏。
+interface ActiveColumnView {
+  column: SiteColumnId;
+  article: string;
+}
+
+const readColumnArticleFromLocation = (): ActiveColumnView | null => {
+  if (typeof window === 'undefined') return null;
+  const match = window.location.hash.match(/^#\/campus\/([^/?#]+)(?:\/([^/?#]+))?/);
+  const first = match?.[1] || '';
+  if (isSiteColumnId(first)) {
+    const articleId = match?.[2];
+    return {
+      column: first,
+      article:
+        articleId && findArticle(first, articleId)
+          ? articleId
+          : siteColumnMap[first].articles[0].id,
+    };
+  }
+  const legacy = LEGACY_TOPIC_MAP[first];
+  return legacy ? { column: legacy.column, article: legacy.article } : null;
+};
+
+const readIsNewsFromLocation = (): boolean =>
+  typeof window !== 'undefined' && window.location.hash === '#/news';
+
 function AppContent(): JSX.Element {
   const [showSidebar, setShowSidebar] = useState(true);
   const [isFooterCollapsed, setIsFooterCollapsed] = useState(false);
   const [activeCampusTopic, setActiveCampusTopic] = useState<CampusTopicId | null>(
     readCampusTopicFromLocation,
   );
+  // 官网 v2：栏目页（学校概况/办学成果/招生入学）与新闻中心的路由状态。
+  // 三者都置位时栏目页优先（旧专题链接两态并存，渲染取栏目页）。
+  const [activeColumn, setActiveColumn] = useState<ActiveColumnView | null>(
+    readColumnArticleFromLocation,
+  );
+  const [isNewsActive, setIsNewsActive] = useState<boolean>(readIsNewsFromLocation);
+  // 栏目页/新闻中心页头齿轮打开的设置侧栏（首页/对话页各自内部持有）
+  const [heroSidebarOpen, setHeroSidebarOpen] = useState(false);
   const [currentRoute, setCurrentRoute] = useState<AppRoute>(() => getCurrentRoute());
   const [currentMainRoute, setCurrentMainRoute] = useState<MainRoute>(() => getCurrentMainRoute());
   const [heroView, setHeroView] = useState<HeroView>(() => readHeroView());
@@ -171,6 +219,8 @@ function AppContent(): JSX.Element {
       setCurrentRoute(getCurrentRoute());
       setCurrentMainRoute(getCurrentMainRoute());
       setActiveCampusTopic(readCampusTopicFromLocation());
+      setActiveColumn(readColumnArticleFromLocation());
+      setIsNewsActive(readIsNewsFromLocation());
       setHeroView(readHeroView());
     };
     window.addEventListener('hashchange', syncRoute);
@@ -209,6 +259,23 @@ function AppContent(): JSX.Element {
       '',
       `${window.location.pathname}${window.location.search}#/campus/${topicId}`,
     );
+  };
+
+  // 官网 v2（2026-09-21）：栏目页/新闻中心的导航走纯 hash（hashchange→syncRoute），
+  // 与上面 pushState 式 navigateToCampusTopic（main 模式工作台专用）互不影响。
+  // 页头（SiteHeader）/栏目页菜单/首页更多入口共用这几个回调。
+  const goColumnArticle = (columnId: SiteColumnId, articleId?: string) => {
+    const article = articleId ?? siteColumnMap[columnId].articles[0].id;
+    window.location.hash = `#/campus/${columnId}/${article}`;
+  };
+  const goNewsPage = () => {
+    window.location.hash = '#/news';
+  };
+  const goDialogPage = () => {
+    window.location.hash = '#/hero';
+  };
+  const goHomePage = () => {
+    window.location.hash = '#/home';
   };
 
   const closeCampusTopic = () => {
@@ -281,10 +348,12 @@ function AppContent(): JSX.Element {
     zIndex: 15,
   };
 
-  // 登录门禁（2026-09-20 需求 #6）：浏览类页面（新首页/校园专题页）不再强制登录，
-  // 进入「对话界面」才要求登录——家长/学生各用各的账号，会话数据按账号隔离。
-  const isHomeViewGate = currentRoute === 'hero' && heroView === 'home' && !activeCampusTopic;
-  const isTopicViewGate = currentRoute === 'hero' && !!activeCampusTopic;
+  // 登录门禁（2026-09-20 需求 #6）：浏览类页面（新首页/栏目页/新闻中心/旧专题页）
+  // 不再强制登录，进入「对话界面」才要求登录——家长/学生各用各的账号，会话按账号隔离。
+  // 官网 v2：栏目/新闻也算浏览态（isOverlayView），画布为它们让出右侧位。
+  const isOverlayView = !!activeCampusTopic || !!activeColumn || isNewsActive;
+  const isHomeViewGate = currentRoute === 'hero' && heroView === 'home' && !isOverlayView;
+  const isTopicViewGate = currentRoute === 'hero' && isOverlayView;
   const isDialogViewGate = currentRoute === 'hero' && !isHomeViewGate && !isTopicViewGate;
   if (isDialogViewGate && !authUser) {
     return <AppLoginPage />;
@@ -299,8 +368,8 @@ function AppContent(): JSX.Element {
 
   // Show Hero Landing page on hero route (still wrapped in all providers)
   if (currentRoute === 'hero') {
-    // 新首页：#/home / 空 hash 且未打开专题页；#/hero 为对话界面
-    const isHomeView = heroView === 'home' && !activeCampusTopic;
+    // 新首页：#/home / 空 hash 且未打开任何栏目/新闻/专题；#/hero 为对话界面
+    const isHomeView = heroView === 'home' && !isOverlayView;
     return (
       <>
         {/* Background layer for hero route（首页居中布局，关闭桌面端分屏遮罩） */}
@@ -327,8 +396,9 @@ function AppContent(): JSX.Element {
           <Live2D showSidebar={false} touchThrough heroAlign={isHomeView ? 'center' : 'right'} />
         </Box>
 
-        {/* CampusKnowledge overlay for topic pages */}
-        {activeCampusTopic && (
+        {/* CampusKnowledge overlay for topic pages（官网 v2 后旧专题链接已映射到
+            新栏目页，仅当两态并存且栏目态缺失时兜底渲染——正常路由不再进入） */}
+        {activeCampusTopic && !activeColumn && (
           <Box
             position="absolute"
             top={0}
@@ -350,16 +420,34 @@ function AppContent(): JSX.Element {
           </Box>
         )}
 
-        {/* WebSocketStatus indicator（专题页打开时隐藏，避免浮在专题页导航上；未登录时隐藏——
-            匿名浏览不连 WS，亮着红色断连提示反而困惑） */}
-        {!activeCampusTopic && authUser && (
+        {/* 栏目页/新闻中心的共享页头（App 级渲染，z30 盖过画布）；
+            首页与对话页的页头由各自组件内部渲染 */}
+        {(activeColumn || isNewsActive) && (
+          <Box position="absolute" top={0} left={0} width="100%" zIndex={30}>
+            <SiteHeader
+              activeNav={activeColumn ? activeColumn.column : 'news'}
+              onNavigateColumn={goColumnArticle}
+              onNavigateNews={goNewsPage}
+              onGoChat={goDialogPage}
+              onOpenSettings={() => setHeroSidebarOpen(!heroSidebarOpen)}
+            />
+          </Box>
+        )}
+        <HeroSidebar
+          isOpen={heroSidebarOpen}
+          onClose={() => setHeroSidebarOpen(false)}
+        />
+
+        {/* WebSocketStatus indicator（专题/栏目/新闻页打开时隐藏，避免浮在页面导航上；
+            未登录时隐藏——匿名浏览不连 WS，亮着红色断连提示反而困惑） */}
+        {!isOverlayView && authUser && (
           <Box position="absolute" top="20px" left="20px" zIndex={10}>
             <WebSocketStatus />
           </Box>
         )}
 
-        {/* Subtitle for hero page - 手机端对话卡片内已展示文本，隐藏；专题页/新首页隐藏 */}
-        {!activeCampusTopic && !isHomeView && (
+        {/* Subtitle for hero page - 手机端对话卡片内已展示文本，隐藏；栏目/新闻/专题/新首页隐藏 */}
+        {!isOverlayView && !isHomeView && (
         <Box
           position="absolute"
           bottom={{ base: "8%", md: "12%" }}
@@ -387,9 +475,21 @@ function AppContent(): JSX.Element {
         </Box>
         )}
 
-        {/* 新首页（学校简介 + 居中数字人 + 开始对话）；对话界面/专题页仍走 HeroLanding */}
+        {/* 官网 v2 渲染链：新首页 → 栏目页（学校概况/办学成果/招生入学，含旧专题
+            映射）→ 新闻中心 → 对话界面。栏目/新闻页画布保持 md 档右侧 55% + 右站位
+            （isHomeView=false），内容卡占左 58%，人物从右侧透出 */}
         {isHomeView ? (
-          <HomePage onNavigateTopic={navigateToCampusTopic} />
+          <HomePage />
+        ) : activeColumn ? (
+          <ColumnPage
+            columnId={activeColumn.column}
+            activeArticleId={activeColumn.article}
+            onNavigateArticle={goColumnArticle}
+            onNavigateHome={goHomePage}
+            onRequireAuth={() => setAuthPrompt(true)}
+          />
+        ) : isNewsActive ? (
+          <NewsPage onNavigateHome={goHomePage} />
         ) : (
           <HeroLanding
             activeCampusTopic={activeCampusTopic}

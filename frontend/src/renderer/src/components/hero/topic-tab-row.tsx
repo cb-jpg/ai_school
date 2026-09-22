@@ -71,11 +71,15 @@ export function TopicTabButton({
 interface TopicTabRowProps {
   /** 当前激活的专题（首页无专题传 null） */
   activeTopicId?: CampusTopicId | null;
-  onNavigateTopic: (topicId: CampusTopicId) => void;
+  /** items 未传（默认专题按钮组）时必传；传 items 时可省 */
+  onNavigateTopic?: (topicId: CampusTopicId) => void;
   /** 行首附加按钮（如首页的"首页"） */
   leading?: React.ReactNode;
   /** 行尾附加按钮（如首页的"对话界面"） */
   trailing?: React.ReactNode;
+  /** 2026-09-21 官网 v2：自定义导航项（栏目下拉/新闻中心），替换默认专题按钮组。
+          页头用 TopicTabRow 只为复用行壳与 kiosk JS 拖滑兜底 */
+  items?: React.ReactNode;
 }
 
 export default function TopicTabRow({
@@ -83,6 +87,7 @@ export default function TopicTabRow({
   onNavigateTopic,
   leading,
   trailing,
+  items,
 }: TopicTabRowProps) {
   // 竖屏大屏：整行按手机端"单行横滑"形态放大展示（内容列限宽内一行放不下时仍可滑）
   const isPortraitBoard = usePortraitBoard();
@@ -145,12 +150,12 @@ export default function TopicTabRow({
         css={{ '&::-webkit-scrollbar': { display: 'none' } }}
       >
         {leading}
-        {campusTopics.map((topic) => (
+        {items ?? campusTopics.map((topic) => (
           <TopicTabButton
             key={topic.id}
             topic={topic}
             active={activeTopicId === topic.id}
-            onClick={() => onNavigateTopic(topic.id)}
+            onClick={() => onNavigateTopic?.(topic.id)}
           />
         ))}
         {trailing}
