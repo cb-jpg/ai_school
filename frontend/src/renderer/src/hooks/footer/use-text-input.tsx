@@ -5,6 +5,7 @@ import { useInterrupt } from '@/components/canvas/live2d';
 import { useChatHistory } from '@/context/chat-history-context';
 import { useVAD } from '@/context/vad-context';
 import { useMediaCapture } from '@/hooks/utils/use-media-capture';
+import { safeRandomId } from '@/utils/random-id';
 
 export function useTextInput() {
   const [inputText, setInputText] = useState('');
@@ -28,7 +29,7 @@ export function useTextInput() {
 
     const images = await captureAllMedia();
 
-    const utteranceId = crypto.randomUUID();
+    const utteranceId = safeRandomId('utt');
     const sent = wsContext.sendMessage({
       type: 'text-input',
       text: text.trim(),

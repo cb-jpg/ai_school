@@ -18,6 +18,7 @@ import {
 import { FiArrowRight, FiArrowUpRight, FiChevronRight, FiHome, FiMic, FiPlay } from 'react-icons/fi';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useWebSocket } from '@/context/websocket-context';
+import { safeRandomId } from '@/utils/random-id';
 import { useAiState } from '@/context/ai-state-context';
 import { useSubtitle } from '@/context/subtitle-context';
 import { useAuth } from '@/context/auth-context';
@@ -38,11 +39,6 @@ const paper = siteTheme.paper;
 const surface = '#FBF8F3';
 const accent = siteTheme.red;
 const accentWash = siteTheme.redWash;
-
-const buildNarrationId = () => {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-  return `column-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-};
 
 interface ColumnPageProps {
   columnId: SiteColumnId;
@@ -192,7 +188,7 @@ export default function ColumnPage({
         type: 'static-narration',
         title,
         segments: cleanedSegments,
-        narration_id: buildNarrationId(),
+        narration_id: safeRandomId('column-narrate'),
       });
       if (!sent) {
         setNarrationError('讲解请求发送失败，请检查后端连接。');

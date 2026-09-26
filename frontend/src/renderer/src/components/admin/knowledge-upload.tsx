@@ -26,6 +26,7 @@ import {
 } from 'react-icons/fi';
 import { useState, useCallback } from 'react';
 import { useKnowledgeAdminAPI } from '@/services/knowledge-admin-api';
+import { safeRandomId } from '@/utils/random-id';
 import { toaster } from '@/components/ui/toaster';
 
 
@@ -178,7 +179,7 @@ export default function KnowledgeUpload() {
 
     // Initialize upload statuses
     const initialStatuses: UploadStatus[] = files.map(file => ({
-      id: crypto.randomUUID(),
+      id: safeRandomId('upl'),
       name: file.name,
       status: 'pending',
       progress: 0
@@ -266,7 +267,7 @@ export default function KnowledgeUpload() {
       return;
     }
 
-    const statusId = crypto.randomUUID();
+    const statusId = safeRandomId('upl-status');
     const newStatus: UploadStatus = {
       id: statusId,
       name: textTitle,
@@ -349,7 +350,7 @@ export default function KnowledgeUpload() {
     const url = urlUrl.trim();
     if (!url || !urlCategory.trim()) return;
 
-    const statusId = crypto.randomUUID();
+    const statusId = safeRandomId('upl-status');
     setUploadStatuses(prev => [
       { id: statusId, name: url, status: 'uploading', progress: 30 },
       ...prev,
