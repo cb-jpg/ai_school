@@ -67,10 +67,11 @@ MIN_SCORE = 0.3                 # 相似度低于此分数的块不参与结果
 LOW_CONFIDENCE_THRESHOLD = 0.5  # 命中但最高分低于此值记为低置信问题
 
 # 对话 RAG 参数（与管理端 search 的 TOP_K 区分）：
-# RAG 资料几乎是对话 prompt 的全部 prefill，条数直接决定 LLM 首字延迟；
-# 4 条 + 单条 480 字符上限（切块时已限 500，几乎无损）把上下文压 ~1/3，
-# 换取 64 并发突发下更快的 TTFT。MIN_SCORE/RRF 排序不变，质量不受影响。
-CHAT_TOP_K = 4
+# RAG 资料几乎是对话 prompt 的全部 prefill，条数直接影响 LLM 首字延迟。
+# 2026-09-26：4→6。实测名单/多亮点类问题（优秀学生 7 人、简章六大亮点）
+# 4 条装不下关键信息，用户可见"答非所问的缺胳膊少腿"；检索本身在缓存/
+# 小线程池内开销不变，仅 prompt 增 ~2 块，换回答完整性。480 字符上限不变。
+CHAT_TOP_K = 6
 DOC_CHAR_CAP = 480
 
 # 问题记录上限（防止文件无限增长）
@@ -220,12 +221,43 @@ class RagService:
         self._searchable_cache: Tuple[float, Set[str]] = (0.0, set())
         self._searchable_total: int = -1
 
+    # 纯寒暄/客套短句（2026-09-26）：不检索、也不触发联网兜底，
+    # 保住开口延迟（RAG 白跑 + rag_attempted 引发的联网搜索都省掉）
+    _CHITCHAT_WORDS = (
+        "你好", "您好", "嗨", "哈喽", "哈罗", "hello", "hi", "在吗", "在不在",
+        "谢谢", "感谢", "辛苦了", "再见", "拜拜", "晚安", "早安",
+        "早上好", "中午好", "下午好", "晚上好", "新年好", "圣诞快乐",
+        "你是谁", "你叫什么", "你几岁", "多大了", "喜欢你", "爱你", "讲个笑话",
+    )
+
+    @staticmethod
+    def _is_chitchat(query: str) -> bool:
+        q = query.strip().lower()
+        if not q or len(q) > 24:
+            return False
+        return any(word in q for word in RagService._CHITCHAT_WORDS)
+
     @staticmethod
     def needs_rag_retrieval(query: str) -> bool:
-        """检测查询是否需要 RAG 检索（包含学校相关关键词）"""
+        """是否需要 RAG 检索。
+
+        2026-09-26 修复：旧版按 SCHOOL_KEYWORDS 白名单触发，信息域问题
+        大量漏网（信息学四杰/芝兰玉树/高考成绩/校庆嘉宾/具体人名等），
+        RAG 与联网兜底双双不跑，LLM 只能裸答"没有相关内容"。
+        现改为除纯寒暄外一律检索：噪音由 MIN_SCORE 分数闸过滤，
+        寒暄由 _is_chitchat 拦下（同时避免联网兜底白拖 6 秒）。
+        """
         if not query:
             return False
-        return any(keyword in query for keyword in SCHOOL_KEYWORDS)
+        if RagService._is_chitchat(query):
+            return False
+        return True
+
+    @staticmethod
+    def has_school_signal(query: str) -> bool:
+        """粗判是否学校相关（关键词命中）。仅供联网兜底决定要不要再搜一次，
+        与检索触发（needs_rag_retrieval）解耦。"""
+        return bool(query) and any(keyword in query for keyword in SCHOOL_KEYWORDS)
 
     def _searchable_entry_ids(self) -> Set[str]:
         """可被检索的知识条目：已索引或已发布（归档/处理中/出错的不参与）

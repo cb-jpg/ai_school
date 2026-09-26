@@ -126,10 +126,14 @@ async def process_single_conversation(
             if search_task is not None:
                 web_block = await asyncio.wait_for(search_task, timeout=6.0)
             elif rag_attempted and not rag_hit_flag:
+                from ..knowledge.rag_service import get_rag_service
                 from ..knowledge.web_search import web_search_context
 
-                web_block = await asyncio.wait_for(
-                    web_search_context(input_text), timeout=6.0)
+                # 2026-09-26：RAG 现在几乎每问必跑，裸"未命中"不再是学校问题信号；
+                # 兜底仍按学校关键词收口，闲聊/长尾问题不再白吃一次联网搜索延迟
+                if get_rag_service().has_school_signal(input_text):
+                    web_block = await asyncio.wait_for(
+                        web_search_context(input_text), timeout=6.0)
             if web_block:
                 enriched_input_text = f"{enriched_input_text}\n\n{web_block}"
                 span = current_span()
