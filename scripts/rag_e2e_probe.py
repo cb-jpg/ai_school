@@ -38,10 +38,16 @@ async def run(url: str, question: str, timeout: float):
             if t == "rag-status" and t not in seen:
                 seen[t] = m
                 print(f"RAG-STATUS: has_context={m.get('has_context')} doc_count={m.get('doc_count')}")
-            elif t in ("full-text", "ai-sentence") and t not in seen:
-                seen[t] = m
+            elif t in ("full-text", "ai-sentence"):
                 text = m.get("text") or m.get("message", "")
-                print(f"REPLY: {text[:160]}")
+                if t == "full-text" and text.strip() in ("Connection established", "Thinking..."):
+                    continue
+                if t == "full-text":
+                    seen[t] = m  # full-text 是完整回复，后到覆盖
+                    print(f"REPLY: {text[:400]}")
+                elif t not in seen:
+                    seen[t] = m
+                    print(f"REPLY: {text[:400]}")
             elif t == "audio" and t not in seen:
                 seen[t] = m
                 dt = m.get("display_text") or {}

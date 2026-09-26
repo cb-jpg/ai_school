@@ -13,7 +13,7 @@ import { LAppLive2DManager } from '../../../WebSDK/src/lapplive2dmanager';
 import { initializeLive2D } from '@cubismsdksamples/main';
 import { useMode } from '@/context/mode-context';
 import { usePortraitBoard } from '@/hooks/utils/use-portrait-board';
-import { isPhoneStyleViewport, IS_KIOSK } from '@/utils/device-profile';
+import { isPhoneStyleViewport } from '@/utils/device-profile';
 
 interface UseLive2DModelProps {
   modelInfo: ModelInfo | undefined;
@@ -853,12 +853,12 @@ export const useLive2DModel = ({
     target.addEventListener('touchend', onEnd, { passive: false });
     target.addEventListener('touchcancel', onCancel, { passive: false });
 
-    // 一体机红外屏兜底（仅 kiosk）：部分一体机触摸以鼠标事件送达（上报
-    // maxTouchPoints=2 但实际投递方式不一致），穿透模式只挂 touch 监听会
-    // 拖不动人物。命中模型的鼠标按下接管为拖动；捕获阶段拦截并吞掉其后
-    // 的 click，防止拖动/点按人物时误触下层按钮。
+    // 鼠标兜底（穿透模式全启用）：桌面浏览器画布 pointerEvents:none 收不到
+    // 鼠标事件，须窗口级监听；kiosk 一体机红外屏部分以鼠标事件送达，同路
+    // 一并覆盖。命中模型的按下才接管为拖动/点按（未命中完全放行给下层）；
+    // 捕获阶段拦截并吞掉其后的 click，防止操作人物时误触下层按钮。
     const winCleanups: Array<() => void> = [];
-    if (touchThrough && IS_KIOSK) {
+    if (touchThrough) {
       let mouseSession = false;
       let suppressClickUntil = 0;
       const onMouseDown = (e: MouseEvent) => {
@@ -886,15 +886,23 @@ export const useLive2DModel = ({
         e.preventDefault();
         e.stopPropagation();
       };
+      // 桌面特有：拖动中切窗/失焦会丢 mouseup，会话残留会让下次按下错乱
+      const onBlur = () => {
+        if (!mouseSession) return;
+        mouseSession = false;
+        touchNativeRef.current.cancel();
+      };
       window.addEventListener('mousedown', onMouseDown, true);
       window.addEventListener('mousemove', onMouseMove);
       window.addEventListener('mouseup', onMouseUp, true);
       window.addEventListener('click', onClick, true);
+      window.addEventListener('blur', onBlur);
       winCleanups.push(
         () => window.removeEventListener('mousedown', onMouseDown, true),
         () => window.removeEventListener('mousemove', onMouseMove),
         () => window.removeEventListener('mouseup', onMouseUp, true),
         () => window.removeEventListener('click', onClick, true),
+        () => window.removeEventListener('blur', onBlur),
       );
     }
 
