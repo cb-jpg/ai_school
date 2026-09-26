@@ -148,7 +148,8 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
         setAiState('idle');
         break;
       case 'full-text':
-        if (message.text) {
+        // 连接问候语只进日志不进字幕条（2026-09-26 修复：连接后字幕条残留 Connection established）
+        if (message.text && !/^connection established$/i.test(message.text.trim())) {
           setSubtitleText(message.text);
         }
         break;
