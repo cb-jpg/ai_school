@@ -65,6 +65,10 @@ const HOME_OFFSET_F = 0.732; // 首页：73% 屏宽（原 x_view 0.22）
 const HOME_BANNER_FIT_FACTOR = 0.5;
 const HOME_BANNER_CENTER_Y = 0.34;
 const HOME_BANNER_OFFSET_F = 0.72;
+// 手机端（App）首页 banner 站位再右移（2026-09-27 用户参考截图）：人物站到画面
+// 最右侧（中心 ≈91% 屏宽、右缘 ≈97%），完全让开红面板文字区，脚底仍落 banner
+// 下缘；桌面横屏仍用上方 0.72（红面板更窄，72% 处不压字且不贴边）。
+const HOME_BANNER_OFFSET_F_PHONE = 0.91;
 
 // 桌面栏目/新闻页站位（2026-09-22 官网 v2 用户反馈修正）：画布是右侧 55% 竖条、
 // 页面顶部有 ~128+132px 的不透明栏目 banner 条（页面 z30 盖过画布 z1）。人物若按
@@ -363,7 +367,7 @@ export const useLive2DModel = ({
       yView = isHomeAlign ? HOME_BOARD_CENTER_Y : HERO_BOARD_CENTER_Y;
     } else if (isPhoneStyleViewport()) {
       fitFactor = isHomeAlign ? HOME_BANNER_FIT_FACTOR : HERO_FIT_FACTOR;
-      xScreenFrac = isHomeAlign ? HOME_BANNER_OFFSET_F : HERO_OFFSET_F;
+      xScreenFrac = isHomeAlign ? HOME_BANNER_OFFSET_F_PHONE : HERO_OFFSET_F;
       yView = isHomeAlign ? HOME_BANNER_CENTER_Y : HERO_CENTER_Y;
     } else if (isHomeAlign) {
       fitFactor = HOME_BANNER_FIT_FACTOR;
