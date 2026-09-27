@@ -1,15 +1,20 @@
 /* eslint-disable no-shadow */
 // import { StrictMode } from 'react';
-import { Box, ChakraProvider, createSystem, defaultConfig, defineTokens } from "@chakra-ui/react";
+import {
+  Box,
+  ChakraProvider,
+  createSystem,
+  defaultConfig,
+  defineTokens,
+} from "@chakra-ui/react";
 
 // v2→v3 迁移兼容：项目大量组件直接用 px 字面量（如 fontSize="14px"、size="20px"），
 // v3 类型只认 token。这里把常用 px 值注册为 token，类型合法且运行时值不变。
 const tokens = defineTokens({
   fontSizes: Object.fromEntries(
-    [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 22, 24, 26, 28, 32, 36].map((px) => [
-      `${px}px`,
-      { value: `${px}px` },
-    ]),
+    [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 22, 24, 26, 28, 32, 36].map(
+      (px) => [`${px}px`, { value: `${px}px` }],
+    ),
   ),
 });
 // 大屏一体机适配（isLargeTouchViewport 判定见 utils/device-profile.ts）：
@@ -23,11 +28,11 @@ const system = createSystem(defaultConfig, {
     ...(IS_KIOSK
       ? {
           breakpoints: {
-            sm: '9991px',
-            md: '9992px',
-            lg: '9993px',
-            xl: '9994px',
-            '2xl': '9995px',
+            sm: "9991px",
+            md: "9992px",
+            lg: "9993px",
+            xl: "9994px",
+            "2xl": "9995px",
           },
         }
       : {}),
@@ -97,50 +102,60 @@ import { CharacterConfig } from "./components/admin/character-config";
 import { usePortraitBoard } from "./hooks/utils/use-portrait-board";
 import { useOtaUpdate } from "./hooks/use-ota-update";
 // 定义路由类型
-type AppRoute = 'hero' | 'main' | 'campus' | 'main-admin';
-type MainRoute = 'dashboard' | 'test-conversation' | 'knowledge-admin' | 'workspace' | string;
+type AppRoute = "hero" | "main" | "campus" | "main-admin";
+type MainRoute =
+  "dashboard" | "test-conversation" | "knowledge-admin" | "workspace" | string;
 // hero 模式下的两个页面：home=新首页（默认），chat=对话界面（原首页迁移至 #/hero）
-type HeroView = 'home' | 'chat';
+type HeroView = "home" | "chat";
 
 const getCurrentRoute = (): AppRoute => {
-  if (typeof window === 'undefined') return 'main-admin';
+  if (typeof window === "undefined") return "main-admin";
   const hash = window.location.hash;
 
   // Main admin workspace routes
-  if (hash.startsWith('#/main') || hash === '#/main' || hash === '#/main/') {
-    return 'main-admin';
+  if (hash.startsWith("#/main") || hash === "#/main" || hash === "#/main/") {
+    return "main-admin";
   }
 
   // Hero landing page route - include campus routes as hero mode
   // #/portal 是 09-20 版独立门户页的旧链接，官网化改版（2026-09-21）后门户
   // 即新首页本身，旧链接兼容落到首页；#/news 为新闻中心（官网 v2）
-  if (hash === '#/home' || hash === '#/hero' || hash === '#/landing' || hash === '#/portal' || hash === '#/news' || hash === '' || hash === '#/' || hash.startsWith('#/campus/')) {
-    return 'hero';
+  if (
+    hash === "#/home" ||
+    hash === "#/hero" ||
+    hash === "#/landing" ||
+    hash === "#/portal" ||
+    hash === "#/news" ||
+    hash === "" ||
+    hash === "#/" ||
+    hash.startsWith("#/campus/")
+  ) {
+    return "hero";
   }
 
   // Default to admin workspace
-  return 'main-admin';
+  return "main-admin";
 };
 
 // hero 模式下的页面视图：#/hero 为对话界面，其余（#/home、空 hash、专题页兜底）为新首页
 const readHeroView = (): HeroView => {
-  if (typeof window === 'undefined') return 'home';
+  if (typeof window === "undefined") return "home";
   const hash = window.location.hash;
-  if (hash === '#/hero' || hash === '#/landing') return 'chat';
-  return 'home';
+  if (hash === "#/hero" || hash === "#/landing") return "chat";
+  return "home";
 };
 
 const getCurrentMainRoute = (): MainRoute => {
-  if (typeof window === 'undefined') return 'dashboard';
+  if (typeof window === "undefined") return "dashboard";
   const hash = window.location.hash;
   const match = hash.match(/^#\/main\/([^/?#]+)/);
-  return match?.[1] || 'dashboard';
+  return match?.[1] || "dashboard";
 };
 
 const readCampusTopicFromLocation = (): CampusTopicId | null => {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === "undefined") return null;
   const match = window.location.hash.match(/^#\/campus\/([^/?#]+)/);
-  const topicId = match?.[1] || '';
+  const topicId = match?.[1] || "";
   return isCampusTopicId(topicId) ? topicId : null;
 };
 
@@ -153,9 +168,11 @@ interface ActiveColumnView {
 }
 
 const readColumnArticleFromLocation = (): ActiveColumnView | null => {
-  if (typeof window === 'undefined') return null;
-  const match = window.location.hash.match(/^#\/campus\/([^/?#]+)(?:\/([^/?#]+))?/);
-  const first = match?.[1] || '';
+  if (typeof window === "undefined") return null;
+  const match = window.location.hash.match(
+    /^#\/campus\/([^/?#]+)(?:\/([^/?#]+))?/,
+  );
+  const first = match?.[1] || "";
   if (isSiteColumnId(first)) {
     const articleId = match?.[2];
     return {
@@ -171,24 +188,29 @@ const readColumnArticleFromLocation = (): ActiveColumnView | null => {
 };
 
 const readIsNewsFromLocation = (): boolean =>
-  typeof window !== 'undefined' && window.location.hash === '#/news';
+  typeof window !== "undefined" && window.location.hash === "#/news";
 
 function AppContent(): JSX.Element {
   const [showSidebar, setShowSidebar] = useState(true);
   const [isFooterCollapsed, setIsFooterCollapsed] = useState(false);
-  const [activeCampusTopic, setActiveCampusTopic] = useState<CampusTopicId | null>(
-    readCampusTopicFromLocation,
-  );
+  const [activeCampusTopic, setActiveCampusTopic] =
+    useState<CampusTopicId | null>(readCampusTopicFromLocation);
   // 官网 v2：栏目页（学校概况/办学成果/招生入学）与新闻中心的路由状态。
   // 三者都置位时栏目页优先（旧专题链接两态并存，渲染取栏目页）。
   const [activeColumn, setActiveColumn] = useState<ActiveColumnView | null>(
     readColumnArticleFromLocation,
   );
-  const [isNewsActive, setIsNewsActive] = useState<boolean>(readIsNewsFromLocation);
+  const [isNewsActive, setIsNewsActive] = useState<boolean>(
+    readIsNewsFromLocation,
+  );
   // 栏目页/新闻中心页头齿轮打开的设置侧栏（首页/对话页各自内部持有）
   const [heroSidebarOpen, setHeroSidebarOpen] = useState(false);
-  const [currentRoute, setCurrentRoute] = useState<AppRoute>(() => getCurrentRoute());
-  const [currentMainRoute, setCurrentMainRoute] = useState<MainRoute>(() => getCurrentMainRoute());
+  const [currentRoute, setCurrentRoute] = useState<AppRoute>(() =>
+    getCurrentRoute(),
+  );
+  const [currentMainRoute, setCurrentMainRoute] = useState<MainRoute>(() =>
+    getCurrentMainRoute(),
+  );
   const [heroView, setHeroView] = useState<HeroView>(() => readHeroView());
   // 未登录用户在专题页点「讲解」时弹出的登录浮层（浏览不中断，登录后自动回到原页面）
   const [authPrompt, setAuthPrompt] = useState(false);
@@ -198,10 +220,26 @@ function AppContent(): JSX.Element {
   // 竖屏大屏（壁挂数字屏/竖放平板）：hero 路由的画布层与文案样式走手机竖屏
   // 同款的全宽穿透形态，而非 md 档"右侧 55% / 低层级"的横屏布局
   const isPortraitBoard = usePortraitBoard();
+  // 手机窄屏（<768，含 kiosk 的 420 布局视口）：栏目/新闻页正文满宽无人物留白，
+  // 画布在这类页面隐藏（桌面端不受影响）。matchMedia 响应式，与 usePortraitBoard 同法
+  const [isNarrowVp, setIsNarrowVp] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 767px)").matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const onChange = () => setIsNarrowVp(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
   useOtaUpdate(); // App 在线更新检查（手机弹窗 / kiosk 静默换包；浏览器端内部短路）
   const live2dContainerRef = useRef<HTMLDivElement>(null);
   const currentLayoutRef = useRef({ showSidebar, isFooterCollapsed });
-  const previousLayoutRef = useRef<{ showSidebar: boolean; isFooterCollapsed: boolean } | null>(null);
+  const previousLayoutRef = useRef<{
+    showSidebar: boolean;
+    isFooterCollapsed: boolean;
+  } | null>(null);
   currentLayoutRef.current = { showSidebar, isFooterCollapsed };
 
   useEffect(() => {
@@ -223,15 +261,15 @@ function AppContent(): JSX.Element {
       setIsNewsActive(readIsNewsFromLocation());
       setHeroView(readHeroView());
     };
-    window.addEventListener('hashchange', syncRoute);
-    window.addEventListener('popstate', syncRoute);
+    window.addEventListener("hashchange", syncRoute);
+    window.addEventListener("popstate", syncRoute);
 
     // 初始检查
     syncRoute();
 
     return () => {
-      window.removeEventListener('hashchange', syncRoute);
-      window.removeEventListener('popstate', syncRoute);
+      window.removeEventListener("hashchange", syncRoute);
+      window.removeEventListener("popstate", syncRoute);
     };
   }, []);
 
@@ -256,7 +294,7 @@ function AppContent(): JSX.Element {
     setActiveCampusTopic(topicId);
     window.history.pushState(
       { campusTopic: topicId },
-      '',
+      "",
       `${window.location.pathname}${window.location.search}#/campus/${topicId}`,
     );
   };
@@ -269,30 +307,29 @@ function AppContent(): JSX.Element {
     window.location.hash = `#/campus/${columnId}/${article}`;
   };
   const goNewsPage = () => {
-    window.location.hash = '#/news';
+    window.location.hash = "#/news";
   };
   const goDialogPage = () => {
-    window.location.hash = '#/hero';
+    window.location.hash = "#/hero";
   };
   const goHomePage = () => {
-    window.location.hash = '#/home';
+    window.location.hash = "#/home";
   };
 
   const closeCampusTopic = () => {
     setActiveCampusTopic(null);
     // 返回到 hero 首页
-    window.location.hash = '#/hero';
+    window.location.hash = "#/hero";
   };
 
-    
-  document.documentElement.style.overflow = 'hidden';
-  document.body.style.overflow = 'hidden';
-  document.documentElement.style.height = '100%';
-  document.body.style.height = '100%';
-  document.documentElement.style.position = 'fixed';
-  document.body.style.position = 'fixed';
-  document.documentElement.style.width = '100%';
-  document.body.style.width = '100%';
+  document.documentElement.style.overflow = "hidden";
+  document.body.style.overflow = "hidden";
+  document.documentElement.style.height = "100%";
+  document.body.style.height = "100%";
+  document.documentElement.style.position = "fixed";
+  document.body.style.position = "fixed";
+  document.documentElement.style.width = "100%";
+  document.body.style.width = "100%";
 
   // body 滚动守卫：App 是固定视口应用（body 已被上方样式锁定），但
   // overflow:hidden 的元素仍可被浏览器程序化滚动——切页内容替换时滚动锚定
@@ -311,12 +348,14 @@ function AppContent(): JSX.Element {
       if (b.scrollTop !== 0) b.scrollTop = 0;
       if (b.scrollLeft !== 0) b.scrollLeft = 0;
     };
-    document.body.addEventListener('scroll', clamp, { passive: true });
-    document.documentElement.addEventListener('scroll', clamp, { passive: true });
+    document.body.addEventListener("scroll", clamp, { passive: true });
+    document.documentElement.addEventListener("scroll", clamp, {
+      passive: true,
+    });
     clamp();
     return () => {
-      document.body.removeEventListener('scroll', clamp);
-      document.documentElement.removeEventListener('scroll', clamp);
+      document.body.removeEventListener("scroll", clamp);
+      document.documentElement.removeEventListener("scroll", clamp);
     };
   }, []);
 
@@ -352,24 +391,51 @@ function AppContent(): JSX.Element {
   // 不再强制登录，进入「对话界面」才要求登录——家长/学生各用各的账号，会话按账号隔离。
   // 官网 v2：栏目/新闻也算浏览态（isOverlayView），画布为它们让出右侧位。
   const isOverlayView = !!activeCampusTopic || !!activeColumn || isNewsActive;
-  const isHomeViewGate = currentRoute === 'hero' && heroView === 'home' && !isOverlayView;
-  const isTopicViewGate = currentRoute === 'hero' && isOverlayView;
-  const isDialogViewGate = currentRoute === 'hero' && !isHomeViewGate && !isTopicViewGate;
-  if (isDialogViewGate && !authUser) {
-    return <AppLoginPage />;
-  }
+  // 手机窄屏浏览栏目/新闻：正文满宽没有人物留白区，画布隐藏防遮挡
+  // （首页 banner 人物区、对话页卡片人物位不受影响）
+  const hideHeroOnPhone = isNarrowVp && isOverlayView;
+  const isHomeViewGate =
+    currentRoute === "hero" && heroView === "home" && !isOverlayView;
+  const isTopicViewGate = currentRoute === "hero" && isOverlayView;
+  const isDialogViewGate =
+    currentRoute === "hero" && !isHomeViewGate && !isTopicViewGate;
+  // 对话页登录门禁浮层化（2026-09-27 App 端人物消失修复）：此前这里整树早退
+  // <AppLoginPage/>，Live2D 画布随之卸载，登录成功后画布重挂载+GL 全量重建，
+  // 真机 WebView 上重建失败即"登录后人物在对话页和首页全消失"（桌面浏览器侥幸存活）。
+  // 改为 z100 不透明浮层盖在 hero 树上（与下方 authPromptOverlay 同法）：
+  // 画布全程不卸载，登录页期间模型照常预加载，登录成功浮层退去人物原地不动。
+  const authGateOverlay =
+    isDialogViewGate && !authUser ? (
+      <Box
+        position="fixed"
+        top={0}
+        left={0}
+        width="100vw"
+        height="100vh"
+        zIndex={100}
+      >
+        <AppLoginPage />
+      </Box>
+    ) : null;
 
   // 专题页匿名点「讲解」：登录浮层盖在当前页面上，可取消继续浏览
   const authPromptOverlay = authPrompt && !authUser && (
-    <Box position="fixed" top={0} left={0} width="100vw" height="100vh" zIndex={100}>
+    <Box
+      position="fixed"
+      top={0}
+      left={0}
+      width="100vw"
+      height="100vh"
+      zIndex={100}
+    >
       <AppLoginPage onCancel={() => setAuthPrompt(false)} />
     </Box>
   );
 
   // Show Hero Landing page on hero route (still wrapped in all providers)
-  if (currentRoute === 'hero') {
+  if (currentRoute === "hero") {
     // 新首页：#/home / 空 hash 且未打开任何栏目/新闻/专题；#/hero 为对话界面
-    const isHomeView = heroView === 'home' && !isOverlayView;
+    const isHomeView = heroView === "home" && !isOverlayView;
     return (
       <>
         {/* Background layer for hero route（首页居中布局，关闭桌面端分屏遮罩） */}
@@ -381,12 +447,19 @@ function AppContent(): JSX.Element {
           position="absolute"
           top={0}
           right={0}
-          width={isHomeView || isPortraitBoard ? "100%" : { base: "100%", md: "55%" }}
+          width={
+            isHomeView || isPortraitBoard ? "100%" : { base: "100%", md: "55%" }
+          }
           height={{
             base: IS_KIOSK ? "var(--app-vh, 100vh)" : "100vh",
             md: isElectron ? "calc(100vh - 30px)" : "100vh",
           }}
-          zIndex={isPortraitBoard ? 15 : { base: 15, md: 1 }}
+          zIndex={isPortraitBoard ? 15 : { base: 35, md: 1 }}
+          /* 手机端画布提到 z35（内容 z20/栏目 z30 之上、页头 z40/设置面板之下）：
+             v2 官网化后首页/栏目页内容层压过画布（base15），人物被整页内容遮挡。
+             栏目/新闻页在手机窄屏正文满宽，人物无处立足——整层隐藏（visibility，
+             保留 GL 链，切回对话页/首页零重载）。桌面端 md:1 维持原分屏布局。 */
+          visibility={hideHeroOnPhone ? "hidden" : "visible"}
           /* 手机端：全屏穿透画布（pointerEvents none + window 级 hitTest 触摸）。
              人物可被拖到屏幕任意位置（包括卡片中间），且只有摸到模型本体
              才拦截触摸，其余区域完全放行——按钮/选项行/输入框全部正常。
@@ -396,7 +469,13 @@ function AppContent(): JSX.Element {
           <Live2D
             showSidebar={false}
             touchThrough
-            heroAlign={isHomeView ? 'center' : (activeColumn || isNewsActive) ? 'column' : 'right'}
+            heroAlign={
+              isHomeView
+                ? "center"
+                : activeColumn || isNewsActive
+                  ? "column"
+                  : "right"
+            }
           />
         </Box>
 
@@ -408,7 +487,13 @@ function AppContent(): JSX.Element {
             top={0}
             left={0}
             width="100%"
-            height={IS_KIOSK ? "var(--app-vh, 100vh)" : (isElectron ? "calc(100vh - 30px)" : "100vh")}
+            height={
+              IS_KIOSK
+                ? "var(--app-vh, 100vh)"
+                : isElectron
+                  ? "calc(100vh - 30px)"
+                  : "100vh"
+            }
             zIndex={2}
             pointerEvents="none"
           >
@@ -430,7 +515,7 @@ function AppContent(): JSX.Element {
         {(activeColumn || isNewsActive) && (
           <Box position="absolute" top={0} left={0} width="100%" zIndex={40}>
             <SiteHeader
-              activeNav={activeColumn ? activeColumn.column : 'news'}
+              activeNav={activeColumn ? activeColumn.column : "news"}
               onNavigateColumn={goColumnArticle}
               onNavigateNews={goNewsPage}
               onGoChat={goDialogPage}
@@ -453,31 +538,31 @@ function AppContent(): JSX.Element {
 
         {/* Subtitle for hero page - 手机端对话卡片内已展示文本，隐藏；栏目/新闻/专题/新首页隐藏 */}
         {!isOverlayView && !isHomeView && (
-        <Box
-          position="absolute"
-          bottom={{ base: "8%", md: "12%" }}
-          right={{ base: "0", md: "0" }}
-          left={{ base: "auto", md: "auto" }}
-          zIndex={20}
-          width={{ base: "85%", md: "45%" }}
-          textAlign="center"
-          pointerEvents="none"
-          paddingRight={{ base: "8", md: "12" }}
-          display={{ base: "none", md: "block" }}
-        >
           <Box
-            bg="rgba(255, 255, 255, 0.95)"
-            borderRadius="16px"
-            padding="16px 24px"
-            boxShadow="0 4px 20px rgba(0, 0, 0, 0.1)"
-            backdropFilter="blur(10px)"
-            border="1px solid rgba(255, 255, 255, 0.5)"
-            margin="0 auto"
-            maxWidth="400px"
+            position="absolute"
+            bottom={{ base: "8%", md: "12%" }}
+            right={{ base: "0", md: "0" }}
+            left={{ base: "auto", md: "auto" }}
+            zIndex={20}
+            width={{ base: "85%", md: "45%" }}
+            textAlign="center"
+            pointerEvents="none"
+            paddingRight={{ base: "8", md: "12" }}
+            display={{ base: "none", md: "block" }}
           >
-            <Subtitle />
+            <Box
+              bg="rgba(255, 255, 255, 0.95)"
+              borderRadius="16px"
+              padding="16px 24px"
+              boxShadow="0 4px 20px rgba(0, 0, 0, 0.1)"
+              backdropFilter="blur(10px)"
+              border="1px solid rgba(255, 255, 255, 0.5)"
+              margin="0 auto"
+              maxWidth="400px"
+            >
+              <Subtitle />
+            </Box>
           </Box>
-        </Box>
         )}
 
         {/* 官网 v2 渲染链：新首页 → 栏目页（学校概况/办学成果/招生入学，含旧专题
@@ -496,68 +581,66 @@ function AppContent(): JSX.Element {
         ) : isNewsActive ? (
           <NewsPage onNavigateHome={goHomePage} />
         ) : (
-          <HeroLanding
-            activeCampusTopic={activeCampusTopic}
-          />
+          <HeroLanding activeCampusTopic={activeCampusTopic} />
         )}
 
         {/* 专题页匿名点「讲解」触发的登录浮层（盖在当前页面上，可取消） */}
         {authPromptOverlay}
+        {authGateOverlay}
       </>
     );
   }
 
   // Admin workspace page - school themed management dashboard
-  if (currentRoute === 'main-admin') {
+  if (currentRoute === "main-admin") {
     // 登录守卫：管理后台仅 admin（最高权限管理员）/ editor（数据管理员）可进入；
     // 学生（user）/ 家长（parent）无权限
-    if (!authUser || (authUser.role !== 'admin' && authUser.role !== 'editor')) {
+    if (
+      !authUser ||
+      (authUser.role !== "admin" && authUser.role !== "editor")
+    ) {
       return <AppLoginPage />;
     }
 
     let content;
     switch (currentMainRoute) {
-      case 'dashboard':
+      case "dashboard":
         content = <SchoolDashboard />;
         break;
-      case 'test-conversation':
+      case "test-conversation":
         content = <SchoolTestConversation />;
         break;
-      case 'workspace':
+      case "workspace":
         content = <ModernMainWorkspace />;
         break;
-      case 'unanswered-questions':
+      case "unanswered-questions":
         content = <UnansweredQuestions />;
         break;
-      case 'user-management':
+      case "user-management":
         content = <UserManagement />;
         break;
-      case 'character-config':
+      case "character-config":
         content = <CharacterConfig />;
         break;
-      case 'document-knowledge':
+      case "document-knowledge":
         content = <DocumentKnowledge />;
         break;
-      case 'system-logs':
+      case "system-logs":
         content = <SystemLogs />;
         break;
-      case 'knowledge-admin':
+      case "knowledge-admin":
         return <KnowledgeAdmin />;
       default:
         content = <SchoolDashboard />;
     }
 
-    return (
-      <SchoolAdminLayout>
-        {content}
-      </SchoolAdminLayout>
-    );
+    return <SchoolAdminLayout>{content}</SchoolAdminLayout>;
   }
 
   return (
     <>
       {/* 工作台模式 - 现代化管理界面（默认） */}
-      {currentRoute === 'main' && (
+      {currentRoute === "main" && (
         <>
           {/* 使用工作台风格的侧边栏 */}
           <ModernSidebar
@@ -567,26 +650,26 @@ function AppContent(): JSX.Element {
 
           {/* 主内容区域 */}
           <Box
-            ml={showSidebar ? '280px' : '80px'}
+            ml={showSidebar ? "280px" : "80px"}
             height="100vh"
             transition="margin-left 0.3s ease"
             position="relative"
           >
             {/* Live2D 层 */}
             <Box
-              {...(mode === "window"
-                ? live2dWindowFrameStyle
-                : live2dPetStyle)}
-              marginLeft={showSidebar ? '0px' : '0px'}
+              {...(mode === "window" ? live2dWindowFrameStyle : live2dPetStyle)}
+              marginLeft={showSidebar ? "0px" : "0px"}
             >
               <Box
                 ref={live2dContainerRef}
                 position="absolute"
                 top="0"
                 right="0"
-                width={mode === 'window' && activeCampusTopic
-                  ? { base: '100%', lg: '42%' }
-                  : '100%'}
+                width={
+                  mode === "window" && activeCampusTopic
+                    ? { base: "100%", lg: "42%" }
+                    : "100%"
+                }
                 height="100%"
                 pointerEvents="auto"
                 transition="width 0.35s cubic-bezier(0.4, 0, 0.2, 1)"
@@ -612,10 +695,14 @@ function AppContent(): JSX.Element {
                   <Box
                     position="absolute"
                     bottom={isFooterCollapsed ? "39px" : "185px"}
-                    left={activeCampusTopic ? { base: '50%', lg: '79%' } : '50%'}
+                    left={
+                      activeCampusTopic ? { base: "50%", lg: "79%" } : "50%"
+                    }
                     transform="translateX(-50%)"
                     zIndex={10}
-                    width={activeCampusTopic ? { base: '80%', lg: '36%' } : '60%'}
+                    width={
+                      activeCampusTopic ? { base: "80%", lg: "36%" } : "60%"
+                    }
                     transition="all 0.3s ease"
                   >
                     <Subtitle />
@@ -667,41 +754,41 @@ function AdminPanelWrapper(): JSX.Element | null {
 function AppWithGlobalStyles(): JSX.Element {
   const content = (
     <AuthProvider>
-    <CameraProvider>
-      <ScreenCaptureProvider>
-        <CharacterConfigProvider>
-          <ChatHistoryProvider>
-            <VolumeProvider>
-              <AiStateProvider>
-              <ProactiveSpeakProvider>
-                <Live2DConfigProvider>
-                  <SubtitleProvider>
-                    <VADProvider>
-                      <BgUrlProvider>
-                        <GroupProvider>
-                          <BrowserProvider>
-                            <KnowledgeProvider>
-                              <AdminProvider>
-                                <WebSocketHandler>
-                                  <Toaster />
-                                  <AppContent />
-                              </WebSocketHandler>
-                                <AdminPanelWrapper />
-                            </AdminProvider>
-                          </KnowledgeProvider>
-                        </BrowserProvider>
-                      </GroupProvider>
-                      </BgUrlProvider>
-                    </VADProvider>
-                  </SubtitleProvider>
-                </Live2DConfigProvider>
-              </ProactiveSpeakProvider>
-            </AiStateProvider>
-            </VolumeProvider>
-          </ChatHistoryProvider>
-        </CharacterConfigProvider>
-      </ScreenCaptureProvider>
-    </CameraProvider>
+      <CameraProvider>
+        <ScreenCaptureProvider>
+          <CharacterConfigProvider>
+            <ChatHistoryProvider>
+              <VolumeProvider>
+                <AiStateProvider>
+                  <ProactiveSpeakProvider>
+                    <Live2DConfigProvider>
+                      <SubtitleProvider>
+                        <VADProvider>
+                          <BgUrlProvider>
+                            <GroupProvider>
+                              <BrowserProvider>
+                                <KnowledgeProvider>
+                                  <AdminProvider>
+                                    <WebSocketHandler>
+                                      <Toaster />
+                                      <AppContent />
+                                    </WebSocketHandler>
+                                    <AdminPanelWrapper />
+                                  </AdminProvider>
+                                </KnowledgeProvider>
+                              </BrowserProvider>
+                            </GroupProvider>
+                          </BgUrlProvider>
+                        </VADProvider>
+                      </SubtitleProvider>
+                    </Live2DConfigProvider>
+                  </ProactiveSpeakProvider>
+                </AiStateProvider>
+              </VolumeProvider>
+            </ChatHistoryProvider>
+          </CharacterConfigProvider>
+        </ScreenCaptureProvider>
+      </CameraProvider>
     </AuthProvider>
   );
 
@@ -714,18 +801,14 @@ function AppWithGlobalStyles(): JSX.Element {
         transformOrigin="top left"
         /* clip 而非 hidden：hidden 仍可被程序化滚动（scrollIntoView 会把整个
            包装盒滚下去、内容顶出屏），clip 在 Chrome90+ 完全禁滚 */
-        style={{ overflow: 'clip' }}
+        style={{ overflow: "clip" }}
       >
         {content}
       </Box>
     );
   }
 
-  return (
-    <>
-      {content}
-    </>
-  );
+  return <>{content}</>;
 }
 
 export default App;

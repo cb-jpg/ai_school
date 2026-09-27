@@ -7,13 +7,13 @@
 import { useEffect, useRef, useCallback, useState, RefObject } from "react";
 import { ModelInfo } from "@/context/live2d-config-context";
 import { resolveApiBaseUrl } from "@/services/api-base";
-import { updateModelConfig } from '../../../WebSDK/src/lappdefine';
-import { LAppDelegate } from '../../../WebSDK/src/lappdelegate';
-import { LAppLive2DManager } from '../../../WebSDK/src/lapplive2dmanager';
-import { initializeLive2D } from '@cubismsdksamples/main';
-import { useMode } from '@/context/mode-context';
-import { usePortraitBoard } from '@/hooks/utils/use-portrait-board';
-import { isPhoneStyleViewport } from '@/utils/device-profile';
+import { updateModelConfig } from "../../../WebSDK/src/lappdefine";
+import { LAppDelegate } from "../../../WebSDK/src/lappdelegate";
+import { LAppLive2DManager } from "../../../WebSDK/src/lapplive2dmanager";
+import { initializeLive2D } from "@cubismsdksamples/main";
+import { useMode } from "@/context/mode-context";
+import { usePortraitBoard } from "@/hooks/utils/use-portrait-board";
+import { isPhoneStyleViewport } from "@/utils/device-profile";
 
 interface UseLive2DModelProps {
   modelInfo: ModelInfo | undefined;
@@ -25,7 +25,7 @@ interface UseLive2DModelProps {
   /** hero 页人物站位（手机 + 大屏一体机适配生效，见 isPhoneStyleViewport）：
    *  center=首页（banner 右侧）；column=栏目/新闻页（桌面：banner 之下内容区右侧）；
    *  right=对话界面（桌面恢复加载默认居中；两者站位在手机/一体机上一致） */
-  heroAlign?: 'center' | 'right' | 'column';
+  heroAlign?: "center" | "right" | "column";
 }
 
 interface Position {
@@ -93,28 +93,32 @@ const HOME_BOARD_FIT_FACTOR = 0.95;
 const HOME_BOARD_CENTER_Y = -0.34;
 const HOME_BOARD_OFFSET_F = 0.5; // 首页：50% 屏宽（原视图坐标 x=0）
 
-function parseModelUrl(url: string): { baseUrl: string; modelDir: string; modelFileName: string } {
+function parseModelUrl(url: string): {
+  baseUrl: string;
+  modelDir: string;
+  modelFileName: string;
+} {
   try {
-    console.log('[parseModelUrl] Parsing URL:', url);
+    console.log("[parseModelUrl] Parsing URL:", url);
 
     // 如果是相对路径，转换为后端绝对地址
     let absoluteUrl = url;
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
       const base = resolveApiBaseUrl();
-      absoluteUrl = `${base}${url.startsWith('/') ? url : '/' + url}`;
+      absoluteUrl = `${base}${url.startsWith("/") ? url : "/" + url}`;
     }
 
     const urlObj = new URL(absoluteUrl);
     const { pathname } = urlObj;
 
     // Find the model3.json file
-    const lastSlashIndex = pathname.lastIndexOf('/');
+    const lastSlashIndex = pathname.lastIndexOf("/");
     if (lastSlashIndex === -1) {
-      throw new Error('Invalid model URL format');
+      throw new Error("Invalid model URL format");
     }
 
     const fullFileName = pathname.substring(lastSlashIndex + 1);
-    const modelFileName = fullFileName.replace('.model3.json', '');
+    const modelFileName = fullFileName.replace(".model3.json", "");
 
     // baseUrl should be the server root (protocol + host)
     const baseUrl = `${urlObj.protocol}//${urlObj.host}`;
@@ -123,62 +127,75 @@ function parseModelUrl(url: string): { baseUrl: string; modelDir: string; modelF
     // e.g., "/live2d-models/mao_pro/runtime" for "/live2d-models/mao_pro/runtime/mao_pro.model3.json"
     const modelDir = pathname.substring(0, lastSlashIndex);
 
-    console.log('[parseModelUrl] Result:', { baseUrl, modelDir, modelFileName });
+    console.log("[parseModelUrl] Result:", {
+      baseUrl,
+      modelDir,
+      modelFileName,
+    });
     return { baseUrl, modelDir, modelFileName };
   } catch (error) {
-    console.error('[parseModelUrl] Error parsing model URL:', error, 'URL was:', url);
-    return { baseUrl: '', modelDir: '', modelFileName: '' };
+    console.error(
+      "[parseModelUrl] Error parsing model URL:",
+      error,
+      "URL was:",
+      url,
+    );
+    return { baseUrl: "", modelDir: "", modelFileName: "" };
   }
 }
 
-export const playAudioWithLipSync = (audioPath: string, modelIndex = 0): Promise<void> => new Promise((resolve, reject) => {
-  const live2dManager = window.LAppLive2DManager?.getInstance();
-  if (!live2dManager) {
-    reject(new Error('Live2D manager not initialized'));
-    return;
-  }
-
-  const fullPath = `/Resources/${audioPath}`;
-  const audio = new Audio(fullPath);
-
-  audio.addEventListener('canplaythrough', () => {
-    const model = live2dManager.getModel(modelIndex);
-    if (model) {
-      if (model._wavFileHandler) {
-        model._wavFileHandler.start(fullPath);
-        audio.play();
-      } else {
-        reject(new Error('Wav file handler not available on model'));
-      }
-    } else {
-      reject(new Error(`Model index ${modelIndex} not found`));
+export const playAudioWithLipSync = (
+  audioPath: string,
+  modelIndex = 0,
+): Promise<void> =>
+  new Promise((resolve, reject) => {
+    const live2dManager = window.LAppLive2DManager?.getInstance();
+    if (!live2dManager) {
+      reject(new Error("Live2D manager not initialized"));
+      return;
     }
-  });
 
-  audio.addEventListener('ended', () => {
-    resolve();
-  });
+    const fullPath = `/Resources/${audioPath}`;
+    const audio = new Audio(fullPath);
 
-  audio.addEventListener('error', () => {
-    reject(new Error(`Failed to load audio: ${fullPath}`));
-  });
+    audio.addEventListener("canplaythrough", () => {
+      const model = live2dManager.getModel(modelIndex);
+      if (model) {
+        if (model._wavFileHandler) {
+          model._wavFileHandler.start(fullPath);
+          audio.play();
+        } else {
+          reject(new Error("Wav file handler not available on model"));
+        }
+      } else {
+        reject(new Error(`Model index ${modelIndex} not found`));
+      }
+    });
 
-  audio.load();
-});
+    audio.addEventListener("ended", () => {
+      resolve();
+    });
+
+    audio.addEventListener("error", () => {
+      reject(new Error(`Failed to load audio: ${fullPath}`));
+    });
+
+    audio.load();
+  });
 
 export const useLive2DModel = ({
   modelInfo,
   canvasRef,
   touchThrough = false,
-  heroAlign = 'right',
+  heroAlign = "right",
 }: UseLive2DModelProps) => {
   // 站位换算在适配时使用；页面切换（首页↔对话界面）会触发重新适配到对应站位
-  const isHomeAlign = heroAlign === 'center';
+  const isHomeAlign = heroAlign === "center";
   // 竖屏大屏（桌面竖窗/竖放平板的全尺寸视口）换用大屏站位常量（人物比例与
   // 站位按大屏排版）；手机与一体机（420 视口）用真机校准的 手机 组常量
   const isBoard = usePortraitBoard();
   const { mode } = useMode();
-  const isPet = mode === 'pet';
+  const isPet = mode === "pet";
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState<Position>({ x: 0, y: 0 });
   const dragStartPos = useRef<Position>({ x: 0, y: 0 }); // Screen coordinates at drag start
@@ -188,7 +205,8 @@ export const useLive2DModel = ({
   // 换模型（实例身份变化）自动重新捕获
   const baseScaleRef = useRef<number | null>(null);
   const baseModelRef = useRef<{ _modelMatrix?: unknown } | null>(null);
-  const prevModelUrlRef = useRef<string | null>(null);
+  // 模型身份（去协议/主机的路径），而非原始 URL 字符串——见下方 effect 内注释
+  const prevModelIdentityRef = useRef<string | null>(null);
   const isHoveringModelRef = useRef(false);
   const electronApi = (window as any).electron;
 
@@ -200,53 +218,79 @@ export const useLive2DModel = ({
 
   useEffect(() => {
     const currentUrl = modelInfo?.url;
+    if (!currentUrl) return;
     const sdkScale = (window as any).LAppDefine?.CurrentKScale;
-    const modelScale = modelInfo?.kScale !== undefined ? Number(modelInfo.kScale) : undefined;
+    const modelScale =
+      modelInfo?.kScale !== undefined ? Number(modelInfo.kScale) : undefined;
 
-    const needsUpdate = currentUrl &&
-                        (currentUrl !== prevModelUrlRef.current ||
-                         (sdkScale !== undefined && modelScale !== undefined && sdkScale !== modelScale));
+    // 模型身份 = 去协议/主机的路径：匿名态（官网/首页）走 /live2d-models/info 的相对
+    // 路径，登录后 WS set-model-and-conf 推的是同主机绝对路径——同一个模型文件。
+    // 按原始字符串比较会把这次登录误判为"换了模型"，触发 releaseInstance + 重建 GL，
+    // 真机 WebView（App 端）上正是登录后人物直接消失的来源（桌面浏览器侥幸存活）。
+    // 故按身份比较：同一路径且 kScale 未变就不重载，登录前后模型保持原地不动。
+    let identity: string;
+    try {
+      identity = new URL(currentUrl, window.location.origin).pathname;
+    } catch {
+      identity = currentUrl;
+    }
+    const scaleChanged =
+      sdkScale !== undefined &&
+      modelScale !== undefined &&
+      sdkScale !== modelScale;
+    if (identity === prevModelIdentityRef.current && !scaleChanged) return;
+    prevModelIdentityRef.current = identity;
 
-    if (needsUpdate) {
-      prevModelUrlRef.current = currentUrl;
+    try {
+      const { baseUrl, modelDir, modelFileName } = parseModelUrl(currentUrl);
 
-      try {
-        const { baseUrl, modelDir, modelFileName } = parseModelUrl(currentUrl);
+      if (baseUrl && modelDir) {
+        console.log("[useLive2DModel] Updating model config:", {
+          baseUrl,
+          modelDir,
+          modelFileName,
+        });
+        updateModelConfig(
+          baseUrl,
+          modelDir,
+          modelFileName,
+          Number(modelInfo.kScale),
+        );
 
-        if (baseUrl && modelDir) {
-          console.log('[useLive2DModel] Updating model config:', { baseUrl, modelDir, modelFileName });
-          updateModelConfig(baseUrl, modelDir, modelFileName, Number(modelInfo.kScale));
+        // Wait for canvas to be rendered before initializing Live2D
+        setTimeout(() => {
+          // Check if canvas exists before proceeding
+          const canvasElement = document.getElementById("canvas");
+          if (!canvasElement) {
+            console.warn(
+              "[useLive2DModel] Canvas not found, skipping initialization",
+            );
+            return;
+          }
 
-          // Wait for canvas to be rendered before initializing Live2D
-          setTimeout(() => {
-            // Check if canvas exists before proceeding
-            const canvasElement = document.getElementById('canvas');
-            if (!canvasElement) {
-              console.warn('[useLive2DModel] Canvas not found, skipping initialization');
-              return;
-            }
+          // 释放现有实例
+          if ((window as any).LAppLive2DManager?.releaseInstance) {
+            console.log("[useLive2DModel] Releasing existing Live2D manager");
+            (window as any).LAppLive2DManager.releaseInstance();
+          }
 
-            // 释放现有实例
-            if ((window as any).LAppLive2DManager?.releaseInstance) {
-              console.log('[useLive2DModel] Releasing existing Live2D manager');
-              (window as any).LAppLive2DManager.releaseInstance();
-            }
-
-            // 重新初始化Live2D
-            console.log('[useLive2DModel] Reinitializing Live2D');
-            try {
-              initializeLive2D();
-              // SPA 路由往返时组件重挂载，本 effect 重建 GL 链并重新绑定 canvas；
-              // 通知 hero 适配逻辑重新执行初始站位
-              window.dispatchEvent(new Event('live2d-rebound'));
-            } catch (error) {
-              console.error('[useLive2DModel] Error during Live2D initialization:', error);
-            }
-          }, 500);
-        }
-      } catch (error) {
-        console.error('[useLive2DModel] Error processing model URL:', error);
+          // 重新初始化Live2D
+          console.log("[useLive2DModel] Reinitializing Live2D");
+          try {
+            initializeLive2D();
+            // SPA 路由往返时组件重挂载，本 effect 重建 GL 链并重新绑定 canvas；
+            // 通知 hero 适配逻辑重新执行初始站位
+            window.dispatchEvent(new Event("live2d-rebound"));
+          } catch (error) {
+            console.error(
+              "[useLive2DModel] Error during Live2D initialization:",
+              error,
+            );
+          }
+        }, 500);
       }
+    } catch (error) {
+      console.error("[useLive2DModel] Error processing model URL:", error);
     }
   }, [modelInfo?.url, modelInfo?.kScale]);
 
@@ -304,7 +348,7 @@ export const useLive2DModel = ({
   // "加载默认缩放"在模型实例首次就绪时捕获（换模型按实例识别自动重新捕获）。
   useEffect(() => {
     if (!touchThrough) return undefined;
-    const isColumnAlign = heroAlign === 'column';
+    const isColumnAlign = heroAlign === "column";
     // 目标站位：fitFactor（绝对视图缩放）与 xScreenFrac（屏宽比例，须全宽画布）
     // 为一组；桌面右侧 55% 画布（对话/栏目/新闻）改用 baseScaleMul×默认缩放与
     // 视图坐标 xViewStatic/yView
@@ -348,9 +392,13 @@ export const useLive2DModel = ({
         // 就绪判据 = 位图宽达到 clientWidth×dpr（2026-09-22 改：旧判据
         // `width <= clientWidth` 在 dpr=1 的桌面浏览器上永远成立，首页 banner
         // 站位适配被跳过，人物停在默认居中位）。
-        const canvasEl = document.getElementById('canvas') as HTMLCanvasElement | null;
+        const canvasEl = document.getElementById(
+          "canvas",
+        ) as HTMLCanvasElement | null;
         if (!canvasEl) return;
-        const expectedW = Math.round(canvasEl.clientWidth * (window.devicePixelRatio || 1));
+        const expectedW = Math.round(
+          canvasEl.clientWidth * (window.devicePixelRatio || 1),
+        );
         if (canvasEl.width < expectedW - 1) return;
         clearInterval(poll);
         clearTimeout(stop);
@@ -364,7 +412,8 @@ export const useLive2DModel = ({
             baseScaleRef.current = current;
           }
           const base = baseScaleRef.current || 1;
-          const targetScale = fitFactor !== null ? fitFactor : base * baseScaleMul;
+          const targetScale =
+            fitFactor !== null ? fitFactor : base * baseScaleMul;
           const ratio = targetScale / current;
           if (Math.abs(ratio - 1) > 0.001) {
             matrix.scaleRelative(ratio, ratio);
@@ -381,7 +430,7 @@ export const useLive2DModel = ({
           matrix.setMatrix(arr);
           modelPositionRef.current = { x: xViewStatic, y: yView };
         } catch (err) {
-          console.error('[useLive2DModel] hero fit failed:', err);
+          console.error("[useLive2DModel] hero fit failed:", err);
         }
       }, 300);
       const stop = setTimeout(() => clearInterval(poll), 20000);
@@ -408,22 +457,22 @@ export const useLive2DModel = ({
         onRebound();
       }, 350);
     };
-    window.addEventListener('live2d-rebound', onRebound);
-    window.addEventListener('hashchange', onHashChange);
+    window.addEventListener("live2d-rebound", onRebound);
+    window.addEventListener("hashchange", onHashChange);
     return () => {
       cancelled = true;
       cleanup();
       outerStop?.();
       if (hashTimer) clearTimeout(hashTimer);
-      window.removeEventListener('live2d-rebound', onRebound);
-      window.removeEventListener('hashchange', onHashChange);
+      window.removeEventListener("live2d-rebound", onRebound);
+      window.removeEventListener("hashchange", onHashChange);
     };
     // heroAlign 变化（首页 ↔ 对话 ↔ 栏目/新闻）时重新适配站位；
     // 已适配过时比例≈1 不再缩放，只平移到目标站位
   }, [touchThrough, modelInfo?.url, heroAlign, isBoard, isHomeAlign]);
 
   const getCanvasScale = useCallback(() => {
-    const canvas = document.getElementById('canvas') as HTMLCanvasElement;
+    const canvas = document.getElementById("canvas") as HTMLCanvasElement;
     if (!canvas) return { width: 1, height: 1, scale: 1 };
 
     const { width } = canvas;
@@ -433,200 +482,245 @@ export const useLive2DModel = ({
     return { width, height, scale };
   }, []);
 
-  const screenToModelPosition = useCallback((screenX: number, screenY: number) => {
-    const { width, height, scale } = getCanvasScale();
+  const screenToModelPosition = useCallback(
+    (screenX: number, screenY: number) => {
+      const { width, height, scale } = getCanvasScale();
 
-    const x = ((screenX * scale) / width) * 2 - 1;
-    const y = -((screenY * scale) / height) * 2 + 1;
+      const x = ((screenX * scale) / width) * 2 - 1;
+      const y = -((screenY * scale) / height) * 2 + 1;
 
-    return { x, y };
-  }, [getCanvasScale]);
+      return { x, y };
+    },
+    [getCanvasScale],
+  );
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    const adapter = (window as any).getLAppAdapter?.();
-    if (!adapter || !canvasRef.current) return;
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      const adapter = (window as any).getLAppAdapter?.();
+      if (!adapter || !canvasRef.current) return;
 
-    const model = adapter.getModel();
-    const view = LAppDelegate.getInstance().getView();
-    if (!view || !model) return;
+      const model = adapter.getModel();
+      const view = LAppDelegate.getInstance().getView();
+      if (!view || !model) return;
 
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left; // Screen X relative to canvas
-    const y = e.clientY - rect.top; // Screen Y relative to canvas
-
-    // --- Check if click is on model ---
-    // kiosk：rect 是缩放后物理尺寸，clientWidth 是缩放前布局宽——按后者换算命中点会放大 2.29×
-    const scale = canvas.width / rect.width;
-    const scaledX = x * scale;
-    const scaledY = y * scale;
-    const modelX = view._deviceToScreen.transformX(scaledX);
-    const modelY = view._deviceToScreen.transformY(scaledY);
-
-    const hitAreaName = model.anyhitTest(modelX, modelY);
-    const isHitOnModel = model.isHitOnModel(modelX, modelY);
-    // --- End Check ---
-
-    if (hitAreaName !== null || isHitOnModel) {
-      // Record potential tap/drag start
-      mouseDownTimeRef.current = Date.now();
-      mouseDownPosRef.current = { x: e.clientX, y: e.clientY }; // Use clientX/Y for distance check
-      isPotentialTapRef.current = true;
-      setIsDragging(false); // Ensure dragging is false initially
-
-      // Store initial model position IF drag starts later
-      if (model._modelMatrix) {
-        const matrix = model._modelMatrix.getArray();
-        modelStartPos.current = { x: matrix[12], y: matrix[13] };
-      }
-    }
-  }, [canvasRef, modelInfo]);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    const adapter = (window as any).getLAppAdapter?.();
-    const view = LAppDelegate.getInstance().getView();
-    const model = adapter?.getModel();
-
-    // --- Start Drag Logic ---
-    if (isPotentialTapRef.current && adapter && view && model && canvasRef.current) {
-      const timeElapsed = Date.now() - mouseDownTimeRef.current;
-      const deltaX = e.clientX - mouseDownPosRef.current.x;
-      const deltaY = e.clientY - mouseDownPosRef.current.y;
-      const distanceMoved = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-
-      // Check if it's a drag (moved enough distance OR held long enough while moving slightly)
-      if (distanceMoved > DRAG_DISTANCE_THRESHOLD_PX || (timeElapsed > TAP_DURATION_THRESHOLD_MS && distanceMoved > 1)) {
-        isPotentialTapRef.current = false; // It's a drag, not a tap
-        setIsDragging(true);
-
-        // Set initial drag screen position using the position from mousedown
-        const canvas = canvasRef.current;
-        const rect = canvas.getBoundingClientRect();
-        dragStartPos.current = {
-          x: mouseDownPosRef.current.x - rect.left,
-          y: mouseDownPosRef.current.y - rect.top,
-        };
-        // modelStartPos is already set in handleMouseDown
-      }
-    }
-    // --- End Start Drag Logic ---
-
-    // --- Continue Drag Logic ---
-    if (isDragging && adapter && view && model && canvasRef.current) {
       const canvas = canvasRef.current;
       const rect = canvas.getBoundingClientRect();
-      const currentX = e.clientX - rect.left; // Current screen X relative to canvas
-      const currentY = e.clientY - rect.top; // Current screen Y relative to canvas
+      const x = e.clientX - rect.left; // Screen X relative to canvas
+      const y = e.clientY - rect.top; // Screen Y relative to canvas
 
-      // Convert screen delta to model delta
+      // --- Check if click is on model ---
       // kiosk：rect 是缩放后物理尺寸，clientWidth 是缩放前布局宽——按后者换算命中点会放大 2.29×
-    const scale = canvas.width / rect.width;
-      const startScaledX = dragStartPos.current.x * scale;
-      const startScaledY = dragStartPos.current.y * scale;
-      const startModelX = view._deviceToScreen.transformX(startScaledX);
-      const startModelY = view._deviceToScreen.transformY(startScaledY);
-
-      const currentScaledX = currentX * scale;
-      const currentScaledY = currentY * scale;
-      const currentModelX = view._deviceToScreen.transformX(currentScaledX);
-      const currentModelY = view._deviceToScreen.transformY(currentScaledY);
-
-      const dx = currentModelX - startModelX;
-      const dy = currentModelY - startModelY;
-
-      const newX = modelStartPos.current.x + dx;
-      const newY = modelStartPos.current.y + dy;
-
-      // Use the adapter's setModelPosition method if available, otherwise update matrix directly
-      if (adapter.setModelPosition) {
-        adapter.setModelPosition(newX, newY);
-      } else if (model._modelMatrix) {
-        const matrix = model._modelMatrix.getArray();
-        const newMatrix = [...matrix];
-        newMatrix[12] = newX;
-        newMatrix[13] = newY;
-        model._modelMatrix.setMatrix(newMatrix);
-      }
-
-      modelPositionRef.current = { x: newX, y: newY };
-      setPosition({ x: newX, y: newY }); // Update React state if needed for UI feedback
-    }
-    // --- End Continue Drag Logic ---
-
-    // --- Pet Hover Logic (Unchanged) ---
-    if (isPet && !isDragging && !isPotentialTapRef.current && electronApi && adapter && view && model && canvasRef.current) {
-      const canvas = canvasRef.current;
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      // kiosk：rect 是缩放后物理尺寸，clientWidth 是缩放前布局宽——按后者换算命中点会放大 2.29×
-    const scale = canvas.width / rect.width;
+      const scale = canvas.width / rect.width;
       const scaledX = x * scale;
       const scaledY = y * scale;
       const modelX = view._deviceToScreen.transformX(scaledX);
       const modelY = view._deviceToScreen.transformY(scaledY);
 
-      const currentHitState = model.anyhitTest(modelX, modelY) !== null || model.isHitOnModel(modelX, modelY);
+      const hitAreaName = model.anyhitTest(modelX, modelY);
+      const isHitOnModel = model.isHitOnModel(modelX, modelY);
+      // --- End Check ---
 
-      if (currentHitState !== isHoveringModelRef.current) {
-        isHoveringModelRef.current = currentHitState;
-        electronApi.ipcRenderer.send('update-component-hover', 'live2d-model', currentHitState);
-      }
-    }
-    // --- End Pet Hover Logic ---
-  }, [isPet, isDragging, electronApi, canvasRef]);
+      if (hitAreaName !== null || isHitOnModel) {
+        // Record potential tap/drag start
+        mouseDownTimeRef.current = Date.now();
+        mouseDownPosRef.current = { x: e.clientX, y: e.clientY }; // Use clientX/Y for distance check
+        isPotentialTapRef.current = true;
+        setIsDragging(false); // Ensure dragging is false initially
 
-  const handleMouseUp = useCallback((e: React.MouseEvent) => {
-    const adapter = (window as any).getLAppAdapter?.();
-    const model = adapter?.getModel();
-    const view = LAppDelegate.getInstance().getView();
-
-    if (isDragging) {
-      // Finalize drag
-      setIsDragging(false);
-      if (adapter) {
-        const currentModel = adapter.getModel(); // Re-get model in case adapter changed
-        if (currentModel && currentModel._modelMatrix) {
-          const matrix = currentModel._modelMatrix.getArray();
-          const finalPos = { x: matrix[12], y: matrix[13] };
-          modelPositionRef.current = finalPos;
-          modelStartPos.current = finalPos; // Update base position for next potential drag
-          setPosition(finalPos);
+        // Store initial model position IF drag starts later
+        if (model._modelMatrix) {
+          const matrix = model._modelMatrix.getArray();
+          modelStartPos.current = { x: matrix[12], y: matrix[13] };
         }
       }
-    } else if (isPotentialTapRef.current && adapter && model && view && canvasRef.current) {
-      // --- Tap Motion Logic ---
-      const timeElapsed = Date.now() - mouseDownTimeRef.current;
-      const deltaX = e.clientX - mouseDownPosRef.current.x;
-      const deltaY = e.clientY - mouseDownPosRef.current.y;
-      const distanceMoved = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    },
+    [canvasRef, modelInfo],
+  );
 
-      // Check if it qualifies as a tap (short duration, minimal movement)
-      if (timeElapsed < TAP_DURATION_THRESHOLD_MS && distanceMoved < DRAG_DISTANCE_THRESHOLD_PX) {
-        const allowTapMotion = modelInfo?.pointerInteractive !== false;
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      const adapter = (window as any).getLAppAdapter?.();
+      const view = LAppDelegate.getInstance().getView();
+      const model = adapter?.getModel();
 
-        if (allowTapMotion && modelInfo?.tapMotions) {
-          // Use mouse down position for hit testing
+      // --- Start Drag Logic ---
+      if (
+        isPotentialTapRef.current &&
+        adapter &&
+        view &&
+        model &&
+        canvasRef.current
+      ) {
+        const timeElapsed = Date.now() - mouseDownTimeRef.current;
+        const deltaX = e.clientX - mouseDownPosRef.current.x;
+        const deltaY = e.clientY - mouseDownPosRef.current.y;
+        const distanceMoved = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+        // Check if it's a drag (moved enough distance OR held long enough while moving slightly)
+        if (
+          distanceMoved > DRAG_DISTANCE_THRESHOLD_PX ||
+          (timeElapsed > TAP_DURATION_THRESHOLD_MS && distanceMoved > 1)
+        ) {
+          isPotentialTapRef.current = false; // It's a drag, not a tap
+          setIsDragging(true);
+
+          // Set initial drag screen position using the position from mousedown
           const canvas = canvasRef.current;
           const rect = canvas.getBoundingClientRect();
-          // kiosk：rect 是缩放后物理尺寸，clientWidth 是缩放前布局宽——按后者换算命中点会放大 2.29×
-    const scale = canvas.width / rect.width;
-          const downX = (mouseDownPosRef.current.x - rect.left) * scale;
-          const downY = (mouseDownPosRef.current.y - rect.top) * scale;
-          const modelX = view._deviceToScreen.transformX(downX);
-          const modelY = view._deviceToScreen.transformY(downY);
-
-          const hitAreaName = model.anyhitTest(modelX, modelY);
-          // Trigger tap motion using the specific hit area name or null for general body tap
-          model.startTapMotion(hitAreaName, modelInfo.tapMotions);
+          dragStartPos.current = {
+            x: mouseDownPosRef.current.x - rect.left,
+            y: mouseDownPosRef.current.y - rect.top,
+          };
+          // modelStartPos is already set in handleMouseDown
         }
       }
-      // --- End Tap Motion Logic ---
-    }
+      // --- End Start Drag Logic ---
 
-    // Reset potential tap flag regardless of outcome
-    isPotentialTapRef.current = false;
-  }, [isDragging, canvasRef, modelInfo]);
+      // --- Continue Drag Logic ---
+      if (isDragging && adapter && view && model && canvasRef.current) {
+        const canvas = canvasRef.current;
+        const rect = canvas.getBoundingClientRect();
+        const currentX = e.clientX - rect.left; // Current screen X relative to canvas
+        const currentY = e.clientY - rect.top; // Current screen Y relative to canvas
+
+        // Convert screen delta to model delta
+        // kiosk：rect 是缩放后物理尺寸，clientWidth 是缩放前布局宽——按后者换算命中点会放大 2.29×
+        const scale = canvas.width / rect.width;
+        const startScaledX = dragStartPos.current.x * scale;
+        const startScaledY = dragStartPos.current.y * scale;
+        const startModelX = view._deviceToScreen.transformX(startScaledX);
+        const startModelY = view._deviceToScreen.transformY(startScaledY);
+
+        const currentScaledX = currentX * scale;
+        const currentScaledY = currentY * scale;
+        const currentModelX = view._deviceToScreen.transformX(currentScaledX);
+        const currentModelY = view._deviceToScreen.transformY(currentScaledY);
+
+        const dx = currentModelX - startModelX;
+        const dy = currentModelY - startModelY;
+
+        const newX = modelStartPos.current.x + dx;
+        const newY = modelStartPos.current.y + dy;
+
+        // Use the adapter's setModelPosition method if available, otherwise update matrix directly
+        if (adapter.setModelPosition) {
+          adapter.setModelPosition(newX, newY);
+        } else if (model._modelMatrix) {
+          const matrix = model._modelMatrix.getArray();
+          const newMatrix = [...matrix];
+          newMatrix[12] = newX;
+          newMatrix[13] = newY;
+          model._modelMatrix.setMatrix(newMatrix);
+        }
+
+        modelPositionRef.current = { x: newX, y: newY };
+        setPosition({ x: newX, y: newY }); // Update React state if needed for UI feedback
+      }
+      // --- End Continue Drag Logic ---
+
+      // --- Pet Hover Logic (Unchanged) ---
+      if (
+        isPet &&
+        !isDragging &&
+        !isPotentialTapRef.current &&
+        electronApi &&
+        adapter &&
+        view &&
+        model &&
+        canvasRef.current
+      ) {
+        const canvas = canvasRef.current;
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        // kiosk：rect 是缩放后物理尺寸，clientWidth 是缩放前布局宽——按后者换算命中点会放大 2.29×
+        const scale = canvas.width / rect.width;
+        const scaledX = x * scale;
+        const scaledY = y * scale;
+        const modelX = view._deviceToScreen.transformX(scaledX);
+        const modelY = view._deviceToScreen.transformY(scaledY);
+
+        const currentHitState =
+          model.anyhitTest(modelX, modelY) !== null ||
+          model.isHitOnModel(modelX, modelY);
+
+        if (currentHitState !== isHoveringModelRef.current) {
+          isHoveringModelRef.current = currentHitState;
+          electronApi.ipcRenderer.send(
+            "update-component-hover",
+            "live2d-model",
+            currentHitState,
+          );
+        }
+      }
+      // --- End Pet Hover Logic ---
+    },
+    [isPet, isDragging, electronApi, canvasRef],
+  );
+
+  const handleMouseUp = useCallback(
+    (e: React.MouseEvent) => {
+      const adapter = (window as any).getLAppAdapter?.();
+      const model = adapter?.getModel();
+      const view = LAppDelegate.getInstance().getView();
+
+      if (isDragging) {
+        // Finalize drag
+        setIsDragging(false);
+        if (adapter) {
+          const currentModel = adapter.getModel(); // Re-get model in case adapter changed
+          if (currentModel && currentModel._modelMatrix) {
+            const matrix = currentModel._modelMatrix.getArray();
+            const finalPos = { x: matrix[12], y: matrix[13] };
+            modelPositionRef.current = finalPos;
+            modelStartPos.current = finalPos; // Update base position for next potential drag
+            setPosition(finalPos);
+          }
+        }
+      } else if (
+        isPotentialTapRef.current &&
+        adapter &&
+        model &&
+        view &&
+        canvasRef.current
+      ) {
+        // --- Tap Motion Logic ---
+        const timeElapsed = Date.now() - mouseDownTimeRef.current;
+        const deltaX = e.clientX - mouseDownPosRef.current.x;
+        const deltaY = e.clientY - mouseDownPosRef.current.y;
+        const distanceMoved = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+        // Check if it qualifies as a tap (short duration, minimal movement)
+        if (
+          timeElapsed < TAP_DURATION_THRESHOLD_MS &&
+          distanceMoved < DRAG_DISTANCE_THRESHOLD_PX
+        ) {
+          const allowTapMotion = modelInfo?.pointerInteractive !== false;
+
+          if (allowTapMotion && modelInfo?.tapMotions) {
+            // Use mouse down position for hit testing
+            const canvas = canvasRef.current;
+            const rect = canvas.getBoundingClientRect();
+            // kiosk：rect 是缩放后物理尺寸，clientWidth 是缩放前布局宽——按后者换算命中点会放大 2.29×
+            const scale = canvas.width / rect.width;
+            const downX = (mouseDownPosRef.current.x - rect.left) * scale;
+            const downY = (mouseDownPosRef.current.y - rect.top) * scale;
+            const modelX = view._deviceToScreen.transformX(downX);
+            const modelY = view._deviceToScreen.transformY(downY);
+
+            const hitAreaName = model.anyhitTest(modelX, modelY);
+            // Trigger tap motion using the specific hit area name or null for general body tap
+            model.startTapMotion(hitAreaName, modelInfo.tapMotions);
+          }
+        }
+        // --- End Tap Motion Logic ---
+      }
+
+      // Reset potential tap flag regardless of outcome
+      isPotentialTapRef.current = false;
+    },
+    [isDragging, canvasRef, modelInfo],
+  );
 
   const handleMouseLeave = useCallback(() => {
     if (isDragging) {
@@ -640,7 +734,11 @@ export const useLive2DModel = ({
     // --- Pet Hover Logic (Unchanged) ---
     if (isPet && electronApi && isHoveringModelRef.current) {
       isHoveringModelRef.current = false;
-      electronApi.ipcRenderer.send('update-component-hover', 'live2d-model', false);
+      electronApi.ipcRenderer.send(
+        "update-component-hover",
+        "live2d-model",
+        false,
+      );
     }
   }, [isPet, isDragging, electronApi, handleMouseUp]);
 
@@ -699,17 +797,20 @@ export const useLive2DModel = ({
 
   // 原生 touch 事件分发器：通过 ref 调用最新的处理闭包（避免旧 isDragging 状态）
   const touchNativeRef = useRef<{
-    start: (x: number, y: number) => void
-    move: (x: number, y: number) => void
-    end: (x: number, y: number) => void
-    cancel: () => void
+    start: (x: number, y: number) => void;
+    move: (x: number, y: number) => void;
+    end: (x: number, y: number) => void;
+    cancel: () => void;
   }>({ start: () => {}, move: () => {}, end: () => {}, cancel: () => {} });
 
   useEffect(() => {
     touchNativeRef.current = {
-      start: (x, y) => handleMouseDown({ clientX: x, clientY: y } as React.MouseEvent),
-      move: (x, y) => handleMouseMove({ clientX: x, clientY: y } as React.MouseEvent),
-      end: (x, y) => handleMouseUp({ clientX: x, clientY: y } as React.MouseEvent),
+      start: (x, y) =>
+        handleMouseDown({ clientX: x, clientY: y } as React.MouseEvent),
+      move: (x, y) =>
+        handleMouseMove({ clientX: x, clientY: y } as React.MouseEvent),
+      end: (x, y) =>
+        handleMouseUp({ clientX: x, clientY: y } as React.MouseEvent),
       cancel: () => handleMouseLeave(),
     };
   });
@@ -717,7 +818,9 @@ export const useLive2DModel = ({
   useEffect(() => {
     // 穿透模式监听 window（画布 pointerEvents:none 收不到触摸）；
     // 普通模式维持原状挂 canvas
-    const el: HTMLElement | Window | null = touchThrough ? window : canvasRef.current;
+    const el: HTMLElement | Window | null = touchThrough
+      ? window
+      : canvasRef.current;
     if (!el) return undefined;
     const target = el as HTMLElement;
 
@@ -736,10 +839,17 @@ export const useLive2DModel = ({
       if (!view || !model) return false;
       const rect = canvas.getBoundingClientRect();
       // kiosk：rect 是缩放后物理尺寸，clientWidth 是缩放前布局宽——按后者换算命中点会放大 2.29×
-    const scale = canvas.width / rect.width;
-      const modelX = view._deviceToScreen.transformX((clientX - rect.left) * scale);
-      const modelY = view._deviceToScreen.transformY((clientY - rect.top) * scale);
-      return model.anyhitTest(modelX, modelY) !== null || model.isHitOnModel(modelX, modelY);
+      const scale = canvas.width / rect.width;
+      const modelX = view._deviceToScreen.transformX(
+        (clientX - rect.left) * scale,
+      );
+      const modelY = view._deviceToScreen.transformY(
+        (clientY - rect.top) * scale,
+      );
+      return (
+        model.anyhitTest(modelX, modelY) !== null ||
+        model.isHitOnModel(modelX, modelY)
+      );
     };
 
     const distBetween = (touches: TouchList) => {
@@ -755,7 +865,10 @@ export const useLive2DModel = ({
       if (touchThrough) {
         // 穿透模式：首指未命中模型 → 完全放行给下层 UI
         if (e.touches.length === 1) {
-          startHitRef.current = hitTestAt(e.touches[0].clientX, e.touches[0].clientY);
+          startHitRef.current = hitTestAt(
+            e.touches[0].clientX,
+            e.touches[0].clientY,
+          );
           if (!startHitRef.current) return;
           e.preventDefault(); // 命中模型：阻止下层滚动/合成点击
           touchActiveRef.current = true;
@@ -793,10 +906,19 @@ export const useLive2DModel = ({
         applyPinchScale(distBetween(e.touches) / pinchStartDistRef.current);
         return;
       }
-      if (touchThrough && !touchActiveRef.current && !isPinchingRef.current && !waitAllUpRef.current) {
+      if (
+        touchThrough &&
+        !touchActiveRef.current &&
+        !isPinchingRef.current &&
+        !waitAllUpRef.current
+      ) {
         return; // 无会话：放行（页面滚动等默认行为不受影响）
       }
-      if (touchActiveRef.current || isPinchingRef.current || waitAllUpRef.current) {
+      if (
+        touchActiveRef.current ||
+        isPinchingRef.current ||
+        waitAllUpRef.current
+      ) {
         e.preventDefault();
       }
       if (e.touches.length === 1) {
@@ -805,7 +927,12 @@ export const useLive2DModel = ({
     };
 
     const onEnd = (e: TouchEvent) => {
-      if (touchThrough && !touchActiveRef.current && !isPinchingRef.current && !waitAllUpRef.current) {
+      if (
+        touchThrough &&
+        !touchActiveRef.current &&
+        !isPinchingRef.current &&
+        !waitAllUpRef.current
+      ) {
         return; // 无会话：放行（下层按钮/输入框正常接收 click/focus）
       }
       e.preventDefault(); // 阻止触摸结束后浏览器合成 mousedown/mousemove/mouseup
@@ -848,10 +975,10 @@ export const useLive2DModel = ({
       startHitRef.current = false;
     };
 
-    target.addEventListener('touchstart', onStart, { passive: false });
-    target.addEventListener('touchmove', onMove, { passive: false });
-    target.addEventListener('touchend', onEnd, { passive: false });
-    target.addEventListener('touchcancel', onCancel, { passive: false });
+    target.addEventListener("touchstart", onStart, { passive: false });
+    target.addEventListener("touchmove", onMove, { passive: false });
+    target.addEventListener("touchend", onEnd, { passive: false });
+    target.addEventListener("touchcancel", onCancel, { passive: false });
 
     // 鼠标兜底（穿透模式全启用）：桌面浏览器画布 pointerEvents:none 收不到
     // 鼠标事件，须窗口级监听；kiosk 一体机红外屏部分以鼠标事件送达，同路
@@ -892,25 +1019,25 @@ export const useLive2DModel = ({
         mouseSession = false;
         touchNativeRef.current.cancel();
       };
-      window.addEventListener('mousedown', onMouseDown, true);
-      window.addEventListener('mousemove', onMouseMove);
-      window.addEventListener('mouseup', onMouseUp, true);
-      window.addEventListener('click', onClick, true);
-      window.addEventListener('blur', onBlur);
+      window.addEventListener("mousedown", onMouseDown, true);
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("mouseup", onMouseUp, true);
+      window.addEventListener("click", onClick, true);
+      window.addEventListener("blur", onBlur);
       winCleanups.push(
-        () => window.removeEventListener('mousedown', onMouseDown, true),
-        () => window.removeEventListener('mousemove', onMouseMove),
-        () => window.removeEventListener('mouseup', onMouseUp, true),
-        () => window.removeEventListener('click', onClick, true),
-        () => window.removeEventListener('blur', onBlur),
+        () => window.removeEventListener("mousedown", onMouseDown, true),
+        () => window.removeEventListener("mousemove", onMouseMove),
+        () => window.removeEventListener("mouseup", onMouseUp, true),
+        () => window.removeEventListener("click", onClick, true),
+        () => window.removeEventListener("blur", onBlur),
       );
     }
 
     return () => {
-      target.removeEventListener('touchstart', onStart);
-      target.removeEventListener('touchmove', onMove);
-      target.removeEventListener('touchend', onEnd);
-      target.removeEventListener('touchcancel', onCancel);
+      target.removeEventListener("touchstart", onStart);
+      target.removeEventListener("touchmove", onMove);
+      target.removeEventListener("touchend", onEnd);
+      target.removeEventListener("touchcancel", onCancel);
       winCleanups.forEach((fn) => fn());
     };
   }, [canvasRef, getModelScale, applyPinchScale, setIsDragging, touchThrough]);
