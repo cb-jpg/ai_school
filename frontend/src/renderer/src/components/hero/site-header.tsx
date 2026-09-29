@@ -243,13 +243,16 @@ export default function SiteHeader({
         </HStack>
 
         <HStack gap={isPortraitBoard ? 3 : 2} flexShrink={0}>
-          {/* 后台管理：进入管理界面（#/main，未登录由 App 登录门禁接管） */}
+          {/* 后台管理：进入管理界面（#/main，未登录由 App 登录门禁接管）。
+              手机端也要有入口（2026-09-29 用户反馈手机端进不了后台）——
+              base 红带为单行（英文副标隐藏），宽度足够放下四字入口 */}
           {showAdmin && (
             <Box
               as="button"
               onClick={() => goHash('#/main')}
               aria-label="进入后台管理"
-              display={isPortraitBoard ? 'block' : { base: 'none', md: 'block' }}
+              data-testid="site-admin-entry"
+              display="block"
               fontSize={isPortraitBoard ? '18px' : { base: '12.5px', md: '13px' }}
               opacity={0.92}
               px={isPortraitBoard ? 3 : 2}
