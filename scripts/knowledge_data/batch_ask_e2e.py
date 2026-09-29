@@ -12,17 +12,41 @@ v2 修 harness（首轮 6 个 FAIL 全是测试器伪影）：
 """
 import asyncio
 import json
+import os
 import sys
 import time
 import urllib.request
 import uuid
+from pathlib import Path
 
 import websockets
 
 sys.stdout.reconfigure(encoding="utf-8")
 BASE = "http://183.36.243.124:12393"
 WS = "ws://183.36.243.124:12393/client-ws"
-ACCESS = __import__("os").environ.get("OLLV_ACCESS_TOKEN", "")
+
+
+def _load_env_web_local() -> dict:
+    """从 frontend/.env.web.local（gitignored）读 VITE_*=… 键值；环境变量优先。
+    凭据（访问令牌/登录口令）一律不进被跟踪文件——公开仓库铁律。"""
+    p = Path(__file__).resolve().parents[2] / "frontend" / ".env.web.local"
+    if not p.exists():
+        return {}
+    out = {}
+    for line in p.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if "=" in line and not line.startswith("#"):
+            k, _, v = line.partition("=")
+            out[k.strip()] = v.strip()
+    return out
+
+
+_ENV = _load_env_web_local()
+ACCESS = os.environ.get("OLLV_ACCESS_TOKEN") or _ENV.get("VITE_ACCESS_TOKEN", "")
+# 2026-09-29 演示账号 student01/parent01 被校方有意删除，e2e 一律走 kiosk
+# （设备自动登录账号，role=user 对话可用）
+KIOSK_USER = os.environ.get("OLLV_KIOSK_USER") or _ENV.get("VITE_KIOSK_USERNAME", "")
+KIOSK_PASS = os.environ.get("OLLV_KIOSK_PASS") or _ENV.get("VITE_KIOSK_PASSWORD", "")
 REPLY_LOG = r"C:\Users\28432\.claude\jobs\bc8ee473\tmp\batch_e2e_replies-20260926.txt"
 
 QUESTIONS = [
@@ -56,7 +80,7 @@ QUESTIONS = [
 def login():
     req = urllib.request.Request(
         f"{BASE}/api/auth/login",
-        data=json.dumps({"username": "student01", "password": "Shishi2026"}).encode(),
+        data=json.dumps({"username": KIOSK_USER, "password": KIOSK_PASS}).encode(),
         headers={"Content-Type": "application/json", "X-Access-Token": ACCESS})
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.loads(r.read().decode())["token"]
