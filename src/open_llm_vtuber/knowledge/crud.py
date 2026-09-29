@@ -22,7 +22,16 @@ class KnowledgeCRUD:
         self.knowledge_dir.mkdir(parents=True, exist_ok=True)
 
         # Load or create index
+        self._index_sig: Optional[tuple] = None
         self._load_index()
+
+    def _file_signature(self) -> Optional[tuple]:
+        """index.json 的跨进程变更信号（mtime_ns+size，比单 mtime 稳）"""
+        try:
+            st = self.index_file.stat()
+            return (st.st_mtime_ns, st.st_size)
+        except OSError:
+            return None
 
     def _load_index(self):
         """Load knowledge index from disk"""
@@ -31,6 +40,7 @@ class KnowledgeCRUD:
                 with open(self.index_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     self._index = {k: KnowledgeEntry(**v) for k, v in data.items()}
+                self._index_sig = self._file_signature()
                 logger.info(f"Loaded knowledge index with {len(self._index)} entries")
             except Exception as e:
                 logger.error(f"Error loading knowledge index: {e}")
@@ -39,17 +49,27 @@ class KnowledgeCRUD:
             self._index = {}
             self._save_index()
 
+    def _refresh_if_changed(self):
+        """多进程部署（uvicorn --workers 3）下本类是每 worker 内存快照：
+        新建/删除可能落在其他 worker，仅靠内存会出现"刚上传的资料部分请求检索不到、
+        已删条目仍被检索到"。以 index.json 签名变化为跨进程信号，变了就整表重载。"""
+        sig = self._file_signature()
+        if self._index_sig is not None and sig is not None and sig != self._index_sig:
+            self._load_index()
+
     def _save_index(self):
         """Save knowledge index to disk"""
         try:
             data = {k: v.model_dump() for k, v in self._index.items()}
             with open(self.index_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2, default=str)
+            self._index_sig = self._file_signature()
         except Exception as e:
             logger.error(f"Error saving knowledge index: {e}")
 
     def create(self, entry: KnowledgeEntry) -> KnowledgeEntry:
         """Create a new knowledge entry"""
+        self._refresh_if_changed()
         if entry.id in self._index:
             raise ValueError(f"Entry with id {entry.id} already exists")
 
@@ -60,6 +80,7 @@ class KnowledgeCRUD:
 
     def get(self, entry_id: str) -> Optional[KnowledgeEntry]:
         """Get a knowledge entry by ID"""
+        self._refresh_if_changed()
         return self._index.get(entry_id)
 
     def get_all(
@@ -70,6 +91,7 @@ class KnowledgeCRUD:
         include_archived: bool = False
     ) -> List[KnowledgeEntry]:
         """Get all knowledge entries with optional filters"""
+        self._refresh_if_changed()
         entries = list(self._index.values())
 
         # Filter by category
@@ -101,6 +123,7 @@ class KnowledgeCRUD:
 
     def update(self, entry_id: str, **kwargs) -> Optional[KnowledgeEntry]:
         """Update a knowledge entry"""
+        self._refresh_if_changed()
         entry = self._index.get(entry_id)
         if not entry:
             return None
@@ -118,6 +141,7 @@ class KnowledgeCRUD:
 
     def delete(self, entry_id: str) -> bool:
         """Delete a knowledge entry"""
+        self._refresh_if_changed()
         if entry_id not in self._index:
             return False
 

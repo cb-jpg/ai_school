@@ -67,6 +67,7 @@ class UserStore:
         self.users_file = users_file
         # 结构：{username: {"password": hash, "role": "admin"|"editor", "created_at": ts}}
         self.users: dict = {}
+        self._users_sig: tuple | None = None
         self._load_or_bootstrap()
 
     def _load_or_bootstrap(self) -> None:
@@ -74,6 +75,7 @@ class UserStore:
         if self.users_file.exists():
             try:
                 self.users = json.loads(self.users_file.read_text(encoding="utf-8"))
+                self._users_sig = self._file_signature()
                 return
             except Exception as e:
                 logger.error(f"读取用户文件失败，将重建：{e}")
@@ -93,18 +95,44 @@ class UserStore:
             INITIAL_PASSWORD_FILE,
         )
 
+    def _file_signature(self) -> tuple | None:
+        """users.json 的跨进程变更信号（mtime_ns+size，比单 mtime 稳）"""
+        try:
+            st = self.users_file.stat()
+            return (st.st_mtime_ns, st.st_size)
+        except OSError:
+            return None
+
     def _save(self) -> None:
         self.users_file.write_text(
             json.dumps(self.users, ensure_ascii=False, indent=2), encoding="utf-8"
         )
+        self._users_sig = self._file_signature()
+
+    def _refresh_if_changed(self) -> None:
+        """多进程部署（uvicorn --workers 3）下每 worker 一份内存快照：后台在
+        另一 worker 改账号/删号时，本 worker 不重读就会"删掉的号还能登录"。
+        以 users.json 签名变化为跨进程信号。注意刷新走安全重载而非 _load_or_bootstrap：
+        读到半截文件时保留内存态，绝不落入"重建 admin"分支把全部账号洗掉。"""
+        sig = self._file_signature()
+        if self._users_sig is not None and sig is not None and sig != self._users_sig:
+            try:
+                data = json.loads(self.users_file.read_text(encoding="utf-8"))
+                if isinstance(data, dict) and data:
+                    self.users = data
+                    self._users_sig = sig
+            except Exception as e:
+                logger.warning(f"users.json 重读失败，保留内存态稍后再试：{e}")
 
     def authenticate(self, username: str, password: str) -> dict | None:
+        self._refresh_if_changed()
         record = self.users.get(username)
         if record and verify_password(password, record["password"]):
             return {"username": username, "role": record["role"]}
         return None
 
     def create_user(self, username: str, password: str, role: str) -> dict:
+        self._refresh_if_changed()
         if username in self.users:
             raise ValueError(f"用户已存在：{username}")
         if not USERNAME_PATTERN.match(username):
@@ -121,6 +149,7 @@ class UserStore:
         return {"username": username, "role": role}
 
     def delete_user(self, username: str) -> None:
+        self._refresh_if_changed()
         if username not in self.users:
             raise ValueError(f"用户不存在：{username}")
         admins = [u for u, r in self.users.items() if r["role"] == "admin"]
@@ -131,6 +160,7 @@ class UserStore:
         logger.info(f"删除用户 {username}")
 
     def change_password(self, username: str, new_password: str) -> None:
+        self._refresh_if_changed()
         if username not in self.users:
             raise ValueError(f"用户不存在：{username}")
         self.users[username]["password"] = hash_password(new_password)
@@ -138,6 +168,7 @@ class UserStore:
         logger.info(f"用户 {username} 已修改密码")
 
     def list_users(self) -> list:
+        self._refresh_if_changed()
         return [
             {"username": u, "role": r["role"], "created_at": r["created_at"]}
             for u, r in self.users.items()

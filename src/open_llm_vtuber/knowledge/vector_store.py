@@ -407,7 +407,18 @@ class VectorStore:
         """Load chunks for an entry"""
         # Check memory first
         if entry_id in self._chunks_by_entry:
-            return self._chunks_by_entry[entry_id]
+            # 多进程部署防幽灵：磁盘文件已被另一 worker 删除时自愈清内存，
+            # 否则本 worker 的全库索引重建会把已删 chunk 带回检索结果。
+            # 不能在此调 remove_entry/invalidate_global_index——本方法会在
+            # _ensure_global_index 的 _g_lock 内被调用，该锁不可重入。
+            if (self.vectors_dir / f"{entry_id}.json").exists():
+                return self._chunks_by_entry[entry_id]
+            chunks = self._chunks_by_entry.pop(entry_id)
+            for chunk in chunks:
+                self._chunk_index.pop(chunk.id, None)
+                self._bm25_tokens.pop(chunk.id, None)
+                self._embeddings_index.pop(chunk.id, None)
+            return []
 
         # Load from disk
         entry_file = self.vectors_dir / f"{entry_id}.json"
@@ -679,6 +690,7 @@ class VectorStore:
                 for chunk in chunks:
                     self._chunk_index.pop(chunk.id, None)
                     self._bm25_tokens.pop(chunk.id, None)
+                    self._embeddings_index.pop(chunk.id, None)
                 del self._chunks_by_entry[entry_id]
 
             # Remove from disk
