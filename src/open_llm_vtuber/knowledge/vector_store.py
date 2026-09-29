@@ -91,6 +91,43 @@ class VectorStore:
 
         # 重启后内存索引为空会导致 search 永远无结果，这里从磁盘回载全部条目
         self._reload_all_from_disk()
+        # 条目集合对账签名：init 回载后记下 index.json 签名，读路径上据此对账
+        self._reconcile_sig: Optional[tuple] = self._index_signature()
+
+    def _index_signature(self) -> Optional[tuple]:
+        """index.json 的跨进程变更信号（mtime_ns+size）"""
+        try:
+            st = self.knowledge_dir.joinpath("index.json").stat()
+            return (st.st_mtime_ns, st.st_size)
+        except OSError:
+            return None
+
+    def _reconcile_with_index(self) -> None:
+        """条目集合对账（多进程部署防幽灵/防漏）：crud 与向量内存都是每 worker
+        快照，删除/新建落在其他 worker 时，本进程 _chunks_by_entry 里已删 chunk
+        会一直混进 get_all_chunks 的检索结果（后台搜索幽灵），新条目也无人装入
+        内存。以 index.json 签名变化为信号在读路径上对账：磁盘条目集合为准，
+        多退（清内存）少补（从磁盘载入）。只在 search/get_all_chunks/search_all
+        等读入口调用，不进 _g_lock 内的全局索引重建。"""
+        sig = self._index_signature()
+        if sig is None or sig == self._reconcile_sig:
+            return
+        try:
+            with open(self.knowledge_dir / "index.json", "r", encoding="utf-8") as f:
+                known = set(json.load(f).keys())
+        except Exception as e:
+            logger.warning(f"对账读 index.json 失败，跳过本次：{e}")
+            return
+        self._reconcile_sig = sig
+        for eid in list(self._chunks_by_entry.keys()):
+            if eid not in known:
+                chunks = self._chunks_by_entry.pop(eid)
+                for chunk in chunks:
+                    self._chunk_index.pop(chunk.id, None)
+                    self._bm25_tokens.pop(chunk.id, None)
+                    self._embeddings_index.pop(chunk.id, None)
+        for eid in known - set(self._chunks_by_entry.keys()):
+            self.load_entry_chunks(eid)
 
     def _reload_all_from_disk(self):
         """Load all persisted chunk files into the in-memory index.
@@ -220,6 +257,7 @@ class VectorStore:
 
         上报分数仍为余弦相似度，与 rag_service 低置信阈值语义保持一致。
         """
+        self._reconcile_with_index()
         with self._g_lock:
             self._ensure_global_index(entry_ids)
 
@@ -446,6 +484,7 @@ class VectorStore:
 
     def get_all_chunks(self) -> List[Chunk]:
         """Get all chunks from all entries"""
+        self._reconcile_with_index()
         all_chunks = []
         for chunks in self._chunks_by_entry.values():
             all_chunks.extend(chunks)
@@ -470,6 +509,7 @@ class VectorStore:
         Returns:
             List of (chunk, score) tuples
         """
+        self._reconcile_with_index()
         chunks = self._get_search_chunks(entry_id)
 
         if not chunks:
@@ -708,6 +748,7 @@ class VectorStore:
 
     def get_chunk_count(self, entry_id: Optional[str] = None) -> int:
         """Get count of chunks"""
+        self._reconcile_with_index()
         if entry_id:
             chunks = self.load_entry_chunks(entry_id)
             return len(chunks)
