@@ -211,13 +211,21 @@ export const useLive2DModel = ({
   const baseModelRef = useRef<{ _modelMatrix?: unknown } | null>(null);
   // 模型身份（去协议/主机的路径），而非原始 URL 字符串——见下方 effect 内注释
   const prevModelIdentityRef = useRef<string | null>(null);
-  // 站位滑入动画的 RAF 句柄（2026-09-30 优化：页面切换人物从"瞬移"改平滑滑入；
-  // 用户拖动/捏合时立即取消，避免与手势打架）
-  const fitAnimRafRef = useRef<number | null>(null);
+  // 站位滑入动画（2026-09-30 优化：页面切换人物从"瞬移"改平滑滑入；
+  // 用户拖动/捏合时立即取消，避免与手势打架）。2026-09-30 二次优化：
+  // 插值不再跑独立 RAF（与渲染循环交错会错拍掉帧，"看着也卡"），
+  // 改为挂在 LAppDelegate.frameTick 上、每渲染帧 render() 前按时间戳求值，
+  // 与实际绘制同帧同步；animActiveRef 只做存活标记。
+  const fitAnimActiveRef = useRef(false);
+  // 只在动画启动时捕获当时的 delegate 实例（startPoll 内模型已就绪=实例必在），
+  // cancel 不经 getInstance()——后者会惰性新建单例，release/重建窗口期会造出僵尸实例
+  const fitAnimDelegateRef = useRef<{ frameTick: ((n: number) => void) | null } | null>(null);
   const cancelFitAnimation = useCallback(() => {
-    if (fitAnimRafRef.current !== null) {
-      cancelAnimationFrame(fitAnimRafRef.current);
-      fitAnimRafRef.current = null;
+    fitAnimActiveRef.current = false;
+    const delegate = fitAnimDelegateRef.current;
+    if (delegate) {
+      delegate.frameTick = null;
+      fitAnimDelegateRef.current = null;
     }
   }, []);
   const isHoveringModelRef = useRef(false);
@@ -392,7 +400,7 @@ export const useLive2DModel = ({
     let outerStop: (() => void) | null = null;
 
     // 模型初始化是异步的（initializeLive2D 在 500ms 后启动，模型加载还要更久），轮询就绪
-    // （2026-09-30 优化：间隔 300→120ms，页面切换后滑入更早启动）
+    // （2026-09-30 二次优化：间隔 300→50ms；配合防抖 150→40ms，切换后 ~90ms 内起滑）
     const startPoll = () => {
       const poll = setInterval(() => {
         if (cancelled) {
@@ -436,8 +444,10 @@ export const useLive2DModel = ({
           }
 
           // 平滑滑入（2026-09-30）：此前缩放+平移一帧打完=页面切换人物瞬移（用户反馈
-          // "数字人变换太卡顿"）。改 RAF ~420ms easeInOutCubic 插值；差异极小则原地落位。
-          // 用户拖动/捏合会先 cancelFitAnimation，不会与手势打架。
+          // "数字人变换太卡顿"）。首版独立 RAF 插值仍被反馈"看着也卡"——独立 RAF 与
+          // 渲染循环交错执行，矩阵更新常落到本帧绘制之后（等效掉一半帧+错拍抖动）。
+          // 现挂 LAppDelegate.frameTick：每渲染帧 render() 前按时间戳求值，与绘制同帧
+          // 同步。用户拖动/捏合会先 cancelFitAnimation，不会与手势打架。
           cancelFitAnimation();
           const startArr = matrix.getArray();
           const sx0 = startArr[12];
@@ -453,11 +463,12 @@ export const useLive2DModel = ({
           const t0 = performance.now();
           const ease = (t: number) =>
             t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-          const step = (now: number) => {
-            if (cancelled) {
-              fitAnimRafRef.current = null;
-              return;
-            }
+          const delegate = LAppDelegate.getInstance();
+          if (!delegate) return;
+          fitAnimDelegateRef.current = delegate;
+          fitAnimActiveRef.current = true;
+          delegate.frameTick = (now: number) => {
+            if (!fitAnimActiveRef.current) return;
             const k = Math.min(1, (now - t0) / DURATION_MS);
             const e = ease(k);
             const tx = sx0 + (xViewStatic - sx0) * e;
@@ -474,17 +485,16 @@ export const useLive2DModel = ({
             arr[13] = ty;
             matrix.setMatrix(arr);
             modelPositionRef.current = { x: tx, y: ty };
-            if (k < 1) {
-              fitAnimRafRef.current = requestAnimationFrame(step);
-            } else {
-              fitAnimRafRef.current = null;
+            if (k >= 1) {
+              fitAnimActiveRef.current = false;
+              fitAnimDelegateRef.current = null;
+              delegate.frameTick = null;
             }
           };
-          fitAnimRafRef.current = requestAnimationFrame(step);
         } catch (err) {
           console.error("[useLive2DModel] hero fit failed:", err);
         }
-      }, 120);
+      }, 50);
       const stop = setTimeout(() => clearInterval(poll), 20000);
       return () => {
         clearInterval(poll);
@@ -504,10 +514,10 @@ export const useLive2DModel = ({
     let hashTimer: ReturnType<typeof setTimeout> | null = null;
     const onHashChange = () => {
       if (hashTimer) clearTimeout(hashTimer);
-      // 防抖：等页面切换渲染稳定后再适配（350→150ms：滑入更早启动）
+      // 防抖：40ms 仅合并同帧多次 hash 变化（滑动与绘制同帧同步后，早启动不再有错拍代价）
       hashTimer = setTimeout(() => {
         onRebound();
-      }, 150);
+      }, 40);
     };
     window.addEventListener("live2d-rebound", onRebound);
     window.addEventListener("hashchange", onHashChange);

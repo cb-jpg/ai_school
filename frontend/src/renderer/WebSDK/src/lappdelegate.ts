@@ -212,6 +212,16 @@ export class LAppDelegate {
       gl!.blendFunc(gl!.SRC_ALPHA, gl!.ONE_MINUS_SRC_ALPHA);
 
       // 描画更新
+      // 每渲染帧回调（2026-09-30 站位滑动动画用）：render() 前一刻按当前时间
+      // 求值模型矩阵，插值与实际绘制同帧同步——独立 RAF 与本循环交错执行会
+      // 错拍/掉帧，肉眼可见卡顿（用户反馈"平滑移动看着也卡"）。
+      if (this.frameTick) {
+        try {
+          this.frameTick(performance.now());
+        } catch (e) {
+          this.frameTick = null;
+        }
+      }
       this._view!.render();
 
       // ループのために再帰呼び出し
@@ -349,6 +359,11 @@ export class LAppDelegate {
   }
 
   _cubismOption: Option; // Cubism SDK Option
+  /**
+   * 每渲染帧回调（2026-09-30）：主循环在 render() 前调用。
+   * 站位滑动动画借此与绘制同帧同步（见 run() 内注释）。异常时自动摘除。
+   */
+  frameTick: ((now: number) => void) | null = null;
   _view: LAppView | null; // View情報  // 视图信息
   _captured: boolean; // クリックしているか // 是否点击
   _mouseX: number; // マウスX座標 // 鼠标X坐标
