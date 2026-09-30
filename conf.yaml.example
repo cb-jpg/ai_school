@@ -497,3 +497,10 @@ live_config:
     room_ids: [1991478060]
     # SESSDATA cookie值（可选，用于认证请求，可以查看发送弹幕用户名）
     sessdata: ""
+
+# 学校微信公众号文章同步（官网「媒体聚焦」自动拉取，2026-09-30 A路线）
+# 只在服务器 conf.yaml 配置真实值（本文件是模板，conf.yaml 在 .gitignore）。
+# 服务器侧还需在公众号后台「基本配置 → IP白名单」加入服务器出口IP。
+wechat_mp:
+  appid: ''
+  secret: ''

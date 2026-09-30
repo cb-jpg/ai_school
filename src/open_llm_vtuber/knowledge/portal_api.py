@@ -156,6 +156,15 @@ class PortalStore:
         items.sort(key=lambda x: not x.pinned)
         return items
 
+    def find_by_url(self, url: str) -> Optional[PortalItem]:
+        """公众号同步按 url 幂等 upsert 用"""
+        with self._lock:
+            self._refresh_if_changed()
+            for it in self._items.values():
+                if it.url and it.url == url:
+                    return it
+        return None
+
     def get_article(self, item_id: str) -> Optional[PortalItem]:
         with self._lock:
             self._refresh_if_changed()
@@ -316,6 +325,22 @@ def init_portal_admin_routes() -> APIRouter:
             raise HTTPException(status_code=404, detail="条目不存在")
         audit_record(user["username"], "portal.delete", item_id)
         return {"deleted": item_id}
+
+    @router.post("/sync-wechat")
+    async def sync_wechat(user: dict = Depends(require_staff)):
+        """从学校公众号拉「已发布」文章进官网内容库（A路线，手动触发）。
+        凭据在服务器 conf.yaml wechat_mp 节，绝不进 git（见 wechat_sync.py）。"""
+        from .wechat_sync import WechatSyncError, sync_wechat_to_portal_async
+        try:
+            result = await sync_wechat_to_portal_async()
+        except WechatSyncError as e:
+            raise HTTPException(status_code=502, detail=str(e))
+        except Exception as e:  # noqa: BLE001
+            logger.exception("公众号同步异常")
+            raise HTTPException(status_code=502, detail=f"同步失败：{e}")
+        audit_record(user["username"], "portal.wechat_sync", "sync",
+                     f"new={result['created']} upd={result['updated']} hid={result['hidden']}")
+        return result
 
     return router
 

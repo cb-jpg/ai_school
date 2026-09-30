@@ -25,6 +25,7 @@ import {
   FiTrash2,
   FiCamera,
   FiUpload,
+  FiLogOut,
 } from 'react-icons/fi';
 import { Slider } from '@/components/ui/slider';
 import { useChatHistory } from '@/context/chat-history-context';
@@ -34,6 +35,7 @@ import { useBgUrl } from '@/context/bgurl-context';
 import { useCamera } from '@/context/camera-context';
 import { useVolume } from '@/context/volume-context';
 import { useLive2dModels } from '@/hooks/live2d/use-live2d-models';
+import { useAuth } from '@/context/auth-context';
 import type { Live2dCharacter } from '@/services/live2d-models-api';
 import { toaster } from '@/components/ui/toaster';
 import fileUploadDialog from '@/utils/file-upload-dialog';
@@ -90,10 +92,19 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
   const { setBackgroundUrl, addBackgroundFile, setUseCameraBackground } = useBgUrl();
   const { startBackgroundCamera, stopBackgroundCamera, isBackgroundStreaming } = useCamera();
   const { volume, setVolume } = useVolume();
+  const { user: authUser, logout } = useAuth();
 
   const [selectedAvatar, setSelectedAvatar] = useState('');
   const [selectedBg, setSelectedBg] = useState('default');
   const sidebarRef = useRef<HTMLDivElement>(null);
+
+  // 账号角色显示名（09-30 补退出登录入口时一并加）
+  const roleLabels: Record<string, string> = {
+    admin: '管理员',
+    editor: '数据管理员',
+    user: '学生账号',
+    parent: '家长账号',
+  };
 
   // 获取Live2D角色列表（后端接口，会话内缓存）
   const {
@@ -245,6 +256,19 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
     }
   };
 
+  const handleLogout = () => {
+    // 09-30 补：官网对话侧此前没有任何主动退出入口（学生/家长账号反馈）。
+    // 登出后 AuthContext 置空：对话页自动回到登录浮层；一体机(kiosk)自动
+    // 登录会在 60s 冷却后自愈重连，不影响展机。
+    logout();
+    onClose();
+    toaster.create({
+      title: '已退出登录',
+      type: 'info',
+      duration: 2000,
+    });
+  };
+
   const handleNewConversation = () => {
     // 清空当前消息
     setMessages([]);
@@ -367,6 +391,55 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
         }}
       >
         <VStack gap="6" align="stretch">
+          {/* 当前账号 + 退出登录（2026-09-30）：学生/家长账号此前登录后无处主动退出。
+              未登录（匿名浏览）时本节不渲染；一体机 kiosk 自动登录账号也显示，
+              误触退出 60s 后自动登录自愈 */}
+          {authUser && (
+            <Box>
+              <HStack gap="2" mb="3">
+                <FiUser size="4" color={schoolColors.primary} />
+                <Text fontSize="sm" fontWeight="semibold" color={schoolColors.text}>
+                  当前账号
+                </Text>
+              </HStack>
+              <Box
+                p="3"
+                rounded="lg"
+                border="1px solid"
+                borderColor={schoolColors.border}
+                bg={schoolColors.gray50}
+              >
+                <HStack justify="space-between" gap="2">
+                  <VStack align="start" gap="0" minW="0">
+                    <Text
+                      fontSize="sm"
+                      fontWeight="medium"
+                      color={schoolColors.text}
+                      lineClamp={1}
+                      wordBreak="break-all"
+                    >
+                      {authUser.username}
+                    </Text>
+                    <Text fontSize="xs" color={schoolColors.textSecondary}>
+                      {roleLabels[authUser.role] || '普通账号'}
+                    </Text>
+                  </VStack>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    borderColor={schoolColors.border}
+                    color={schoolColors.textSecondary}
+                    flexShrink={0}
+                    onClick={handleLogout}
+                  >
+                    <FiLogOut />
+                    退出登录
+                  </Button>
+                </HStack>
+              </Box>
+            </Box>
+          )}
+
           {/* 数字人选择 */}
           <Box>
             <HStack gap="2" mb="3">

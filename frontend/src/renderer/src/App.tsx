@@ -97,6 +97,7 @@ import { SchoolDashboard } from "./components/admin/school-dashboard";
 import { SchoolTestConversation } from "./components/admin/school-test-conversation";
 import { ModernMainWorkspace } from "./components/admin/modern-workspace";
 import AppLoginPage from "./components/auth/app-login-page";
+import NonStaffNotice from "./components/auth/non-staff-notice";
 import UnansweredQuestions from "./components/admin/unanswered-questions";
 import UserManagement from "./components/admin/user-management";
 import { PortalContentAdmin } from "./components/admin/portal-content-admin";
@@ -617,11 +618,14 @@ function AppContent(): JSX.Element {
   if (currentRoute === "main-admin") {
     // 登录守卫：管理后台仅 admin（最高权限管理员）/ editor（数据管理员）可进入；
     // 学生（user）/ 家长（parent）无权限
-    if (
-      !authUser ||
-      (authUser.role !== "admin" && authUser.role !== "editor")
-    ) {
+    if (!authUser) {
       return <AppLoginPage />;
+    }
+    if (authUser.role !== "admin" && authUser.role !== "editor") {
+      // 09-30 校方反馈"student/parent 无法登录"真因：登录本身成功（服务端 200），
+      // 但这里无声弹回登录页，看起来就像密码错误。改为明确提示页，
+      // 给「进入 AI 对话」「退出登录」两个出口。
+      return <NonStaffNotice user={authUser} />;
     }
 
     let content;

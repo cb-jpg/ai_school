@@ -111,6 +111,9 @@ export function PortalContentAdmin() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<Tab>('all');
+  // 公众号同步（A路线）：按钮触发 POST /api/portal/sync-wechat
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState('');
 
   // 表单：editingId=null 新建；否则编辑该条
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -218,6 +221,28 @@ export function PortalContentAdmin() {
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
+  const handleSyncWechat = async () => {
+    setSyncing(true);
+    setSyncMsg('');
+    setError('');
+    try {
+      const response = await authFetch('/api/portal/sync-wechat', { method: 'POST' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.detail || `同步失败（${response.status}）`);
+      }
+      setSyncMsg(
+        `同步完成：公众号拉到 ${data.total} 篇，新增 ${data.created}、更新 ${data.updated}、下架 ${data.hidden}`,
+      );
+      await loadItems();
+    } catch (e) {
+      setSyncMsg('');
+      setError(e instanceof Error ? e.message : '同步失败');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const visible = items.filter((it) => tab === 'all' || it.kind === tab);
 
   return (
@@ -233,6 +258,12 @@ export function PortalContentAdmin() {
       {error && (
         <Box mb="4" p="3" bg="#FCE8E6" borderRadius="md" borderWidth="1px" borderColor={schoolRed}>
           <Text fontSize="xs" color={schoolRed}>{error}</Text>
+        </Box>
+      )}
+
+      {syncMsg && (
+        <Box mb="4" p="3" bg="#E8F5E9" borderRadius="md" borderWidth="1px" borderColor="#2DAFAD">
+          <Text fontSize="xs" color="#1b7a70">{syncMsg}</Text>
         </Box>
       )}
 
@@ -346,9 +377,22 @@ export function PortalContentAdmin() {
               />
             ))}
           </HStack>
-          <Button size="xs" variant="ghost" onClick={loadItems} loading={loading}>
-            刷新
-          </Button>
+          <HStack gap="2">
+            <Button
+              size="xs"
+              variant="outline"
+              borderColor={schoolBlue}
+              color={schoolBlue}
+              onClick={handleSyncWechat}
+              loading={syncing}
+              loadingText="同步中..."
+            >
+              从公众号同步
+            </Button>
+            <Button size="xs" variant="ghost" onClick={loadItems} loading={loading}>
+              刷新
+            </Button>
+          </HStack>
         </HStack>
         <VStack gap="2" alignItems="stretch">
           {visible.map((it) => (
