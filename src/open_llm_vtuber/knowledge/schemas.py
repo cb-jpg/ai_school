@@ -3,7 +3,7 @@ API request/response schemas for knowledge base endpoints.
 """
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from .models import KnowledgeStatus, KnowledgeCategory, SourceType
 
 
@@ -44,7 +44,14 @@ class BulkOperationRequest(BaseModel):
 class SearchRequest(BaseModel):
     """Request for knowledge chunk search"""
     query: str = Field(..., min_length=1, max_length=500)
-    top_k: int = Field(5, ge=1, le=20)
+    # top_k 超界一律钳制而不是 422：后台条目管理搜索曾固定发 top_k=50，
+    # 被 le=20 整体 422 掉，用户侧表现=「什么都搜不到」（2026-09-30 修复）
+    top_k: int = Field(5, ge=1)
+
+    @field_validator("top_k")
+    @classmethod
+    def _clamp_top_k(cls, v: int) -> int:
+        return min(v, 20)
 
 
 class CategoryFilterRequest(BaseModel):

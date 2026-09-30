@@ -211,6 +211,15 @@ export const useLive2DModel = ({
   const baseModelRef = useRef<{ _modelMatrix?: unknown } | null>(null);
   // 模型身份（去协议/主机的路径），而非原始 URL 字符串——见下方 effect 内注释
   const prevModelIdentityRef = useRef<string | null>(null);
+  // 站位滑入动画的 RAF 句柄（2026-09-30 优化：页面切换人物从"瞬移"改平滑滑入；
+  // 用户拖动/捏合时立即取消，避免与手势打架）
+  const fitAnimRafRef = useRef<number | null>(null);
+  const cancelFitAnimation = useCallback(() => {
+    if (fitAnimRafRef.current !== null) {
+      cancelAnimationFrame(fitAnimRafRef.current);
+      fitAnimRafRef.current = null;
+    }
+  }, []);
   const isHoveringModelRef = useRef(false);
   const electronApi = (window as any).electron;
 
@@ -383,6 +392,7 @@ export const useLive2DModel = ({
     let outerStop: (() => void) | null = null;
 
     // 模型初始化是异步的（initializeLive2D 在 500ms 后启动，模型加载还要更久），轮询就绪
+    // （2026-09-30 优化：间隔 300→120ms，页面切换后滑入更早启动）
     const startPoll = () => {
       const poll = setInterval(() => {
         if (cancelled) {
@@ -418,25 +428,63 @@ export const useLive2DModel = ({
           const base = baseScaleRef.current || 1;
           const targetScale =
             fitFactor !== null ? fitFactor : base * baseScaleMul;
-          const ratio = targetScale / current;
-          if (Math.abs(ratio - 1) > 0.001) {
-            matrix.scaleRelative(ratio, ratio);
-          }
           if (fitFactor !== null) {
             // 横坐标按实际画布宽高比换算（竖屏手机 0.475 / 一体机 0.5625 / 横屏 >1），
             // 屏宽比例 f 处 x_view = (2f-1)×宽高比，人物落在与手机校准一致的屏宽比例处
             const aspect = canvasEl.width / canvasEl.height;
             xViewStatic = (2 * xScreenFrac - 1) * aspect;
           }
-          const arr = matrix.getArray();
-          arr[12] = xViewStatic;
-          arr[13] = yView;
-          matrix.setMatrix(arr);
-          modelPositionRef.current = { x: xViewStatic, y: yView };
+
+          // 平滑滑入（2026-09-30）：此前缩放+平移一帧打完=页面切换人物瞬移（用户反馈
+          // "数字人变换太卡顿"）。改 RAF ~420ms easeInOutCubic 插值；差异极小则原地落位。
+          // 用户拖动/捏合会先 cancelFitAnimation，不会与手势打架。
+          cancelFitAnimation();
+          const startArr = matrix.getArray();
+          const sx0 = startArr[12];
+          const sy0 = startArr[13];
+          const s0 = matrix.getScaleX?.() || startArr[0] || 1;
+          const moveDist = Math.hypot(xViewStatic - sx0, yView - sy0);
+          const scaleDelta = Math.abs(targetScale / s0 - 1);
+          if (moveDist < 0.002 && scaleDelta < 0.001) {
+            modelPositionRef.current = { x: xViewStatic, y: yView };
+            return;
+          }
+          const DURATION_MS = 420;
+          const t0 = performance.now();
+          const ease = (t: number) =>
+            t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+          const step = (now: number) => {
+            if (cancelled) {
+              fitAnimRafRef.current = null;
+              return;
+            }
+            const k = Math.min(1, (now - t0) / DURATION_MS);
+            const e = ease(k);
+            const tx = sx0 + (xViewStatic - sx0) * e;
+            const ty = sy0 + (yView - sy0) * e;
+            const ts = s0 + (targetScale - s0) * e;
+            const arr = matrix.getArray();
+            const curScale = matrix.getScaleX?.() || arr[0] || 1;
+            const frameRatio = ts / curScale;
+            if (Math.abs(frameRatio - 1) > 0.0001) {
+              // CubismMatrix44.scale 是绝对赋值，相对缩放必须 scaleRelative（捏合同坑）
+              matrix.scaleRelative(frameRatio, frameRatio);
+            }
+            arr[12] = tx;
+            arr[13] = ty;
+            matrix.setMatrix(arr);
+            modelPositionRef.current = { x: tx, y: ty };
+            if (k < 1) {
+              fitAnimRafRef.current = requestAnimationFrame(step);
+            } else {
+              fitAnimRafRef.current = null;
+            }
+          };
+          fitAnimRafRef.current = requestAnimationFrame(step);
         } catch (err) {
           console.error("[useLive2DModel] hero fit failed:", err);
         }
-      }, 300);
+      }, 120);
       const stop = setTimeout(() => clearInterval(poll), 20000);
       return () => {
         clearInterval(poll);
@@ -456,10 +504,10 @@ export const useLive2DModel = ({
     let hashTimer: ReturnType<typeof setTimeout> | null = null;
     const onHashChange = () => {
       if (hashTimer) clearTimeout(hashTimer);
-      // 防抖：等页面切换渲染稳定后再适配
+      // 防抖：等页面切换渲染稳定后再适配（350→150ms：滑入更早启动）
       hashTimer = setTimeout(() => {
         onRebound();
-      }, 350);
+      }, 150);
     };
     window.addEventListener("live2d-rebound", onRebound);
     window.addEventListener("hashchange", onHashChange);
@@ -467,6 +515,7 @@ export const useLive2DModel = ({
       cancelled = true;
       cleanup();
       outerStop?.();
+      cancelFitAnimation();
       if (hashTimer) clearTimeout(hashTimer);
       window.removeEventListener("live2d-rebound", onRebound);
       window.removeEventListener("hashchange", onHashChange);
@@ -525,6 +574,8 @@ export const useLive2DModel = ({
       // --- End Check ---
 
       if (hitAreaName !== null || isHitOnModel) {
+        // 用户摸到人物：立即停掉站位滑入动画，让位给拖动/点按（否则互相拉扯）
+        cancelFitAnimation();
         // Record potential tap/drag start
         mouseDownTimeRef.current = Date.now();
         mouseDownPosRef.current = { x: e.clientX, y: e.clientY }; // Use clientX/Y for distance check
@@ -890,6 +941,7 @@ export const useLive2DModel = ({
       }
       if (e.touches.length >= 2) {
         // 进入双指缩放：取消单指点按/拖动，开启缩放会话
+        cancelFitAnimation(); // 滑入动画让位给手势
         pinchStartDistRef.current = Math.max(1, distBetween(e.touches));
         pinchBaseScaleRef.current = getModelScale();
         isPinchingRef.current = true;
@@ -1044,7 +1096,7 @@ export const useLive2DModel = ({
       target.removeEventListener("touchcancel", onCancel);
       winCleanups.forEach((fn) => fn());
     };
-  }, [canvasRef, getModelScale, applyPinchScale, setIsDragging, touchThrough]);
+  }, [canvasRef, getModelScale, applyPinchScale, setIsDragging, touchThrough, cancelFitAnimation]);
 
   useEffect(() => {
     if (!isPet && electronApi && isHoveringModelRef.current) {

@@ -97,7 +97,6 @@ import { SchoolDashboard } from "./components/admin/school-dashboard";
 import { SchoolTestConversation } from "./components/admin/school-test-conversation";
 import { ModernMainWorkspace } from "./components/admin/modern-workspace";
 import AppLoginPage from "./components/auth/app-login-page";
-import NonStaffNotice from "./components/auth/non-staff-notice";
 import UnansweredQuestions from "./components/admin/unanswered-questions";
 import UserManagement from "./components/admin/user-management";
 import { PortalContentAdmin } from "./components/admin/portal-content-admin";
@@ -200,6 +199,30 @@ const readArticleIdFromLocation = (): string | null => {
   const match = window.location.hash.match(/^#\/article\/([^/?#]+)/);
   return match?.[1] || null;
 };
+
+// 学生/家长账号误入 #/main：登录有效但无后台权限，自动送回对话页（正常页面）。
+// 一闪而过（effect 在首帧渲染后立即执行），过渡文案避免白屏闪烁。
+function RedirectToHero(): JSX.Element {
+  useEffect(() => {
+    window.location.hash = "#/hero";
+  }, []);
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "var(--app-vh, 100vh)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#586174",
+        fontSize: 14,
+        fontFamily: "'Noto Sans SC', 'Microsoft YaHei', sans-serif",
+      }}
+    >
+      学生/家长账号，正在进入对话页面…
+    </div>
+  );
+}
 
 function AppContent(): JSX.Element {
   const [showSidebar, setShowSidebar] = useState(true);
@@ -622,10 +645,10 @@ function AppContent(): JSX.Element {
       return <AppLoginPage />;
     }
     if (authUser.role !== "admin" && authUser.role !== "editor") {
-      // 09-30 校方反馈"student/parent 无法登录"真因：登录本身成功（服务端 200），
-      // 但这里无声弹回登录页，看起来就像密码错误。改为明确提示页，
-      // 给「进入 AI 对话」「退出登录」两个出口。
-      return <NonStaffNotice user={authUser} />;
+      // 学生/家长账号登录成功但无后台权限：直接送回正常页面（2026-09-30 校方要求
+      // "家长学生登录进来后就直接是正常的页面"；v2.17 曾是提示页，现改为自动跳转）。
+      // 真因背景：此前这里无声弹回登录页，服务端 200 却像密码错误（09-30 修复起点）。
+      return <RedirectToHero />;
     }
 
     let content;

@@ -16,6 +16,7 @@ import { SCHOOL_CONFIG } from './school-config';
 import { kaiFont, swissFont, siteTheme } from './site-theme';
 import { useInterrupt } from '@/hooks/utils/use-interrupt';
 import { usePortraitBoard } from '@/hooks/utils/use-portrait-board';
+import { useAuth } from '@/context/auth-context';
 import { CampusTopicId } from '@/data/campus-knowledge';
 import { SiteColumnId, siteColumns } from '@/data/site-columns';
 
@@ -167,10 +168,18 @@ export default function SiteHeader({
 }: SiteHeaderProps) {
   const { interrupt } = useInterrupt();
   const isPortraitBoard = usePortraitBoard();
+  const { user, logout } = useAuth();
+  const isStaff = user?.role === 'admin' || user?.role === 'editor';
 
   const goHash = (hash: string) => {
     interrupt();
     window.location.hash = hash;
+  };
+
+  // 退出登录（学生/家长用）：留在当前页（匿名浏览态），对话页则回登录浮层
+  const handleLogout = () => {
+    interrupt();
+    logout();
   };
 
   const goColumn = (columnId: SiteColumnId, articleId?: string) => {
@@ -243,15 +252,21 @@ export default function SiteHeader({
         </HStack>
 
         <HStack gap={isPortraitBoard ? 3 : 2} flexShrink={0}>
-          {/* 后台管理：进入管理界面（#/main，未登录由 App 登录门禁接管）。
+          {/* 右上入口按登录身份切换（2026-09-30 校方要求）：
+              admin/editor → 「后台管理」进 #/main；学生/家长 → 「退出登录」；
+              匿名 → 「登录」（进 #/main 登录页，学生/家长登录后自动回正常页面）。
               手机端也要有入口（2026-09-29 用户反馈手机端进不了后台）——
               base 红带为单行（英文副标隐藏），宽度足够放下四字入口 */}
           {showAdmin && (
             <Box
               as="button"
-              onClick={() => goHash('#/main')}
-              aria-label="进入后台管理"
-              data-testid="site-admin-entry"
+              onClick={user && !isStaff ? handleLogout : () => goHash('#/main')}
+              aria-label={
+                user && !isStaff ? '退出登录' : isStaff ? '进入后台管理' : '去登录'
+              }
+              data-testid={
+                user && !isStaff ? 'site-logout-entry' : 'site-admin-entry'
+              }
               display="block"
               fontSize={isPortraitBoard ? '18px' : { base: '12.5px', md: '13px' }}
               opacity={0.92}
@@ -262,7 +277,7 @@ export default function SiteHeader({
               transition="all 0.2s ease"
               _hover={{ opacity: 1, background: 'rgba(255, 255, 255, 0.14)' }}
             >
-              后台管理
+              {user && !isStaff ? '退出登录' : isStaff ? '后台管理' : '登录'}
             </Box>
           )}
           {/* 设置齿轮：打开 HeroSidebar（模型/语音等设置） */}

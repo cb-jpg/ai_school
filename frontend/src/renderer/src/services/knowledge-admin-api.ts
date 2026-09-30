@@ -212,7 +212,8 @@ export async function searchDocuments(requestBody: {
   const data = await request('/api/knowledge/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query: requestBody.query, top_k: requestBody.top_k ?? 10 }),
+    // 后端 top_k 上限 20（超出会钳制/此前 422），此处不再发 50
+    body: JSON.stringify({ query: requestBody.query, top_k: Math.min(requestBody.top_k ?? 10, 20) }),
   });
 
   const byEntry = new Map<string, SearchResult>();
