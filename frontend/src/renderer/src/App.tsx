@@ -85,6 +85,7 @@ import {
 import HeroLanding from "./components/hero/hero-landing";
 import HomePage from "./components/hero/home-page";
 import NewsPage from "./components/hero/news-page";
+import ArticlePage from "./components/hero/article-page";
 import SiteHeader from "./components/hero/site-header";
 import HeroSidebar from "./components/hero/hero-sidebar";
 import KnowledgeAdmin from "./components/admin/knowledge-admin";
@@ -98,6 +99,7 @@ import { ModernMainWorkspace } from "./components/admin/modern-workspace";
 import AppLoginPage from "./components/auth/app-login-page";
 import UnansweredQuestions from "./components/admin/unanswered-questions";
 import UserManagement from "./components/admin/user-management";
+import { PortalContentAdmin } from "./components/admin/portal-content-admin";
 import { CharacterConfig } from "./components/admin/character-config";
 import { usePortraitBoard } from "./hooks/utils/use-portrait-board";
 import { useOtaUpdate } from "./hooks/use-ota-update";
@@ -128,7 +130,8 @@ const getCurrentRoute = (): AppRoute => {
     hash === "#/news" ||
     hash === "" ||
     hash === "#/" ||
-    hash.startsWith("#/campus/")
+    hash.startsWith("#/campus/") ||
+    hash.startsWith("#/article/")
   ) {
     return "hero";
   }
@@ -190,6 +193,13 @@ const readColumnArticleFromLocation = (): ActiveColumnView | null => {
 const readIsNewsFromLocation = (): boolean =>
   typeof window !== "undefined" && window.location.hash === "#/news";
 
+// 官网新闻/公告后台管理化（2026-09-29）：自撰文章阅读页 #/article/<id>
+const readArticleIdFromLocation = (): string | null => {
+  if (typeof window === "undefined") return null;
+  const match = window.location.hash.match(/^#\/article\/([^/?#]+)/);
+  return match?.[1] || null;
+};
+
 function AppContent(): JSX.Element {
   const [showSidebar, setShowSidebar] = useState(true);
   const [isFooterCollapsed, setIsFooterCollapsed] = useState(false);
@@ -202,6 +212,10 @@ function AppContent(): JSX.Element {
   );
   const [isNewsActive, setIsNewsActive] = useState<boolean>(
     readIsNewsFromLocation,
+  );
+  // 官网文章阅读页（#/article/<id>，后台发布的自撰文章）
+  const [activeArticleId, setActiveArticleId] = useState<string | null>(
+    readArticleIdFromLocation,
   );
   // 栏目页/新闻中心页头齿轮打开的设置侧栏（首页/对话页各自内部持有）
   const [heroSidebarOpen, setHeroSidebarOpen] = useState(false);
@@ -259,6 +273,7 @@ function AppContent(): JSX.Element {
       setActiveCampusTopic(readCampusTopicFromLocation());
       setActiveColumn(readColumnArticleFromLocation());
       setIsNewsActive(readIsNewsFromLocation());
+      setActiveArticleId(readArticleIdFromLocation());
       setHeroView(readHeroView());
     };
     window.addEventListener("hashchange", syncRoute);
@@ -390,7 +405,8 @@ function AppContent(): JSX.Element {
   // 登录门禁（2026-09-20 需求 #6）：浏览类页面（新首页/栏目页/新闻中心/旧专题页）
   // 不再强制登录，进入「对话界面」才要求登录——家长/学生各用各的账号，会话按账号隔离。
   // 官网 v2：栏目/新闻也算浏览态（isOverlayView），画布为它们让出右侧位。
-  const isOverlayView = !!activeCampusTopic || !!activeColumn || isNewsActive;
+  const isOverlayView =
+    !!activeCampusTopic || !!activeColumn || isNewsActive || !!activeArticleId;
   // 手机窄屏浏览栏目/新闻：正文满宽没有人物留白区，画布隐藏防遮挡
   // （首页 banner 人物区、对话页卡片人物位不受影响）
   const hideHeroOnPhone = isNarrowVp && isOverlayView;
@@ -472,7 +488,7 @@ function AppContent(): JSX.Element {
             heroAlign={
               isHomeView
                 ? "center"
-                : activeColumn || isNewsActive
+                : activeColumn || isNewsActive || activeArticleId
                   ? "column"
                   : "right"
             }
@@ -509,10 +525,10 @@ function AppContent(): JSX.Element {
           </Box>
         )}
 
-        {/* 栏目页/新闻中心的共享页头（App 级渲染；z40 须压过页面根 z30——
+        {/* 栏目页/新闻中心/文章阅读页的共享页头（App 级渲染；z40 须压过页面根 z30——
             两者同为 z30 时页面在 DOM 靠后会把下拉面板盖住，用户反馈过）；
             首页与对话页的页头由各自组件内部渲染 */}
-        {(activeColumn || isNewsActive) && (
+        {(activeColumn || isNewsActive || activeArticleId) && (
           <Box position="absolute" top={0} left={0} width="100%" zIndex={40}>
             <SiteHeader
               activeNav={activeColumn ? activeColumn.column : "news"}
@@ -580,6 +596,12 @@ function AppContent(): JSX.Element {
           />
         ) : isNewsActive ? (
           <NewsPage onNavigateHome={goHomePage} />
+        ) : activeArticleId ? (
+          <ArticlePage
+            articleId={activeArticleId}
+            onNavigateNews={goNewsPage}
+            onNavigateHome={goHomePage}
+          />
         ) : (
           <HeroLanding activeCampusTopic={activeCampusTopic} />
         )}
@@ -624,6 +646,9 @@ function AppContent(): JSX.Element {
         break;
       case "document-knowledge":
         content = <DocumentKnowledge />;
+        break;
+      case "portal-content":
+        content = <PortalContentAdmin />;
         break;
       case "system-logs":
         content = <SystemLogs />;

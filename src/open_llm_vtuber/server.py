@@ -186,6 +186,13 @@ class WebSocketServer:
 
         self.app.include_router(init_auth_routes())
 
+        # 官网新闻/公告后台管理（2026-09-29）：公共读（/content、/article/{id}）
+        # + 后台管理写（require_staff）。官网匿名页经 apiUrl() 自动附访问令牌可读。
+        from .knowledge.portal_api import init_portal_routes
+
+        for portal_router in init_portal_routes():
+            self.app.include_router(portal_router)
+
         # Include character config routes (name/persona -> conf.yaml + hot reload agent)
         from .character_config_api import init_character_config_routes
 

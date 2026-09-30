@@ -22,18 +22,18 @@ import SiteHeader from './site-header';
 import { kaiFont, swissFont, siteTheme } from './site-theme';
 import { useInterrupt } from '@/hooks/utils/use-interrupt';
 import { usePortraitBoard } from '@/hooks/utils/use-portrait-board';
+import { SCHOOL_CONTACT } from '@/data/portal-content';
 import {
-  PORTAL_ANNOUNCEMENTS,
-  PORTAL_NEWS,
-  SCHOOL_CONTACT,
-} from '@/data/portal-content';
+  portalItemHref,
+  usePortalContent,
+} from '@/services/portal-content-api';
 import campusGate from '@/assets/school/campus-gate.jpg';
 
 // 亮点数据：南方+《佛山唯一！保送北大！》——"石实实验学校近年来第13位
 // 因信息学特长保送进入清北的学子"，校领导最认可的硬成果
 const HIGHLIGHT_COUNT = '13';
 
-// 新闻/公告栏目：占位数据（事件真实、细节未获校方审核），首页展示前 3 条
+// 新闻/公告栏目：后台管理数据（2026-09-29 起），首页展示前 3 条
 const NEWS_COUNT = 3;
 const ANNOUNCE_COUNT = 3;
 
@@ -100,6 +100,8 @@ export default function HomePage(_props: HomePageProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { interrupt } = useInterrupt();
   const isPortraitBoard = usePortraitBoard();
+  // 新闻/公告=后台管理数据（GET /api/portal/content；后台不可达回退静态占位）
+  const { news, announcements } = usePortalContent();
 
   // 进入对话界面：先打断可能进行中的播报，再切路由
   const goChat = () => {
@@ -387,7 +389,9 @@ export default function HomePage(_props: HomePageProps) {
             <SectionTitle isPortraitBoard={isPortraitBoard} onMore={goNews}>
               学校新闻
             </SectionTitle>
-            {PORTAL_NEWS.slice(0, NEWS_COUNT).map((item, idx) => {
+            {news.slice(0, NEWS_COUNT).map((item, idx) => {
+              // 条目三态：外链新窗 / 自撰文章站内阅读页 / 纯标题不可点
+              const href = portalItemHref(item);
               const row = (
                 <Flex
                   align="flex-start"
@@ -410,16 +414,16 @@ export default function HomePage(_props: HomePageProps) {
                     {item.date}
                   </Text>
                   <Text
-                    color={item.url ? siteTheme.navy : siteTheme.textBody}
+                    color={href ? siteTheme.navy : siteTheme.textBody}
                     fontSize={isPortraitBoard ? '19px' : { base: '11px', md: '13px' }}
                     lineHeight="1.5"
                     lineClamp={1}
                     flex="1"
                     minW={0}
-                    _hover={item.url ? { color: siteTheme.red } : undefined}
+                    _hover={href ? { color: siteTheme.red } : undefined}
                   >
                     {item.title}
-                    {item.url && (
+                    {href && (
                       <FiArrowUpRight
                         size={isPortraitBoard ? 20 : 12}
                         style={{ marginLeft: '3px', display: 'inline', verticalAlign: '-1px', color: siteTheme.red }}
@@ -436,16 +440,16 @@ export default function HomePage(_props: HomePageProps) {
                     background={item.category === '荣誉喜报' ? siteTheme.tealWash : siteTheme.redWash}
                     color={item.category === '荣誉喜报' ? siteTheme.teal : siteTheme.red}
                   >
-                    {item.category}
+                    {item.category || '新闻'}
                   </Box>
                 </Flex>
               );
-              return item.url ? (
+              return href ? (
                 <Link
                   key={item.id}
-                  href={item.url}
-                  target="_blank"
-                  rel="noreferrer"
+                  href={href}
+                  target={item.url ? '_blank' : undefined}
+                  rel={item.url ? 'noreferrer' : undefined}
                   data-testid={`home-news-${item.id}`}
                   display="block"
                   _hover={{ textDecoration: 'none' }}
@@ -465,53 +469,79 @@ export default function HomePage(_props: HomePageProps) {
             <SectionTitle isPortraitBoard={isPortraitBoard} onMore={goNews}>
               公告与通知
             </SectionTitle>
-            {PORTAL_ANNOUNCEMENTS.slice(0, ANNOUNCE_COUNT).map((item, idx) => (
-              <Flex
-                key={item.id}
-                align="flex-start"
-                gap={isPortraitBoard ? 4 : { base: 2, md: 3 }}
-                py={isPortraitBoard ? '10px' : { base: '3px', md: '5px' }}
-                borderBottom="1px dashed"
-                borderColor={siteTheme.hairline}
-                display={idx === ANNOUNCE_COUNT - 1 && !isPortraitBoard
-                  ? { base: 'none', md: 'flex' }
-                  : 'flex'}
-              >
-                <Box
-                  flexShrink={0}
-                  px={isPortraitBoard ? '10px' : '6px'}
-                  py="1px"
-                  borderRadius="sm"
-                  background={siteTheme.redWash}
-                  color={siteTheme.red}
-                  fontSize={isPortraitBoard ? '14px' : { base: '9px', md: '10.5px' }}
-                  fontWeight="600"
-                  fontFamily={swissFont}
-                  mt="1px"
+            {announcements.slice(0, ANNOUNCE_COUNT).map((item, idx) => {
+              const href = portalItemHref(item);
+              const row = (
+                <Flex
+                  align="flex-start"
+                  gap={isPortraitBoard ? 4 : { base: 2, md: 3 }}
+                  py={isPortraitBoard ? '10px' : { base: '3px', md: '5px' }}
+                  borderBottom="1px dashed"
+                  borderColor={siteTheme.hairline}
+                  display={idx === ANNOUNCE_COUNT - 1 && !isPortraitBoard
+                    ? { base: 'none', md: 'flex' }
+                    : 'flex'}
                 >
-                  {item.date}
-                </Box>
-                <Box flex="1" minW={0}>
-                  <Text
-                    color={siteTheme.textBody}
-                    fontSize={isPortraitBoard ? '19px' : { base: '11px', md: '13px' }}
-                    lineHeight="1.5"
-                    lineClamp={1}
+                  <Box
+                    flexShrink={0}
+                    px={isPortraitBoard ? '10px' : '6px'}
+                    py="1px"
+                    borderRadius="sm"
+                    background={siteTheme.redWash}
+                    color={siteTheme.red}
+                    fontSize={isPortraitBoard ? '14px' : { base: '9px', md: '10.5px' }}
+                    fontWeight="600"
+                    fontFamily={swissFont}
+                    mt="1px"
                   >
-                    {item.title}
+                    {item.date}
+                  </Box>
+                  <Box flex="1" minW={0}>
+                    <Text
+                      color={href ? siteTheme.navy : siteTheme.textBody}
+                      fontSize={isPortraitBoard ? '19px' : { base: '11px', md: '13px' }}
+                      lineHeight="1.5"
+                      lineClamp={1}
+                      _hover={href ? { color: siteTheme.red } : undefined}
+                    >
+                      {item.title}
+                      {href && (
+                        <FiArrowUpRight
+                          size={isPortraitBoard ? 20 : 12}
+                          style={{ marginLeft: '3px', display: 'inline', verticalAlign: '-1px', color: siteTheme.red }}
+                        />
+                      )}
+                    </Text>
+                  </Box>
+                  <Text
+                    flexShrink={0}
+                    color={siteTheme.textSecondary}
+                    fontSize={isPortraitBoard ? '14px' : { base: '9.5px', md: '10.5px' }}
+                    pt="2px"
+                    display={isPortraitBoard ? 'block' : { base: 'none', md: 'block' }}
+                  >
+                    {item.audience}
                   </Text>
-                </Box>
-                <Text
-                  flexShrink={0}
-                  color={siteTheme.textSecondary}
-                  fontSize={isPortraitBoard ? '14px' : { base: '9.5px', md: '10.5px' }}
-                  pt="2px"
-                  display={isPortraitBoard ? 'block' : { base: 'none', md: 'block' }}
+                </Flex>
+              );
+              return href ? (
+                <Link
+                  key={item.id}
+                  href={href}
+                  target={item.url ? '_blank' : undefined}
+                  rel={item.url ? 'noreferrer' : undefined}
+                  data-testid={`home-announce-${item.id}`}
+                  display="block"
+                  _hover={{ textDecoration: 'none' }}
                 >
-                  {item.audience}
-                </Text>
-              </Flex>
-            ))}
+                  {row}
+                </Link>
+              ) : (
+                <Box key={item.id} data-testid={`home-announce-${item.id}`}>
+                  {row}
+                </Box>
+              );
+            })}
           </Box>
         </Flex>
         <Text
@@ -520,7 +550,7 @@ export default function HomePage(_props: HomePageProps) {
           color={siteTheme.textSecondary}
           fontSize={isPortraitBoard ? '14px' : { base: '9.5px', md: '10.5px' }}
         >
-          带 ↗ 的新闻可点击查看公开报道原文；新闻与公告为示例数据，正式内容待校方审核后由后台发布流替换
+          带 ↗ 的条目可点击查看（公开报道原文或站内发布文章）；新闻与公告由学校后台统一发布，实时更新
         </Text>
 
         {/* 竖屏大屏：人物在下方居中展示 + 底部主 CTA（非竖屏大屏的 CTA 已并入 banner 红面板） */}

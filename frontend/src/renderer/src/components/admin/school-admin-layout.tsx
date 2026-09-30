@@ -21,6 +21,7 @@ import {
   FiChevronDown,
   FiChevronRight,
   FiMenu,
+  FiExternalLink,
 } from 'react-icons/fi';
 import '@/styles/school-theme.css';
 
@@ -134,6 +135,13 @@ const menuGroups: MenuGroupConfig[] = [
         icon: FiFileText,
         onClick: () => {},
         description: '切分结果与向量化状态',
+      },
+      {
+        id: 'portal-content',
+        label: '官网新闻公告',
+        icon: FiExternalLink,
+        onClick: () => {},
+        description: '官网首页/新闻中心内容发布',
       },
     ],
   },
@@ -313,6 +321,7 @@ export const SchoolAdminLayout: FC<{
       'test-conversation': '#/main/test-conversation',
       'knowledge-admin': '#/main/knowledge-admin',
       'document-knowledge': '#/main/document-knowledge',
+      'portal-content': '#/main/portal-content',
       'unanswered-questions': '#/main/unanswered-questions',
       'user-management': '#/main/user-management',
       'system-logs': '#/main/system-logs',

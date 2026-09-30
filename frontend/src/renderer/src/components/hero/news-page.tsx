@@ -1,7 +1,10 @@
 /**
- * 新闻中心页（2026-09-21 简化版省实改版）
+ * 新闻中心页（2026-09-21 简化版省实改版；2026-09-29 后台管理化）
  * 省实官网列表页式：红标题 + 红下划线 + 新闻/公告两组可点击列表 + 右侧栏
- * （图说石实照片卡 + 联系方式卡）。匿名可看；条目有已核实直链才可点击跳转。
+ * （图说石实照片卡 + 联系方式卡）。匿名可看。
+ * 数据=后台 GET /api/portal/content（刷新即见，无需重建）；
+ * 后台不可达时回退静态占位数组。条目三态：外链 ↗ 新窗、自撰文章站内阅读、
+ * 纯标题不可点。
  */
 import { Box, Button, Flex, HStack, Image, Link, Text } from "@chakra-ui/react";
 import {
@@ -12,12 +15,11 @@ import {
   FiPhone,
 } from "react-icons/fi";
 import { useState } from "react";
+import { CAMPUS_PHOTOS, SCHOOL_CONTACT } from "@/data/portal-content";
 import {
-  CAMPUS_PHOTOS,
-  PORTAL_ANNOUNCEMENTS,
-  PORTAL_NEWS,
-  SCHOOL_CONTACT,
-} from "@/data/portal-content";
+  portalItemHref,
+  usePortalContent,
+} from "@/services/portal-content-api";
 import { swissFont, siteTheme } from "./site-theme";
 import { usePortraitBoard } from "@/hooks/utils/use-portrait-board";
 
@@ -37,14 +39,18 @@ function NewsRow({
   title,
   date,
   tag,
-  url,
+  href,
+  external,
   source,
   testId,
 }: {
   title: string;
   date: string;
   tag: string;
-  url?: string;
+  /** 条目点击目标：外链 url / 站内 #/article/<id>；null=纯标题不可点 */
+  href: string | null;
+  /** 外链（新窗口）与站内阅读（本窗 hash 跳转）区分 */
+  external: boolean;
   source?: string;
   testId: string;
 }) {
@@ -59,16 +65,16 @@ function NewsRow({
     >
       <Box minWidth="0" flex="1">
         <Text
-          color={url ? ink : muted}
+          color={href ? ink : muted}
           fontSize={{ base: "14px", md: "15px" }}
           lineHeight="1.55"
           fontWeight="500"
           display="flex"
           alignItems="center"
-          _hover={url ? { color: accent } : undefined}
+          _hover={href ? { color: accent } : undefined}
         >
           {title}
-          {url && (
+          {href && (
             <FiArrowUpRight
               size={14}
               style={{ marginLeft: "4px", flexShrink: 0, color: accent }}
@@ -103,7 +109,7 @@ function NewsRow({
       </Box>
     </Flex>
   );
-  if (!url)
+  if (!href)
     return (
       <Box data-testid={testId} opacity={0.9}>
         {inner}
@@ -112,9 +118,9 @@ function NewsRow({
   return (
     <Link
       data-testid={testId}
-      href={url}
-      target="_blank"
-      rel="noreferrer"
+      href={href}
+      target={external ? "_blank" : undefined}
+      rel={external ? "noreferrer" : undefined}
       display="block"
       _hover={{ textDecoration: "none" }}
     >
@@ -125,6 +131,8 @@ function NewsRow({
 
 export default function NewsPage({ onNavigateHome }: NewsPageProps) {
   const isPortraitBoard = usePortraitBoard();
+  // 后台管理数据（失败/空回退静态占位）；刷新即见后台改动
+  const { news, announcements } = usePortalContent();
   // 图说石实：校园实景轮换（静态取前 3 张，手机取 2 张由布局裁剪）
   const [photoIndex] = useState(0);
   const galleryPhotos = CAMPUS_PHOTOS.slice(photoIndex, photoIndex + 3);
@@ -204,7 +212,7 @@ export default function NewsPage({ onNavigateHome }: NewsPageProps) {
                 mb="7"
               >
                 学校新闻与通知公告。带 ↗
-                的条目可点击查看政府或媒体公开报道原文；更多图文请关注学校微信公众号"石实"。
+                的条目可点击查看（政府/媒体公开报道或站内发布文章）；更多图文请关注学校微信公众号"石实"。
               </Text>
 
               {/* 学校新闻 */}
@@ -220,14 +228,15 @@ export default function NewsPage({ onNavigateHome }: NewsPageProps) {
               >
                 学校新闻
               </Text>
-              {PORTAL_NEWS.map((item) => (
+              {news.map((item) => (
                 <NewsRow
                   key={item.id}
                   testId={`news-row-${item.id}`}
                   title={item.title}
                   date={item.date}
-                  tag={item.category}
-                  url={item.url}
+                  tag={item.category || "新闻"}
+                  href={portalItemHref(item)}
+                  external={Boolean(item.url)}
                   source={item.source}
                 />
               ))}
@@ -246,22 +255,26 @@ export default function NewsPage({ onNavigateHome }: NewsPageProps) {
               >
                 通知公告
               </Text>
-              {PORTAL_ANNOUNCEMENTS.map((item) => (
+              {announcements.map((item) => (
                 <NewsRow
                   key={item.id}
                   testId={`news-row-${item.id}`}
                   title={item.title}
                   date={item.date}
                   tag={
-                    item.audience === "全体" ? "通知" : `${item.audience}·通知`
+                    item.audience === "全体" || !item.audience
+                      ? "通知"
+                      : `${item.audience}·通知`
                   }
-                  url={item.url}
+                  href={portalItemHref(item)}
+                  external={Boolean(item.url)}
+                  source={item.source}
                 />
               ))}
 
               <Text mt="6" color={muted} fontSize="11px" lineHeight="1.7">
-                注：新闻与公告目前为占位示例（内容基于学校真实事件，日期可能不精确），正式发布前由校方宣传审核；
-                公众号图文永久链接需校方在微信内复制提供后接入。
+                注：新闻与公告由学校后台统一发布（2026-09-29 起，无需重新发版即生效）；
+                带 ↗ 条目跳转政府/媒体公开报道原文，站内发布的文章点击后在阅读页打开。
               </Text>
             </Box>
           </Box>
