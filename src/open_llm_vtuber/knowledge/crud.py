@@ -57,6 +57,15 @@ class KnowledgeCRUD:
         if self._index_sig is not None and sig is not None and sig != self._index_sig:
             self._load_index()
 
+    def data_version(self) -> Optional[tuple]:
+        """当前索引签名（先探测跨进程变更）。
+
+        供检索查询缓存做失效判据：签名变了 = 有本进程或其他进程的建/删/改，
+        旧查询缓存一律作废（2026-10-03 实测：删除条目后管理端同题复搜
+        180s 内仍返回含已删条目的旧结果，UI 表现为"删了还在"）。"""
+        self._refresh_if_changed()
+        return self._index_sig
+
     def _save_index(self):
         """Save knowledge index to disk"""
         try:

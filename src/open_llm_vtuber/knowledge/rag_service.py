@@ -293,21 +293,23 @@ class RagService:
         """查询归一化：压缩空白，让"同题不同空白"命中同一缓存"""
         return " ".join(query.split())
 
-    def _cache_get(self, key: Tuple[str, int]) -> Optional[List[Dict[str, Any]]]:
+    def _cache_get(self, key: Tuple[str, int], version) -> Optional[List[Dict[str, Any]]]:
         with self._query_cache_lock:
             item = self._query_cache.get(key)
             if item is None:
                 return None
-            cached_at, docs = item
-            if time.monotonic() - cached_at > _QUERY_CACHE_TTL:
+            cached_at, docs, cached_ver = item
+            if time.monotonic() - cached_at > _QUERY_CACHE_TTL or cached_ver != version:
+                # TTL 到期，或知识库已变（建/删/改/重建索引，含其他 worker 落盘的）：
+                # 旧结果作废——否则管理端删改后同题复搜仍端出旧条目（2026-10-03）
                 del self._query_cache[key]
                 return None
             self._query_cache.move_to_end(key)
             return docs
 
-    def _cache_put(self, key: Tuple[str, int], docs: List[Dict[str, Any]]) -> None:
+    def _cache_put(self, key: Tuple[str, int], docs: List[Dict[str, Any]], version) -> None:
         with self._query_cache_lock:
-            self._query_cache[key] = (time.monotonic(), docs)
+            self._query_cache[key] = (time.monotonic(), docs, version)
             self._query_cache.move_to_end(key)
             while len(self._query_cache) > _QUERY_CACHE_MAX:
                 self._query_cache.popitem(last=False)
@@ -335,7 +337,8 @@ class RagService:
         检索跑在专用小线程池上；相同查询在 TTL 内直接命中缓存（校园场景同题率极高）。
         """
         cache_key = (self._normalize_query(query), top_k)
-        cached = self._cache_get(cache_key)
+        version = get_knowledge_crud().data_version()  # 索引签名：建/删/改即变（含跨 worker）
+        cached = self._cache_get(cache_key, version)
         if cached is not None:
             span = current_span()
             if span is not None:
@@ -374,7 +377,7 @@ class RagService:
                 "content": chunk.content,
                 "score": round(float(score), 4),
             })
-        self._cache_put(cache_key, docs)
+        self._cache_put(cache_key, docs, version)
         return docs
 
     async def retrieve_and_enrich_input(
