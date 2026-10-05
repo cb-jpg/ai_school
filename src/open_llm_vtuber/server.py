@@ -193,6 +193,12 @@ class WebSocketServer:
         for portal_router in init_portal_routes():
             self.app.include_router(portal_router)
 
+        # 公众号→官网定时自动同步（2026-10-05）：常驻线程按周期拉发布记录，
+        # 无需后台点按钮；多 worker 靠状态文件+独占锁单实例执行，未配凭据不启动。
+        from .knowledge.wechat_sync import start_wechat_sync_scheduler
+
+        start_wechat_sync_scheduler()
+
         # Include character config routes (name/persona -> conf.yaml + hot reload agent)
         from .character_config_api import init_character_config_routes
 

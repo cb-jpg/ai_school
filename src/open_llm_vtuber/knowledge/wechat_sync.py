@@ -14,7 +14,9 @@ cgi-bin/freepublish/batchget 拉已发布文章（article_url 为永久链接）
 按 url 幂等 upsert 进 PortalStore（kind=news, category=媒体聚焦,
 source=学校微信公众号，created_by=wechat-sync）。已从公众号撤回/删除的文章
 同步在官网下架（仅当本次确实拉到了文章时才做清扫，防 API 异常清空）。
-由后台「从公众号同步」按钮手动触发，不做定时任务。
+后台「从公众号同步」按钮可手动触发；另有常驻定时同步（默认每 6 小时，
+环境变量 OLLV_WECHAT_SYNC_INTERVAL_HOURS 调整周期，设 0 关闭），
+多 worker 部署靠状态文件 + 独占锁保证同一周期只有一个进程真正执行。
 """
 import asyncio
 import hashlib
@@ -196,3 +198,85 @@ def sync_wechat_to_portal() -> dict:
 async def sync_wechat_to_portal_async() -> dict:
     """async 包装：urllib 是阻塞调用，丢线程池避免卡事件循环。"""
     return await asyncio.to_thread(sync_wechat_to_portal)
+
+
+# ---- 定时自动同步（2026-10-05）：无需人工点按钮 ----
+
+_SYNC_INTERVAL_ENV = "OLLV_WECHAT_SYNC_INTERVAL_HOURS"
+DEFAULT_SYNC_INTERVAL_HOURS = 6.0
+_STATE_FILE = Path("data/portal/wechat_sync_state.json")
+_LOCK_FILE = Path("data/portal/.wechat_sync.lock")
+
+
+def _last_ok_age_hours() -> float:
+    """上次成功同步距今的小时数；状态文件缺失/损坏视为∞（该跑了）。"""
+    try:
+        data = json.loads(_STATE_FILE.read_text(encoding="utf-8"))
+        return (time.time() - float(data.get("last_ok", 0))) / 3600
+    except Exception:  # noqa: BLE001
+        return float("inf")
+
+
+def _claim_lock(interval_hours: float) -> bool:
+    """独占锁：多 worker 只有一个进程真正执行。锁陈旧（超周期+2h）视为持有者已死。"""
+    _LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        fd = os.open(str(_LOCK_FILE), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.close(fd)
+        return True
+    except FileExistsError:
+        try:
+            if time.time() - _LOCK_FILE.stat().st_mtime > interval_hours * 3600 + 7200:
+                _LOCK_FILE.unlink()
+                fd = os.open(str(_LOCK_FILE), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.close(fd)
+                return True
+        except OSError:
+            pass
+        return False
+
+
+def _release_lock() -> None:
+    try:
+        _LOCK_FILE.unlink()
+    except OSError:
+        pass
+
+
+def _mark_ok() -> None:
+    _STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _STATE_FILE.write_text(json.dumps({"last_ok": time.time()}), encoding="utf-8")
+
+
+def start_wechat_sync_scheduler() -> None:
+    """启动公众号→官网定时同步常驻线程。未配置凭据或周期设为 0 时不启动。
+    每小时醒一次判断是否到期，到期且抢到锁的进程执行同步，失败下个周期重试。"""
+    try:
+        interval_hours = float(
+            os.environ.get(_SYNC_INTERVAL_ENV, DEFAULT_SYNC_INTERVAL_HOURS) or 0)
+    except ValueError:
+        interval_hours = DEFAULT_SYNC_INTERVAL_HOURS
+    if interval_hours <= 0:
+        return
+
+    def _loop() -> None:
+        try:
+            _load_credentials()
+        except WechatSyncError as e:
+            logger.info(f"公众号定时同步未启用：{e}")
+            return
+        time.sleep(120)  # 避开进程启动高峰再首跑
+        logger.info(f"公众号定时同步已启动（每 {interval_hours:g} 小时）")
+        while True:
+            if _last_ok_age_hours() >= interval_hours and _claim_lock(interval_hours):
+                try:
+                    result = sync_wechat_to_portal()
+                    _mark_ok()
+                    logger.info(f"公众号定时同步执行完毕：{result}")
+                except Exception as e:  # noqa: BLE001
+                    logger.warning(f"公众号定时同步失败（下个周期重试）：{e}")
+                finally:
+                    _release_lock()
+            time.sleep(3600)
+
+    threading.Thread(target=_loop, daemon=True, name="wechat-sync-timer").start()
