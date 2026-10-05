@@ -22,10 +22,12 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 import threading
 import time
 import urllib.request
 from datetime import datetime
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import List, Optional
 from urllib.parse import urlencode
@@ -191,6 +193,8 @@ def sync_wechat_to_portal() -> dict:
                 hidden += 1
     result = {"ok": True, "total": len(articles), "created": created,
               "updated": updated, "hidden": hidden, "skipped": len(articles) - len(fetched_urls)}
+    result["kb"] = _ingest_articles_to_kb()
+    result["kb_anchor"] = _refresh_latest_anchor()
     logger.info(f"公众号同步完成：{result}")
     return result
 
@@ -280,3 +284,258 @@ def start_wechat_sync_scheduler() -> None:
             time.sleep(3600)
 
     threading.Thread(target=_loop, daemon=True, name="wechat-sync-timer").start()
+
+
+# ---- 公众号文章正文 → 知识库（2026-10-05）：数字人答题也能引用最新动态 ----
+#
+# 同步进官网的同时，把还没灌过库的文章抓回正文（mp.weixin.qq.com 页面
+# id="js_content" 容器），走 create_manual_entry → crud.create →
+# index_chunks 标准链路进知识库。覆盖范围=官网内容库里所有公众号域名
+# 的已发布条目（含后台手动贴的链接）。已在知识库的记进状态文件不再重抓；
+# 抓取失败不记状态（下轮重试）；纯图片无正文（<100 字）记 skip 不重试。
+# 公众号撤回的文章只下架官网，知识库保留（新闻无时效风险，且避开
+# delete 不清向量索引的孤儿 chunk 坑）。OLLV_WECHAT_KB_INGEST=0 可关。
+
+_KB_STATE_FILE = Path("data/portal/wechat_kb_state.json")
+_KB_INGEST_ENV = "OLLV_WECHAT_KB_INGEST"
+_KB_MIN_CHARS = 100   # 低于此长度视为纯图片灌水文，无检索价值
+_KB_MAX_PER_RUN = 30  # 单次最多抓取篇数
+_UA_IPHONE = ("Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) "
+              "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.40")
+
+_KB_LOCK = threading.Lock()
+
+
+def _is_wx_url(url: Optional[str]) -> bool:
+    return bool(url) and "mp.weixin.qq.com" in url
+
+
+def _http_get_text(url: str, timeout: int = 15, max_bytes: int = 6 * 1024 * 1024) -> str:
+    req = urllib.request.Request(url, headers={
+        "User-Agent": _UA_IPHONE, "Accept-Language": "zh-CN,zh;q=0.9"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.read(max_bytes).decode("utf-8", errors="ignore")
+
+
+class _TextExtractor(HTMLParser):
+    """js_content 片段 → 纯文本：块级标签转换行，其余剥壳，实体自动还原。"""
+    _BLOCKS = {"p", "div", "section", "br", "li", "h1", "h2", "h3", "h4",
+               "blockquote", "tr", "table", "figcaption"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts: List[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag in self._BLOCKS:
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag):
+        if tag in self._BLOCKS:
+            self.parts.append("\n")
+
+    def handle_data(self, data):
+        self.parts.append(data)
+
+
+def _extract_js_content(html: str) -> str:
+    """定位 id="js_content" 正文容器（内部嵌套 div，按配对深度找闭合）转纯文本。"""
+    start = html.find('id="js_content"')
+    if start == -1:
+        return ""
+    body_start = html.find(">", start) + 1
+    end = len(html)
+    depth = 1
+    for m in re.finditer(r"</?div\b", html[body_start:], re.IGNORECASE):
+        depth += -1 if m.group(0).startswith("</") else 1
+        if depth == 0:
+            end = body_start + m.start()
+            break
+    extractor = _TextExtractor()
+    extractor.feed(html[body_start:end])
+    lines = [re.sub(r"[ \t　]+", " ", ln).strip()
+             for ln in "".join(extractor.parts).splitlines()]
+    out: List[str] = []
+    for ln in lines:
+        if ln or (out and out[-1]):
+            out.append(ln)
+    return "\n".join(out).strip()
+
+
+def _extract_article_meta(html: str) -> tuple:
+    """(标题, 日期)：og:title + `var ct = "纪元秒"`。"""
+    tm = re.search(r'property="og:title" content="([^"]+)"', html) \
+        or re.search(r"property='og:title' content='([^']+)'", html)
+    title = (tm.group(1) if tm else "").strip()
+    date = ""
+    cm = re.search(r'var ct = "([0-9]+)"', html)
+    if cm:
+        date = datetime.fromtimestamp(int(cm.group(1))).strftime("%Y-%m-%d")
+    return title, date
+
+
+def _pick_kb_category(title: str):
+    from .models import KnowledgeCategory
+    if re.search(r"荣誉|喜报|获奖|夺冠|佳绩|祝贺|一等奖|二等奖|特等奖|金牌|百强", title):
+        return KnowledgeCategory.HONORS
+    return KnowledgeCategory.ACTIVITIES
+
+
+def _kb_state() -> dict:
+    try:
+        return json.loads(_KB_STATE_FILE.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _kb_state_put(state: dict) -> None:
+    _KB_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _KB_STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=1),
+                              encoding="utf-8")
+
+
+def _ingest_articles_to_kb() -> dict:
+    """官网内容库里尚未灌库的公众号文章 → 抓正文 → 知识库。"""
+    if os.environ.get(_KB_INGEST_ENV, "").strip() == "0":
+        return {"ingested": 0, "skipped": 0, "failed": 0, "disabled": True}
+    with _KB_LOCK:  # 进程内串行；跨进程竞态由 source_url 查重兜底
+        from .crud import get_knowledge_crud
+        from .document_processor import DocumentProcessor
+        from .vector_store import get_vector_store
+
+        crud = get_knowledge_crud()
+        state = _kb_state()
+        # 其他 worker 刚灌过但状态文件还没记到的，按 source_url 补账防重
+        for e in crud.get_all():
+            if _is_wx_url(e.source_url):
+                state.setdefault(e.source_url, {"entry_id": e.id, "ts": time.time()})
+
+        store = get_portal_store()
+        candidates = [
+            it for it in store.list_all()
+            if it.published and _is_wx_url(it.url)
+            and it.url not in state
+        ]
+        candidates.sort(key=lambda x: x.date or "", reverse=True)
+        candidates = candidates[:_KB_MAX_PER_RUN]
+
+        ingested = skipped = failed = 0
+        for it in candidates:
+            try:
+                html = _http_get_text(it.url)
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"知识库灌文抓取失败（下轮重试）：{it.title[:24]} {e}")
+                failed += 1
+                continue
+            if "环境异常" in html[:3000]:
+                logger.warning(f"知识库灌文遇验证页（下轮重试）：{it.title[:24]}")
+                failed += 1
+                continue
+            text = _extract_js_content(html)
+            if len(text) < _KB_MIN_CHARS:
+                state[it.url] = {"skip": True, "ts": time.time()}
+                skipped += 1
+                logger.info(f"公众号文章正文过短视为图片稿，跳过灌库：{it.title[:24]}")
+                continue
+            page_title, page_date = _extract_article_meta(html)
+            title = (page_title or it.title).strip()
+            date = it.date or page_date
+            content = f"{title}\n{date} 发布于学校微信公众号。\n\n{text}"
+            if any(e.title == title for e in crud.get_all()):
+                title = f"{title}（{date}）"
+            try:
+                entry, chunks = asyncio.run(DocumentProcessor().create_manual_entry(
+                    title=title, content=content,
+                    category=_pick_kb_category(title),
+                    tags=["公众号", "校园动态"], created_by=SYNC_BY))
+                crud.create(entry)
+                crud.update(entry.id, source_url=it.url)
+                get_vector_store().index_chunks(entry.id, chunks)
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"知识库灌文入库失败（下轮重试）：{it.title[:24]} {e}")
+                failed += 1
+                continue
+            state[it.url] = {"entry_id": entry.id, "ts": time.time(),
+                             "date": date, "digest": text[:100]}
+            ingested += 1
+            logger.info(f"公众号文章已灌知识库：{title}（{len(chunks)} 块）")
+            time.sleep(1.0)  # 对公众号页面温和抓取
+        if candidates:
+            _kb_state_put(state)
+        return {"ingested": ingested, "skipped": skipped, "failed": failed}
+
+
+# ---- 「最新动态」问答锚点条目：桥接笼统题 → 公众号新文章 ----
+#
+# 公众号文章标题都是具体事件（「石光扬长汇｜…」），笼统问法（「学校最近
+# 有什么活动」）检索时被校史「…开展的各项活动」这类字面匹配条目压住
+# （09-26/27 同款问题）。按既定经验做问答体锚点：固定 id、每轮同步后用
+# 近期文章一览刷新内容。index_chunks 对同 id 是覆盖式更新，直接重索引
+# 即可，不走删除重建（避开 delete 不清向量索引的孤儿 chunk 坑）。
+
+KB_LATEST_ENTRY_ID = "qa-wechat-latest"
+KB_LATEST_TITLE = "问答：学校最近有什么活动？最新校园动态一览"
+
+
+def _refresh_latest_anchor() -> bool:
+    state = _kb_state()
+    from .crud import get_knowledge_crud
+    from .document_processor import DocumentProcessor
+    from .models import (KnowledgeCategory, KnowledgeEntry, KnowledgeStatus,
+                         SourceType)
+    from .vector_store import get_vector_store
+
+    crud = get_knowledge_crud()
+    items = []
+    for url, info in state.items():
+        if info.get("skip") or not info.get("entry_id"):
+            continue
+        entry = crud.get(info["entry_id"])
+        if not entry:
+            continue
+        summary = entry.summary or ""
+        dm = re.search(r"(\d{4}-\d{2}-\d{2})", summary)
+        date = info.get("date") or (dm.group(1) if dm else "")
+        digest = (info.get("digest") or summary).replace("\n", " ").strip()
+        # 老状态没有 digest 时回退 summary，剥掉内容头（标题+发布行）
+        digest = re.sub(r".*?发布于学校微信公众号。", "", digest, count=1,
+                        flags=re.S).strip()
+        items.append({"date": date, "title": entry.title, "digest": digest[:70]})
+    if not items:
+        return False
+    items.sort(key=lambda x: x["date"], reverse=True)
+    items = items[:12]
+    listing = "\n".join(
+        f"- {it['date'] or '日期不详'}《{it['title']}》{it['digest']}"
+        for it in items)
+    content = (
+        f"{KB_LATEST_TITLE}\n\n"
+        "学校微信公众号持续发布校园动态，近期文章如下（时间从近到远）：\n"
+        f"{listing}\n\n"
+        "想了解某一项的详细情况，可以直接追问，例如「学校最近的家长会」"
+        "「教师分享会讲了什么」。"
+    )
+    processor = DocumentProcessor()
+    chunks = processor._chunk_text(content, title=KB_LATEST_TITLE)
+    try:
+        if crud.get(KB_LATEST_ENTRY_ID):
+            crud.update(KB_LATEST_ENTRY_ID,
+                        summary=processor._generate_summary(content),
+                        chunk_count=len(chunks))
+        else:
+            crud.create(KnowledgeEntry(
+                id=KB_LATEST_ENTRY_ID, title=KB_LATEST_TITLE,
+                category=KnowledgeCategory.ACTIVITIES,
+                tags=["公众号", "校园动态", "问答"],
+                source_type=SourceType.MANUAL,
+                status=KnowledgeStatus.INDEXED,
+                chunk_count=len(chunks),
+                summary=processor._generate_summary(content),
+                created_by=SYNC_BY))
+        asyncio.run(processor._save_processed_data(KB_LATEST_ENTRY_ID, content, chunks))
+        get_vector_store().index_chunks(KB_LATEST_ENTRY_ID, chunks)
+        logger.info(f"「最新动态」锚点已刷新（{len(items)} 篇，{len(chunks)} 块）")
+        return True
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"「最新动态」锚点刷新失败：{e}")
+        return False
