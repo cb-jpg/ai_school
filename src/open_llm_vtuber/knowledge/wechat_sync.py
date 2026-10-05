@@ -125,7 +125,9 @@ def _extract_articles(data: dict) -> List[dict]:
         for news in (pub.get("content") or {}).get("news_item") or []:
             if str(news.get("is_deleted", "0")).lower() in ("1", "true"):
                 continue
-            url = (news.get("article_url") or "").strip()
+            # freepublish/batchget 实测返回链接字段是 url（文档写的 article_url
+            # 实际不出现，2026-10-05 实锤：16 篇文章因取错字段全被丢弃）；两者都收
+            url = (news.get("article_url") or news.get("url") or "").strip()
             title = (news.get("title") or "").strip()
             if not url or not title:
                 continue
