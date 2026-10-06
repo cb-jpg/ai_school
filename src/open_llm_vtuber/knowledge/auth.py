@@ -11,16 +11,20 @@
 """
 
 import base64
+import csv
 import hashlib
 import hmac
+import io
 import json
 import re
 import secrets
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile
+from fastapi import File as FastFile
 from loguru import logger
 from pydantic import BaseModel, Field
 
@@ -131,7 +135,7 @@ class UserStore:
             return {"username": username, "role": record["role"]}
         return None
 
-    def create_user(self, username: str, password: str, role: str) -> dict:
+    def create_user(self, username: str, password: str, role: str, group: str = "") -> dict:
         self._refresh_if_changed()
         if username in self.users:
             raise ValueError(f"用户已存在：{username}")
@@ -142,10 +146,11 @@ class UserStore:
         self.users[username] = {
             "password": hash_password(password),
             "role": role,
+            "group": (group or "").strip()[:32],
             "created_at": time.time(),
         }
         self._save()
-        logger.info(f"创建用户 {username}（{role}）")
+        logger.info(f"创建用户 {username}（{role}，分组：{(group or '').strip()[:32] or '无'}）")
         return {"username": username, "role": role}
 
     def delete_user(self, username: str) -> None:
@@ -170,7 +175,8 @@ class UserStore:
     def list_users(self) -> list:
         self._refresh_if_changed()
         return [
-            {"username": u, "role": r["role"], "created_at": r["created_at"]}
+            {"username": u, "role": r["role"], "group": r.get("group", ""),
+             "created_at": r["created_at"]}
             for u, r in self.users.items()
         ]
 
@@ -288,6 +294,7 @@ class CreateUserRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=64)
     password: str = Field(..., min_length=8, max_length=128)
     role: str = Field(..., pattern="^(admin|editor|user|parent)$")
+    group: str = Field("", max_length=32)
 
 
 class ChangePasswordRequest(BaseModel):
@@ -317,10 +324,92 @@ def init_auth_routes() -> APIRouter:
     @router.post("/users")
     async def create_user(req: CreateUserRequest, _admin: dict = Depends(require_admin)):
         try:
-            created = get_user_store().create_user(req.username, req.password, req.role)
+            created = get_user_store().create_user(req.username, req.password, req.role, req.group)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         return {"user": created}
+
+    # ---- 账号批量导入/导出（2026-10-06）：CSV 表格，方便学校批量建号 ----
+    #
+    # 导入列：用户名,密码,角色,分组（表头中文；角色接受中文或英文键；密码留空
+    # 则自动生成，明文只在本次响应的 created 里出现一次，供管理端下载回执）。
+    # 已存在的账号跳过不覆盖；坏行逐条报错不中断。密码为 scrypt 哈希存储，
+    # 导出接口只含 用户名/角色/分组/创建时间，不含密码（哈希不可逆）。
+
+    IMPORT_HEADERS = ["用户名", "密码", "角色", "分组"]
+    ROLE_CN_TO_KEY = {
+        "学生": "user", "普通用户": "user", "user": "user",
+        "家长": "parent", "parent": "parent",
+        "数据管理员": "editor", "编辑者": "editor", "editor": "editor",
+        "管理员": "admin", "最高权限管理员": "admin", "admin": "admin",
+    }
+
+    @router.post("/users/import")
+    async def import_users(file: UploadFile = FastFile(...), _admin: dict = Depends(require_admin)):
+        raw = await file.read()
+        if len(raw) > 2 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="文件过大（>2MB），请分批导入")
+        try:
+            text = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            try:
+                text = raw.decode("gbk")  # Excel 中文环境「另存为 CSV」常见编码
+            except UnicodeDecodeError:
+                raise HTTPException(status_code=400, detail="文件编码不支持：请用 UTF-8 或重新另存为 CSV")
+        reader = csv.DictReader(io.StringIO(text))
+        headers = [h.strip() for h in (reader.fieldnames or [])]
+        if not headers or "用户名" not in headers or "角色" not in headers:
+            raise HTTPException(status_code=400,
+                                detail="表头需包含「用户名」和「角色」列：用户名,密码,角色,分组（可先下载模板）")
+        store = get_user_store()
+        created: list = []
+        skipped: list = []
+        errors: list = []
+        for idx, row in enumerate(reader, start=2):
+            username = (row.get("用户名") or "").strip()
+            password = (row.get("密码") or "").strip()
+            role_raw = (row.get("角色") or "").strip()
+            group = (row.get("分组") or "").strip()[:32]
+            if not username and not password and not role_raw:
+                continue  # 空行
+            role = role_raw if role_raw in VALID_ROLES else ROLE_CN_TO_KEY.get(role_raw, "")
+            if not role:
+                errors.append({"line": idx, "username": username,
+                               "error": f"角色无法识别：{role_raw or '(空)'}（可用：学生/家长/数据管理员/管理员）"})
+                continue
+            if not password:
+                password = secrets.token_urlsafe(9)
+            try:
+                store.create_user(username, password, role, group)
+            except ValueError as e:
+                if "已存在" in str(e):
+                    skipped.append({"line": idx, "username": username, "reason": "已存在，未改动"})
+                else:
+                    errors.append({"line": idx, "username": username, "error": str(e)})
+                continue
+            created.append({"username": username, "password": password,
+                            "role": role, "group": group})
+            if len(created) + len(skipped) + len(errors) >= 2000:
+                errors.append({"line": idx + 1, "username": "", "error": "已达单次导入上限 2000 行，其余未处理"})
+                break
+        logger.info(f"账号批量导入：新建 {len(created)} / 跳过 {len(skipped)} / 错误 {len(errors)}")
+        return {"created": created, "skipped": skipped, "errors": errors}
+
+    @router.get("/users/export")
+    async def export_users(_admin: dict = Depends(require_admin)):
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(["用户名", "角色", "分组", "创建时间"])
+        users = sorted(get_user_store().list_users(), key=lambda x: x["username"])
+        for u in users:
+            created = datetime.fromtimestamp(u["created_at"]).strftime("%Y-%m-%d %H:%M") \
+                if u.get("created_at") else ""
+            writer.writerow([u["username"], u["role"], u.get("group", ""), created])
+        # BOM 让 Excel 直接打开不乱码
+        return Response(
+            content="﻿" + buf.getvalue(),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": "attachment; filename=accounts.csv"})
 
     @router.delete("/users/{username}")
     async def delete_user(username: str, admin: dict = Depends(require_admin)):
