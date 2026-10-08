@@ -256,6 +256,7 @@ export const campusTopics: CampusTopic[] = [
     softAccent: '#E8EEFF',
     stats: [
       { value: '全国', label: '防震减灾科普示范校' },
+      { value: '43 位', label: '校方通报累计录取清北学子' },
       { value: '13 位', label: '报道所称信息学特长保送清北学子' },
       { value: '一等奖', label: '2026年美育报道入选' },
     ],
@@ -279,7 +280,7 @@ export const campusTopics: CampusTopic[] = [
         title: '让兴趣成为持续发展的方向',
         summary: '公开报道提到，学校长期重视信息学特长培养，近年来已有多位学生凭信息学特长进入清华大学、北京大学等高校。',
         facts: [
-          '2025年公开报道提到近年来已有13位相关学生保送清北',
+          '校方通报（2026-10）：累计43位学子录取清北，其中13位凭信息学特长保送',
           '强调兴趣、长期训练与项目实践的结合',
           '页面不展示未成年人的姓名、班级和具体分数',
         ],
@@ -530,7 +531,8 @@ function convertAPIToTopic(topicId: CampusTopicId, data: any): CampusTopic {
         softAccent: '#E8EEFF',
         stats: [
           { value: '全国', label: '防震减灾科普示范校' },
-          { value: '13 位', label: '报道所称信息学特长保送清北学子' },
+          { value: '43 位', label: '校方通报累计录取清北学子' },
+      { value: '13 位', label: '报道所称信息学特长保送清北学子' },
           { value: '一等奖', label: '2026年美育报道入选' },
         ],
         introNarration: '现在看到的是石实实验学校成就展页。学校的成果不只是一张成绩单，也包括面向真实生活的安全教育、长期积累的教师专业成长、阅读与美育活动，以及信息学等特色发展方向。下面的内容都来自公开报道，涉及学生个人的地方只保留经过概括的集体信息。',

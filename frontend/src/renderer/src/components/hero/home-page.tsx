@@ -29,8 +29,9 @@ import {
 } from '@/services/portal-content-api';
 import campusGate from '@/assets/school/campus-gate.jpg';
 
-// 亮点数据：南方+《佛山唯一！保送北大！》——"石实实验学校近年来第13位
-// 因信息学特长保送进入清北的学子"，校领导最认可的硬成果
+// 亮点数据（2026-10-08 校方口径）：建校以来 43 位学子录取清北，其中 13 位
+// 凭信息学特长保送清北（南方+曾报道《佛山唯一！保送北大！》），校领导最认可的硬成果
+const ADMITTED_COUNT = '43';
 const HIGHLIGHT_COUNT = '13';
 
 // 新闻/公告栏目：后台管理数据（2026-09-29 起），首页展示前 3 条
@@ -328,6 +329,12 @@ export default function HomePage(_props: HomePageProps) {
               >
                 <Text fontSize={{ base: '11px', md: '14px' }} lineHeight="1.5">
                   <Box as="span" fontWeight="bold" fontSize={{ base: '15px', md: '19px' }}>
+                    {ADMITTED_COUNT}
+                  </Box>
+                  {' '}位学子录取清北
+                </Text>
+                <Text fontSize={{ base: '11px', md: '14px' }} lineHeight="1.5">
+                  <Box as="span" fontWeight="bold" fontSize={{ base: '15px', md: '19px' }}>
                     {HIGHLIGHT_COUNT}
                   </Box>
                   {' '}位学子保送清北
@@ -339,7 +346,7 @@ export default function HomePage(_props: HomePageProps) {
                   {' '}门扬长选修课
                 </Text>
                 <Text fontSize={{ base: '11px', md: '14px' }} lineHeight="1.5" opacity={0.85}>
-                  据南方+公开报道
+                  据校方及公开报道
                 </Text>
               </Flex>
 
