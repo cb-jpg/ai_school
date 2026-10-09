@@ -229,7 +229,7 @@ function AppContent(): JSX.Element {
   const [isFooterCollapsed, setIsFooterCollapsed] = useState(false);
   const [activeCampusTopic, setActiveCampusTopic] =
     useState<CampusTopicId | null>(readCampusTopicFromLocation);
-  // 官网 v2：栏目页（学校概况/办学成果/招生入学）与新闻中心的路由状态。
+  // 官网 v2：栏目页（学校概况/办学成果/招生咨询）与新闻中心的路由状态。
   // 三者都置位时栏目页优先（旧专题链接两态并存，渲染取栏目页）。
   const [activeColumn, setActiveColumn] = useState<ActiveColumnView | null>(
     readColumnArticleFromLocation,
@@ -605,7 +605,7 @@ function AppContent(): JSX.Element {
           </Box>
         )}
 
-        {/* 官网 v2 渲染链：新首页 → 栏目页（学校概况/办学成果/招生入学，含旧专题
+        {/* 官网 v2 渲染链：新首页 → 栏目页（学校概况/办学成果/招生咨询，含旧专题
             映射）→ 新闻中心 → 对话界面。栏目/新闻页画布保持 md 档右侧 55% + 右站位
             （isHomeView=false），内容卡占左 58%，人物从右侧透出 */}
         {isHomeView ? (

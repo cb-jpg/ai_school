@@ -3,18 +3,19 @@
  * 全站共享页头（2026-09-21 全站官网化；同日二次改版：省实式下拉导航）
  * 绛红校名横带 + 白色通栏栏目导航条。首页（home-page）/ 栏目页（column-page）/
  * 新闻中心（news-page）/ 对话页（hero-landing）四处共用。
- * 导航行（省实官网式）：首页 | 学校概况▾ 办学成果▾ 招生入学▾ | 新闻中心▾ | 对话。
+ * 导航行（省实官网式）：首页 | 学校概况▾ 办学成果▾ 招生咨询▾ | 新闻中心▾ | 对话。
  * 下拉菜单只在 md+ 桌面悬停/点击展开；手机端与一体机（kiosk 断点不可达）一律
  * 平铺直跳栏目页，文章切换由栏目页内菜单完成——触摸稳定优先。
  * 横带：石字圆章 + 楷体校名 + 英文副标 + 后台管理入口 + 设置齿轮。
  */
 import { useState } from 'react';
-import { Box, Button, Flex, HStack, Text } from '@chakra-ui/react';
+import { Box, Button, Flex, HStack, Image, Text } from '@chakra-ui/react';
 import { FiChevronDown, FiHome, FiMessageCircle, FiSettings } from 'react-icons/fi';
 import TopicTabRow from './topic-tab-row';
 import { SCHOOL_CONFIG } from './school-config';
 import { kaiFont, swissFont, siteTheme } from './site-theme';
 import { useInterrupt } from '@/hooks/utils/use-interrupt';
+import emblemWhite from '@/assets/brand/emblem-white.png';
 import { usePortraitBoard } from '@/hooks/utils/use-portrait-board';
 import { useAuth } from '@/context/auth-context';
 import { CampusTopicId } from '@/data/campus-knowledge';
@@ -210,23 +211,15 @@ export default function SiteHeader({
           align="center"
           minW={0}
         >
-          {/* "石"字圆章（校徽矢量图到位前的占位章） */}
-          <Box
+          {/* 校徽（2026-10 取自校方招生简章，白章透明底；浅底场景用 emblem-red.png）。
+              走 assets import（/assets 在共享令牌门禁白名单内；/brand 公共路径会 401） */}
+          <Image
+            src={emblemWhite}
+            alt="石实实验学校校徽"
             flexShrink={0}
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            width={isPortraitBoard ? '52px' : { base: '36px', md: '42px' }}
             height={isPortraitBoard ? '52px' : { base: '36px', md: '42px' }}
-            borderRadius="full"
-            border="2px solid rgba(255, 255, 255, 0.85)"
-            fontFamily={kaiFont}
-            fontWeight="bold"
-            fontSize={isPortraitBoard ? '28px' : { base: '19px', md: '23px' }}
-            lineHeight="1"
-          >
-            石
-          </Box>
+            width="auto"
+          />
           <Box minW={0}>
             <Text
               fontFamily={kaiFont}

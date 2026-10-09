@@ -221,7 +221,7 @@ export default function HomePage(_props: HomePageProps) {
                 lineHeight="1.35"
                 textShadow="0 1px 8px rgba(255, 255, 255, 0.9), 0 0 18px rgba(255, 255, 255, 0.65)"
               >
-                让每一个孩子都能成长、成才、成功
+                让每一个石实学子都闪闪发光
               </Text>
             </Box>
             <Box maxW="640px">
@@ -302,7 +302,7 @@ export default function HomePage(_props: HomePageProps) {
                 lineHeight="1.4"
                 mt={{ base: 1, md: 2 }}
               >
-                让每一个孩子都能成长、成才、成功
+                让每一个石实学子都闪闪发光
               </Text>
 
               {/* 校训三行（楷体小字） */}
