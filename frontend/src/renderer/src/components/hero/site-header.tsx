@@ -20,6 +20,7 @@ import { usePortraitBoard } from '@/hooks/utils/use-portrait-board';
 import { useAuth } from '@/context/auth-context';
 import { CampusTopicId } from '@/data/campus-knowledge';
 import { SiteColumnId, siteColumns } from '@/data/site-columns';
+import { IS_KIOSK } from '@/utils/device-profile';
 
 export type SiteNavActive = 'home' | 'dialog' | 'news' | SiteColumnId | CampusTopicId;
 
@@ -59,9 +60,14 @@ function NavDropdown({
   testId: string;
 }) {
   const [open, setOpen] = useState(false);
-  // base（手机/一体机 420 布局视口）：无下拉，点击直达栏目页；
-  // md+ 桌面：点击/悬停展开下拉，菜单项切换到具体文章
-  const isDesktopViewport = typeof window !== 'undefined'
+  // base（手机/一体机）：无下拉，点击直达栏目页；md+ 桌面：悬停/点击展开下拉。
+  // ⚠️ 一体机陷阱（2026-10-13 唯实智能真机）：IS_KIOSK 把 Chakra md 断点顶到
+  // 9992px，下拉 CSS `display:md` 永远不出现；但 matchMedia('(min-width:768px)')
+  // 看的是物理视口（1080），仍为 true → 旧逻辑走「只 toggle open」、菜单却不可见，
+  // 表现为顶栏「学校概况/办学成果/招生咨询/新闻中心」点了毫无反应（视频实证），
+  // 而同页普通按钮（开始对话）正常。kiosk 必须强制直跳，绝不能信裸 matchMedia。
+  const isDesktopViewport = !IS_KIOSK
+    && typeof window !== 'undefined'
     && window.matchMedia('(min-width: 768px)').matches;
   const navigateFirst = () => items[0]?.onClick();
 

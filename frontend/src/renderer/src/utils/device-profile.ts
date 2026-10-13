@@ -94,12 +94,20 @@ export const KIOSK_SCALE =
     : 1;
 
 /**
- * WebView 接受 width=420 后已经会把页面铺满屏幕，此时不能再做 CSS 放大。
- * 只有运行时 meta viewport 被 ROM 忽略、innerWidth 仍是物理宽度时才启用兜底缩放。
+ * kiosk CSS 放大倍数。
+ * - meta 被 ROM 忽略（innerWidth 仍是物理宽）→ 用 KIOSK_SCALE 兜底；
+ * - meta 接受 width=420 且浏览器已 fit-width 铺满 → 返回 1，避免双重放大；
+ * - meta 接受 width=420 但 OEM 不做 fit-width（唯实智能 2026-10-13：内容缩在
+ *   中间一条、两侧大片黑边）→ outerWidth 仍是物理宽，按 outer/420 做 CSS 放大。
  */
 export const getKioskCssScale = (): number => {
   if (!IS_KIOSK || typeof window === 'undefined') return 1;
-  return window.innerWidth <= KIOSK_LAYOUT_WIDTH + 1 ? 1 : KIOSK_SCALE;
+  if (window.innerWidth > KIOSK_LAYOUT_WIDTH + 1) return KIOSK_SCALE;
+  const outer = window.outerWidth || 0;
+  if (outer > KIOSK_LAYOUT_WIDTH * 1.3) {
+    return outer / KIOSK_LAYOUT_WIDTH;
+  }
+  return 1;
 };
 
 if (IS_KIOSK) {
@@ -112,11 +120,18 @@ if (IS_KIOSK) {
   const rootEl = document.getElementById('root');
   if (rootEl) {
     rootEl.style.overflow = 'clip';
-    // clip 会按 #root 自身高度裁剪：包装盒 420×app-vh 经 scale 放大后视觉
-    // 高度是 app-vh × css-scale，而 #root 自动高度只算布局值（transform 不
-    // 计入父盒高度）→ 真机实锤下半屏 56% 被裁成白屏。钉成视觉高度。
+    // clip 会按 #root 自身宽高裁剪：包装盒 420×app-vh 经 scale 放大后视觉
+    // 尺寸是 layout × css-scale，而 #root 自动尺寸只算布局值（transform 不
+    // 计入父盒）→ 真机实锤下半屏 56% 被裁成白屏；部分 OEM WebView（唯实智能
+    // 2026-10-13）还会把偏小的布局盒水平居中，两侧露出大片黑边。宽高都钉成
+    // 视觉尺寸，内容从左上角铺满，不再被居中留白。
+    rootEl.style.width = `calc(${KIOSK_LAYOUT_WIDTH}px * var(--kiosk-css-scale, 1))`;
     rootEl.style.height = 'calc(var(--app-vh, 100vh) * var(--kiosk-css-scale, 1))';
   }
+  // WebView 默认底色常是黑：scale 未铺满或首帧闪一下时两侧/上下会露黑边。
+  // 与官网纸白底对齐，露边也不刺眼。
+  document.documentElement.style.background = '#FAF7F2';
+  document.body.style.background = '#FAF7F2';
 
   const meta = document.querySelector('meta[name="viewport"]');
   if (meta) {
