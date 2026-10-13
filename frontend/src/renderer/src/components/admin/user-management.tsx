@@ -4,8 +4,16 @@
  * 2026-10-06 批量建号：CSV 导入（用户名,密码,角色,分组；密码留空自动生成，
  * 导入后可下载含初始密码的一次性回执——服务端 scrypt 哈希不可逆，导出清单
  * 因此不含密码）；「分组」为纯标注字段（班级/部门），不参与权限。
+ *
+ * 2026-10-13 下载修复：Android WebView（App/一体机）没有下载处理器，
+ * blob + <a download> 点击是纯静默 no-op（Capacitor 未接 DownloadListener），
+ * 校方在 App 后台点「下载模板/导出/回执」毫无反应。原生环境改弹
+ * 「复制内容」层兜底（execCommand 复制，http 非安全上下文无 navigator.clipboard）；
+ * 桌面浏览器保持原下载（CDP 实测落盘正常）。原生真下载需 APK 接
+ * DownloadListener + 服务端附件端点，留待后续发版。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import {
   Box, VStack, HStack, Text, Button, Input, Badge,
 } from '@chakra-ui/react';
@@ -56,15 +64,31 @@ interface ImportResult {
   errors: { line: number; username: string; error: string }[];
 }
 
-/** 下载 CSV（BOM 让 Excel 直接打开不乱码） */
-function downloadCsv(filename: string, content: string) {
+/** 能否走浏览器原生下载：Capacitor App（Android WebView）下载会静默失败，
+ *  一律走「复制内容」兜底；桌面浏览器/Electron 可下载。
+ *  桌面地址栏加 ?csvcopy=1 可强制预览兜底弹层（调试用）。 */
+const canBrowserDownload = (): boolean => {
+  try {
+    if (new URLSearchParams(window.location.search).get('csvcopy') === '1') return false;
+    return !Capacitor.isNativePlatform();
+  } catch {
+    return true;
+  }
+};
+
+/** 浏览器下载 CSV（BOM 让 Excel 直接打开不乱码）。
+ *  元素先挂 DOM 再点击（老内核兜底）；revoke 延后一分钟，避免个别
+ *  WebView 起下载慢、同步 revoke 把下载掐死的竞态。 */
+function saveCsvViaBrowser(filename: string, content: string) {
   const blob = new Blob([`﻿${content}`], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 const TEMPLATE_CSV = [
@@ -91,6 +115,43 @@ export default function UserManagement() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+
+  // CSV 下载（原生 App 走复制兜底层）
+  const [csvFallback, setCsvFallback] = useState<{ filename: string; content: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const downloadCsv = useCallback((filename: string, content: string) => {
+    if (!canBrowserDownload()) {
+      setCsvFallback({ filename, content });
+      return;
+    }
+    saveCsvViaBrowser(filename, content);
+  }, []);
+
+  const copyFallbackCsv = useCallback(async () => {
+    if (!csvFallback) return;
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText(csvFallback.content);
+      ok = true;
+    } catch {
+      // http 非安全上下文无 navigator.clipboard：execCommand 兜底
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = csvFallback.content;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        ok = document.execCommand('copy');
+        ta.remove();
+      } catch {
+        ok = false;
+      }
+    }
+    setCopied(ok);
+    window.setTimeout(() => setCopied(false), 2500);
+  }, [csvFallback]);
 
   // 筛选
   const [roleFilter, setRoleFilter] = useState<'all' | CreateRole>('all');
@@ -433,6 +494,49 @@ export default function UserManagement() {
           )}
         </VStack>
       </Box>
+
+      {/* 原生 App 下载兜底：Android WebView 无下载处理器，提供复制出口 */}
+      {csvFallback && (
+        <Box
+          position="fixed" inset="0" zIndex={1400} bg="blackAlpha.600"
+          display="flex" alignItems="center" justifyContent="center" p="4"
+          onClick={() => setCsvFallback(null)}
+        >
+          <Box
+            bg="white" borderRadius="lg" p="5" width="100%" maxWidth="560px"
+            maxHeight="80vh" overflowY="auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Text fontWeight="bold" color={gray800} mb="2">保存「{csvFallback.filename}」</Text>
+            <Text fontSize="xs" color={gray600} mb="3">
+              当前 App 内无法直接下载文件，请点「复制内容」后：电脑上粘贴到记事本，
+              另存为 .csv 文件（或直接粘贴进 Excel）；也可以用电脑浏览器打开后台
+              管理，点同一按钮即可直接下载。
+            </Text>
+            <textarea
+              readOnly value={csvFallback.content} rows={6}
+              onFocus={(e) => e.currentTarget.select()}
+              style={{
+                width: '100%', fontFamily: 'monospace', fontSize: '11px', padding: '8px',
+                border: `1px solid ${gray200}`, borderRadius: '6px',
+                color: gray800, background: '#f8fafc',
+              }}
+            />
+            <HStack mt="3" justify="flex-end" gap="2">
+              <Button size="sm" variant="outline" onClick={() => setCsvFallback(null)}>
+                关闭
+              </Button>
+              <Button
+                size="sm" background={copied ? '#2e8b57' : schoolBlue} color="white"
+                _hover={{ background: copied ? '#25704a' : '#0f3a6e' }}
+                onClick={copyFallbackCsv}
+              >
+                {copied ? '已复制 ✓' : '复制内容'}
+              </Button>
+            </HStack>
+          </Box>
+        </Box>
+      )}
     </Box>
   );
 }
