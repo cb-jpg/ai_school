@@ -12,6 +12,30 @@ const USER_KEY = 'kb_user';
 export interface AuthUser {
   username: string;
   role: 'admin' | 'editor' | 'user' | 'parent';
+  /** 首次登录/被管理员重置后为 true：前端登录页强制先改密（2026-10-14）。
+   *  存量账号后端不回传此字段 → undefined 按无需改密处理。 */
+  must_change_password?: boolean;
+}
+
+/** 自助修改密码（登录态）：首次登录强制改密与设置面板共用 */
+export async function changePassword(newPassword: string): Promise<void> {
+  const response = await authFetch('/api/auth/change-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ new_password: newPassword }),
+  });
+  if (!response.ok) {
+    const detail = await response
+      .json()
+      .then((data) => data?.detail)
+      .catch(() => null);
+    throw new Error(detail || `修改失败（${response.status}）`);
+  }
+  // 本地 user 同步清除标记（下次登录后端也不会再返回 true）
+  const stored = getStoredUser();
+  if (stored) {
+    setAuth(getStoredToken() || '', { ...stored, must_change_password: false });
+  }
 }
 
 export function getStoredToken(): string | null {

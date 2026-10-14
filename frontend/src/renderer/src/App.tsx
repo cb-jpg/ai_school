@@ -444,8 +444,9 @@ function AppContent(): JSX.Element {
   // 真机 WebView 上重建失败即"登录后人物在对话页和首页全消失"（桌面浏览器侥幸存活）。
   // 改为 z100 不透明浮层盖在 hero 树上（与下方 authPromptOverlay 同法）：
   // 画布全程不卸载，登录页期间模型照常预加载，登录成功浮层退去人物原地不动。
+  // 强制改密（2026-10-14）：首次登录/被重置的账号视同未登录，先改密再进对话。
   const authGateOverlay =
-    isDialogViewGate && !authUser ? (
+    isDialogViewGate && (!authUser || authUser.must_change_password) ? (
       <Box
         position="fixed"
         top={0}
@@ -458,8 +459,9 @@ function AppContent(): JSX.Element {
       </Box>
     ) : null;
 
-  // 专题页匿名点「讲解」：登录浮层盖在当前页面上，可取消继续浏览
-  const authPromptOverlay = authPrompt && !authUser && (
+  // 专题页匿名点「讲解」：登录浮层盖在当前页面上，可取消继续浏览；
+  // 已登录但待强制改密的账号同样保留浮层（登录页就地显示改密步骤）
+  const authPromptOverlay = authPrompt && (!authUser || authUser.must_change_password) && (
     <Box
       position="fixed"
       top={0}
@@ -640,8 +642,9 @@ function AppContent(): JSX.Element {
   // Admin workspace page - school themed management dashboard
   if (currentRoute === "main-admin") {
     // 登录守卫：管理后台仅 admin（最高权限管理员）/ editor（数据管理员）可进入；
-    // 学生（user）/ 家长（parent）无权限
-    if (!authUser) {
+    // 学生（user）/ 家长（parent）无权限。
+    // 待强制改密的登录态视同未登录（2026-10-14），先在登录页改完密码再进后台。
+    if (!authUser || authUser.must_change_password) {
       return <AppLoginPage />;
     }
     if (authUser.role !== "admin" && authUser.role !== "editor") {

@@ -89,6 +89,8 @@ class UserStore:
             "admin": {
                 "password": hash_password(initial_password),
                 "role": "admin",
+                # 初始密码是一次性随机串，首次登录必须改（2026-10-14）
+                "must_change_password": True,
                 "created_at": time.time(),
             }
         }
@@ -132,7 +134,13 @@ class UserStore:
         self._refresh_if_changed()
         record = self.users.get(username)
         if record and verify_password(password, record["password"]):
-            return {"username": username, "role": record["role"]}
+            # must_change_password：首次登录/被重置后强制改密（存量账号无此字段=False，
+            # 2026-10-14 起新建与重置都会打上标记）
+            return {
+                "username": username,
+                "role": record["role"],
+                "must_change_password": bool(record.get("must_change_password", False)),
+            }
         return None
 
     def create_user(self, username: str, password: str, role: str, group: str = "") -> dict:
@@ -147,6 +155,8 @@ class UserStore:
             "password": hash_password(password),
             "role": role,
             "group": (group or "").strip()[:32],
+            # 初始密码（含批量导入自动生成）视为临时凭据，首次登录强制修改
+            "must_change_password": True,
             "created_at": time.time(),
         }
         self._save()
@@ -164,18 +174,27 @@ class UserStore:
         self._save()
         logger.info(f"删除用户 {username}")
 
-    def change_password(self, username: str, new_password: str) -> None:
+    def change_password(self, username: str, new_password: str,
+                        must_change: bool = False) -> None:
+        """改密码。pv（密码版本）自增使该账号已签发令牌立即失效（重置/改密即踢旧会话）；
+        must_change 控制下次登录是否强制改密：自助改密=False（清除），
+        管理员重置=True（2026-10-14 首次登录必须改密）。"""
         self._refresh_if_changed()
         if username not in self.users:
             raise ValueError(f"用户不存在：{username}")
-        self.users[username]["password"] = hash_password(new_password)
+        record = self.users[username]
+        record["password"] = hash_password(new_password)
+        record["pv"] = record.get("pv", 0) + 1
+        record["must_change_password"] = must_change
         self._save()
-        logger.info(f"用户 {username} 已修改密码")
+        logger.info(f"用户 {username} 密码已修改（pv={record['pv']}，"
+                    f"下次登录强制改密={must_change}）")
 
     def list_users(self) -> list:
         self._refresh_if_changed()
         return [
             {"username": u, "role": r["role"], "group": r.get("group", ""),
+             "must_change_password": bool(r.get("must_change_password", False)),
              "created_at": r["created_at"]}
             for u, r in self.users.items()
         ]
@@ -207,8 +226,11 @@ class TokenManager:
         return secret
 
     def issue(self, username: str, role: str) -> str:
+        # pv=密码版本：签发时带上，verify 时与用户记录比对——改密/重置后旧令牌立即失效
+        record = get_user_store().users.get(username) or {}
         payload = json.dumps(
-            {"username": username, "role": role, "exp": int(time.time()) + TOKEN_TTL_SECONDS}
+            {"username": username, "role": role,
+             "pv": record.get("pv", 0), "exp": int(time.time()) + TOKEN_TTL_SECONDS}
         ).encode("utf-8")
         body = base64.urlsafe_b64encode(payload)
         sig = hmac.new(self.secret, body, hashlib.sha256).digest()
@@ -223,6 +245,15 @@ class TokenManager:
                 return None
             payload = json.loads(base64.urlsafe_b64decode(body))
             if payload.get("exp", 0) < time.time():
+                return None
+            # 密码版本一致性（2026-10-14）：改密/重置后旧令牌即失效。存量令牌与存量
+            # 账号都没有 pv → 双方按 0 比 → 匹配，部署不影响现有登录。
+            # 比对前先刷新用户快照：重置发生在另一 worker 时，本 worker 不重读
+            # users.json 会拿旧 pv 误杀新令牌（多进程部署，与 UserStore 同一信号）。
+            store = get_user_store()
+            store._refresh_if_changed()
+            record = store.users.get(payload.get("username")) or {}
+            if payload.get("pv", 0) != record.get("pv", 0):
                 return None
             return payload
         except Exception:
@@ -298,6 +329,10 @@ class CreateUserRequest(BaseModel):
 
 
 class ChangePasswordRequest(BaseModel):
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+
+class ResetPasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=8, max_length=128)
 
 
@@ -419,9 +454,22 @@ def init_auth_routes() -> APIRouter:
             raise HTTPException(status_code=400, detail=str(e))
         return {"message": f"用户 {username} 已删除"}
 
+    # ---- 管理员重置任意账号密码（2026-10-14）：替代"删号重建"的改密方式 ----
+    # 重置后该账号旧令牌立即失效（pv），且下次登录强制改密（must_change_password）。
+    # 允许 admin 给自己重置（即管理员修改自己的密码）。
+    @router.post("/users/{username}/password")
+    async def reset_password(username: str, req: ResetPasswordRequest,
+                             _admin: dict = Depends(require_admin)):
+        try:
+            get_user_store().change_password(username, req.new_password, must_change=True)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        return {"message": f"用户 {username} 的密码已重置，下次登录须先修改密码"}
+
     @router.post("/change-password")
     async def change_password(req: ChangePasswordRequest, user: dict = Depends(require_user)):
-        get_user_store().change_password(user["username"], req.new_password)
+        # 自助改密：清除强制改密标记（首次登录/被重置后走这里完成改密）
+        get_user_store().change_password(user["username"], req.new_password, must_change=False)
         return {"message": "密码已修改"}
 
     return router

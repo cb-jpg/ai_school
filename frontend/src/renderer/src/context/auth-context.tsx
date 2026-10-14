@@ -12,6 +12,9 @@ interface AuthContextValue {
   user: AuthUser | null;
   login: (username: string, password: string) => Promise<AuthUser>;
   logout: () => void;
+  /** 从 localStorage 重读用户（改密成功清除 must_change_password 标记后调用，
+   *  让门禁立即放行） */
+  refreshUser: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -69,8 +72,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  const refreshUser = () => {
+    setUser(getStoredUser());
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, login, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,5 +1,8 @@
 /**
- * 用户管理页（仅 admin 可见）：列表（角色/分组筛选）/ 创建 / 批量导入导出 / 删除
+ * 用户管理页（仅 admin 可见）：列表（角色/分组筛选）/ 创建 / 批量导入导出 / 删除 / 重置密码
+ *
+ * 2026-10-14 重置密码：每行「重置密码」直接给该账号设置新密码（替代"删号重建"），
+ * 重置后该账号旧登录立即失效、下次登录强制改新密码；给 admin 自己重置=管理员改自己密码。
  *
  * 2026-10-06 批量建号：CSV 导入（用户名,密码,角色,分组；密码留空自动生成，
  * 导入后可下载含初始密码的一次性回执——服务端 scrypt 哈希不可逆，导出清单
@@ -30,6 +33,7 @@ interface UserRow {
   username: string;
   role: 'admin' | 'editor' | 'user' | 'parent';
   group?: string;
+  must_change_password?: boolean;
   created_at: number;
 }
 
@@ -119,6 +123,50 @@ export default function UserManagement() {
   // CSV 下载（原生 App 走复制兜底层）
   const [csvFallback, setCsvFallback] = useState<{ filename: string; content: string } | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // 重置密码（2026-10-14）：弹层输入新密码；成功后提示旧登录失效+下次登录强制改密
+  const [resetTarget, setResetTarget] = useState<UserRow | null>(null);
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetting, setResetting] = useState(false);
+  const [resetDone, setResetDone] = useState(false);
+  const [resetError, setResetError] = useState('');
+
+  const openReset = (u: UserRow) => {
+    setResetTarget(u);
+    setResetPassword('');
+    setResetDone(false);
+    setResetError('');
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetTarget) return;
+    if (resetPassword.length < 8) {
+      setResetError('新密码至少 8 位');
+      return;
+    }
+    setResetting(true);
+    setResetError('');
+    try {
+      const response = await authFetch(
+        `/api/auth/users/${encodeURIComponent(resetTarget.username)}/password`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ new_password: resetPassword }),
+        },
+      );
+      if (!response.ok) {
+        const detail = await response.json().then((d) => d?.detail).catch(() => null);
+        throw new Error(detail || `重置失败（${response.status}）`);
+      }
+      setResetDone(true);
+      await loadUsers();
+    } catch (e) {
+      setResetError(e instanceof Error ? e.message : '重置失败');
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const downloadCsv = useCallback((filename: string, content: string) => {
     if (!canBrowserDownload()) {
@@ -295,7 +343,9 @@ export default function UserManagement() {
         <Text fontSize="lg" fontWeight="bold" color={gray800}>用户管理</Text>
         <Text fontSize="xs" color={gray600}>
           管理员拥有全部权限；编辑者仅可管理知识库；普通用户用于 App 登录（每人独立聊天记录）。
-          「分组」用于标注班级/部门，方便筛选，不影响权限。当前登录：{user?.username}
+          「分组」用于标注班级/部门，方便筛选，不影响权限。忘记密码不用删号重建，
+          直接「重置密码」即可（重置后该账号旧登录失效、下次登录须先改新密码）。
+          当前登录：{user?.username}
         </Text>
       </VStack>
 
@@ -475,18 +525,32 @@ export default function UserManagement() {
                     {u.group}
                   </Badge>
                 )}
+                {u.must_change_password && (
+                  <Badge bg="#fff5e6" color="#b7791f" fontSize="9px" px="2" rounded="full">
+                    初始密码未改
+                  </Badge>
+                )}
                 {u.username === user?.username && (
                   <Text fontSize="10px" color={gray600}>（当前登录）</Text>
                 )}
               </HStack>
-              <Button
-                size="xs" variant="ghost" color={schoolRed}
-                onClick={() => handleDelete(u.username)}
-                disabled={u.username === user?.username}
-                title={u.username === user?.username ? '不能删除当前登录用户' : undefined}
-              >
-                删除
-              </Button>
+              <HStack gap="1">
+                <Button
+                  size="xs" variant="ghost" color={schoolBlue}
+                  onClick={() => openReset(u)}
+                  title="设置新密码：该账号旧登录立即失效，下次登录须先改新密码"
+                >
+                  重置密码
+                </Button>
+                <Button
+                  size="xs" variant="ghost" color={schoolRed}
+                  onClick={() => handleDelete(u.username)}
+                  disabled={u.username === user?.username}
+                  title={u.username === user?.username ? '不能删除当前登录用户' : undefined}
+                >
+                  删除
+                </Button>
+              </HStack>
             </HStack>
           ))}
           {!loading && shownUsers.length === 0 && (
@@ -494,6 +558,69 @@ export default function UserManagement() {
           )}
         </VStack>
       </Box>
+
+      {/* 重置密码弹层（2026-10-14）：管理员给任意账号（含自己）设置新密码 */}
+      {resetTarget && (
+        <Box
+          position="fixed" inset="0" zIndex={1400} bg="blackAlpha.600"
+          display="flex" alignItems="center" justifyContent="center" p="4"
+          onClick={() => setResetTarget(null)}
+        >
+          <Box
+            bg="white" borderRadius="lg" p="5" width="100%" maxWidth="420px"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {resetDone ? (
+              <>
+                <Text fontWeight="bold" color={gray800} mb="2">
+                  已重置 {resetTarget.username} 的密码
+                </Text>
+                <Text fontSize="xs" color={gray600} mb="4">
+                  该账号的旧登录已全部失效；下次登录会要求先改成自己的新密码。
+                  请把新密码告知本人（建议当面或班级群私下告知，勿在公开渠道发送）。
+                </Text>
+                <HStack justify="flex-end">
+                  <Button size="sm" background={schoolBlue} color="white" onClick={() => setResetTarget(null)}>
+                    好的
+                  </Button>
+                </HStack>
+              </>
+            ) : (
+              <>
+                <Text fontWeight="bold" color={gray800} mb="1">
+                  重置密码：{resetTarget.username}
+                </Text>
+                <Text fontSize="xs" color={gray600} mb="3">
+                  {resetTarget.username === user?.username
+                    ? '这是你自己的账号：重置后需重新登录并设置新密码。'
+                    : '重置后该账号旧登录立即失效，下次登录强制先改新密码。'}
+                </Text>
+                <Input
+                  type="password" placeholder="新密码（至少 8 位）" size="sm"
+                  value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  mb="2"
+                />
+                {resetError && (
+                  <Text fontSize="xs" color={schoolRed} mb="2">{resetError}</Text>
+                )}
+                <HStack mt="3" justify="flex-end" gap="2">
+                  <Button size="sm" variant="outline" onClick={() => setResetTarget(null)}>
+                    取消
+                  </Button>
+                  <Button
+                    size="sm" background={schoolBlue} color="white"
+                    _hover={{ background: '#0f3a6e' }}
+                    onClick={handleResetPassword} loading={resetting} loadingText="重置中..."
+                  >
+                    确认重置
+                  </Button>
+                </HStack>
+              </>
+            )}
+          </Box>
+        </Box>
+      )}
 
       {/* 原生 App 下载兜底：Android WebView 无下载处理器，提供复制出口 */}
       {csvFallback && (
