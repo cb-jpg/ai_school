@@ -519,6 +519,24 @@ function AppContent(): JSX.Element {
                   : "right"
             }
           />
+          {/* AI 生成内容显式标识（合规 2026-10-14：虚拟场景模态角标，随数字人画布出现；
+              真实校园照片是背景层不在此画布内，不会被误标。pointerEvents 继承 none） */}
+          <Box
+            position="absolute"
+            bottom={{ base: "76px", md: "12px" }}
+            right="10px"
+            px={2}
+            py="2px"
+            rounded="full"
+            bg="rgba(13, 34, 65, 0.55)"
+            color="white"
+            fontSize="10px"
+            lineHeight="1.4"
+            pointerEvents="none"
+            data-testid="ai-generated-badge"
+          >
+            AI生成
+          </Box>
         </Box>
 
         {/* CampusKnowledge overlay for topic pages（官网 v2 后旧专题链接已映射到

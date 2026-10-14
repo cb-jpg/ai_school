@@ -207,9 +207,12 @@ class WebSocketServer:
         )
 
         # Include system logs routes (audit trail / service log tail / stats)
-        from .system_logs_api import init_system_logs_routes
+        from .system_logs_api import init_agreements_routes, init_system_logs_routes
 
         self.app.include_router(init_system_logs_routes())
+
+        # Agreement document downloads (login-page 用户协议/隐私政策, 2026-10-14)
+        self.app.include_router(init_agreements_routes())
 
         # Initialize and include proxy routes if proxy is enabled
         system_config = config.system_config

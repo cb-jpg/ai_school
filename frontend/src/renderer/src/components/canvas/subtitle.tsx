@@ -35,7 +35,25 @@ const Subtitle = memo((): JSX.Element | null => {
       maxWidth="100%"
       backgroundColor="transparent"
     >
+      {/* AI 生成内容显式标识（合规 2026-10-14：音频模态播放期间字幕条随行小标） */}
+      <Box
+        as="span"
+        display="inline-block"
+        verticalAlign="middle"
+        mr={2}
+        px={2}
+        py="1px"
+        rounded="full"
+        bg="rgba(13, 34, 65, 0.55)"
+        color="white"
+        fontSize={{ base: '10px', md: '11px' }}
+        lineHeight="1.5"
+        data-testid="ai-generated-badge"
+      >
+        AI生成
+      </Box>
       <Text
+        as="span"
         color={siteTheme.navy}
         fontSize={{ base: 'md', md: 'lg' }}
         textAlign="center"
@@ -43,6 +61,7 @@ const Subtitle = memo((): JSX.Element | null => {
         whiteSpace="pre-wrap"
         fontWeight="medium"
         fontFamily="'Helvetica Neue', Arial, sans-serif"
+        verticalAlign="middle"
       >
         {subtitleText}
       </Text>

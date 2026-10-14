@@ -1,0 +1,15 @@
+{
+  "_说明": "AIGC 溯源标识配置（GB 45438-2025 生成合成内容标识方法）。校方实数到位后只改本文件重跑打标工具即可，无需改代码。",
+  "_字段对照": "Label=标识位; ContentProducer=生成合成服务提供者名称(元数据中存MD5编码); ProduceID=算法服务版本号+生成文件ID(MD5); ReservedCode1=文件名+生成时间(MD5); ContentPropagator=企业社会信用代码(明文); PropagateID=时间戳+用户ID+用户手机号(MD5); ReservedCode2=hash:+信用代码MD5",
+  "_隐私铁律": "原始手机号只允许经本工具进 MD5，绝不写入任何文件/元数据明文。",
+
+  "provider_name": "佛山市南海区石实实验学校",
+  "credit_code": "91440605MAAAAAAA0X",
+  "_credit_code_note": "占位信用代码（18位结构合规），待校方提供真实统一社会信用代码后替换重跑",
+  "algorithm_version": "2.28",
+  "_algorithm_version_note": "算法服务版本号，与 App versionName 同步",
+
+  "user_id": "school-demo",
+  "user_phone": "13800000000",
+  "_user_phone_note": "演示用测试号码（非真实号码）；只进 PropagateID 的 MD5"
+}

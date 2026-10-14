@@ -30,8 +30,10 @@ import {
   fetchKnowledgeStats,
   fetchAuditEntries,
   fetchServiceLog,
+  fetchContentReview,
   AUDIT_ACTION_LABELS,
   type AuditEntry,
+  type ContentReviewEntry,
   type KnowledgeStats,
 } from '@/services/system-logs-api';
 
@@ -71,6 +73,11 @@ export const SystemLogs: FC = () => {
   const [logLoading, setLogLoading] = useState(true);
   const [logKeyword, setLogKeyword] = useState('');
 
+  const [review, setReview] = useState<ContentReviewEntry[]>([]);
+  const [reviewTotal, setReviewTotal] = useState(0);
+  const [reviewLoading, setReviewLoading] = useState(true);
+  const [reviewFilter, setReviewFilter] = useState('');
+
   const loadAll = async (): Promise<void> => {
     // 概况
     try {
@@ -108,6 +115,18 @@ export const SystemLogs: FC = () => {
     } finally {
       setLogLoading(false);
     }
+    // 内容审核记录
+    setReviewLoading(true);
+    try {
+      const data = await fetchContentReview({ limit: 300 });
+      setReview(data.entries);
+      setReviewTotal(data.total);
+    } catch {
+      setReview([]);
+      // 静默失败：审核记录属新增能力，旧部署无此文件时留空即可
+    } finally {
+      setReviewLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -124,6 +143,11 @@ export const SystemLogs: FC = () => {
     if (!kw) return serviceLog;
     return serviceLog.filter((line) => line.toLowerCase().includes(kw));
   }, [serviceLog, logKeyword]);
+
+  const filteredReview = useMemo(() => {
+    if (!reviewFilter) return review;
+    return review.filter((entry) => entry.status === reviewFilter);
+  }, [review, reviewFilter]);
 
   const hasUnreadableLog =
     serviceLog.length > 0 && serviceLog[0].startsWith('[读取失败]');
@@ -197,6 +221,9 @@ export const SystemLogs: FC = () => {
         <Tabs.List borderBottom="2px solid" borderColor={colors.gray200} gap="16px">
           <Tabs.Trigger value="audit" fontSize="sm">
             操作记录（{auditTotal}）
+          </Tabs.Trigger>
+          <Tabs.Trigger value="review" fontSize="sm">
+            内容审核（{reviewTotal}）
           </Tabs.Trigger>
           <Tabs.Trigger value="service" fontSize="sm">
             服务运行日志
@@ -282,6 +309,125 @@ export const SystemLogs: FC = () => {
                       {entry.target_id ? `ID ${entry.target_id.slice(0, 8)}` : ''}
                     </Text>
                   )}
+                </Box>
+              ))}
+          </Box>
+        </Tabs.Content>
+
+        {/* 内容审核（合规 2026-10-14：每轮对话留痕，五大要素） */}
+        <Tabs.Content value="review">
+          <Box pt="4">
+            <HStack mb="3" gap="2" flexWrap="wrap" rowGap="2">
+              <Badge
+                as="button"
+                cursor="pointer"
+                px="2" py="1" rounded="md" fontSize="10px"
+                bg={!reviewFilter ? colors.primary : colors.gray100}
+                color={!reviewFilter ? 'white' : colors.gray600}
+                onClick={() => setReviewFilter('')}
+              >
+                全部状态
+              </Badge>
+              {[
+                ['通过', '#f0fff4', '#276749'],
+                ['已拦截', '#fff5f5', '#C53030'],
+              ].map(([key, bg, fg]) => (
+                <Badge
+                  key={key}
+                  as="button"
+                  cursor="pointer"
+                  px="2" py="1" rounded="md" fontSize="10px"
+                  bg={reviewFilter === key ? fg : (bg as string)}
+                  color={reviewFilter === key ? 'white' : (fg as string)}
+                  _hover={{ opacity: 0.85 }}
+                  onClick={() => setReviewFilter(key)}
+                >
+                  {key}
+                </Badge>
+              ))}
+              <Text fontSize="2xs" color={colors.gray400} ml="1">
+                每轮对话自动留痕：用户ID / 审核时间 / 输入指令 / 输出内容 / 审核状态
+              </Text>
+            </HStack>
+
+            {reviewLoading && (
+              <Text fontSize="xs" color={colors.gray600}>
+                正在加载内容审核记录…
+              </Text>
+            )}
+
+            {!reviewLoading && filteredReview.length === 0 && (
+              <Text fontSize="xs" color={colors.gray600}>
+                暂无审核记录。用户与数字人对话后会自动记录到这里（含正常回复与敏感词拦截）。
+              </Text>
+            )}
+
+            {/* 五大要素表头 */}
+            {!reviewLoading && filteredReview.length > 0 && (
+              <Box
+                display="grid"
+                gridTemplateColumns={{ base: '1fr', md: '90px 150px 1fr 1fr 80px' }}
+                gap="2"
+                px="3"
+                py="1.5"
+                fontSize="2xs"
+                fontWeight="semibold"
+                color={colors.gray600}
+                borderBottom="2px solid"
+                borderColor={colors.gray200}
+              >
+                <Text>用户ID</Text>
+                <Text>审核时间</Text>
+                <Text>输入指令</Text>
+                <Text>输出内容</Text>
+                <Text>审核状态</Text>
+              </Box>
+            )}
+
+            {!reviewLoading &&
+              filteredReview.map((entry, idx) => (
+                <Box
+                  key={`${entry.ts}-${idx}`}
+                  display="grid"
+                  gridTemplateColumns={{ base: '1fr', md: '90px 150px 1fr 1fr 80px' }}
+                  gap="2"
+                  py="2"
+                  px="3"
+                  borderBottom="1px solid"
+                  borderColor={colors.gray100}
+                  bg={entry.status === '已拦截' ? '#fff5f5' : colors.gray50}
+                  rounded="md"
+                  mb="1"
+                  alignItems="start"
+                >
+                  <Text fontSize="2xs" fontWeight="medium" color={colors.gray800} wordBreak="break-all">
+                    {entry.username || '未登录'}
+                  </Text>
+                  <Text fontSize="2xs" color={colors.gray600}>
+                    {entry.review_time || formatTs(entry.ts)}
+                  </Text>
+                  <Text fontSize="2xs" color={colors.gray800} wordBreak="break-all">
+                    {entry.input_text}
+                    {entry.hit_words && entry.hit_words.length > 0 && (
+                      <Text as="span" color="#C53030" fontWeight="semibold" ml="1">
+                        （命中：{entry.hit_words.join('、')}）
+                      </Text>
+                    )}
+                  </Text>
+                  <Text fontSize="2xs" color={colors.gray600} wordBreak="break-all">
+                    {entry.output_text}
+                  </Text>
+                  <Box>
+                    <Badge
+                      fontSize="9px"
+                      px="1.5"
+                      py="0.5"
+                      bg={entry.status === '已拦截' ? '#C53030' : '#38A169'}
+                      color="white"
+                    >
+                      {entry.status}
+                    </Badge>
+                  </Box>
                 </Box>
               ))}
           </Box>

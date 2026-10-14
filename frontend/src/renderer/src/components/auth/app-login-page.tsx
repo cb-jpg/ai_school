@@ -11,6 +11,8 @@ import { useState } from 'react';
 import { Box, VStack, Text, Input, Button } from '@chakra-ui/react';
 import { useAuth } from '@/context/auth-context';
 import { changePassword } from '@/services/auth';
+import { withToken } from '@/services/api-base';
+import { AGREEMENTS, type AgreementDoc } from '@/data/agreements';
 import { siteTheme, swissFont } from '@/components/hero/site-theme';
 
 // 全站官网主题（site-theme.ts）：绛红主色，渐变到按压深一档
@@ -33,6 +35,8 @@ export default function AppLoginPage({ onCancel }: AppLoginPageProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // 协议弹层（合规 2026-10-14：用户协议/隐私政策放置到登录页）
+  const [agreement, setAgreement] = useState<AgreementDoc | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -298,9 +302,154 @@ export default function AppLoginPage({ onCancel }: AppLoginPageProps) {
         color="rgba(255,255,255,0.65)"
         mt={{ base: 6, md: 8 }}
         position="relative"
+        textAlign="center"
       >
         如需账号请联系学校管理员
+        <Text
+          as="span"
+          mx={2}
+          color="rgba(255,255,255,0.35)"
+        >
+          ·
+        </Text>
+        <Text
+          as="span"
+          data-agreement-link="user-agreement"
+          cursor="pointer"
+          textDecoration="underline"
+          _hover={{ color: 'white' }}
+          onClick={() => setAgreement(AGREEMENTS['user-agreement'] ?? null)}
+        >
+          用户协议
+        </Text>
+        <Text
+          as="span"
+          mx={1}
+          color="rgba(255,255,255,0.35)"
+        >
+          ·
+        </Text>
+        <Text
+          as="span"
+          data-agreement-link="privacy-policy"
+          cursor="pointer"
+          textDecoration="underline"
+          _hover={{ color: 'white' }}
+          onClick={() => setAgreement(AGREEMENTS['privacy-policy'] ?? null)}
+        >
+          隐私政策
+        </Text>
       </Text>
+
+      {/* 协议全文弹层：内嵌全文，各端（App/手机/桌面）都可在线阅读 */}
+      {agreement && (
+        <Box
+          data-agreement-modal
+          position="fixed"
+          top={0}
+          left={0}
+          width="100%"
+          height="var(--app-vh, 100vh)"
+          zIndex={200}
+          background="rgba(0,0,0,0.55)"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          p={{ base: 4, md: 8 }}
+          onClick={() => setAgreement(null)}
+        >
+          <Box
+            bg="white"
+            borderRadius="16px"
+            width={{ base: '92vw', md: '640px' }}
+            maxHeight="calc(var(--app-vh, 100vh) - 64px)"
+            display="flex"
+            flexDirection="column"
+            overflow="hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Box
+              px={5}
+              pt={4}
+              pb={3}
+              borderBottom="1px solid #e2e8f0"
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+              flexShrink={0}
+            >
+              <VStack gap="0" alignItems="start">
+                <Text data-agreement-title fontSize="md" fontWeight="bold" color={brand}>
+                  {agreement.title}
+                </Text>
+                <Text fontSize="2xs" color="#94a3b8">
+                  {`佛山市南海区石实实验学校　更新日期：${agreement.updated}`}
+                </Text>
+              </VStack>
+              <Button
+                size="xs"
+                variant="ghost"
+                color="#64748b"
+                onClick={() => setAgreement(null)}
+              >
+                关闭
+              </Button>
+            </Box>
+            <Box px={5} py={4} overflowY="auto" flex={1}>
+              {agreement.sections.map((section) => (
+                <Box key={section.heading} mb={4}>
+                  <Text fontSize="sm" fontWeight="bold" color="#1e293b" mb={1}>
+                    {section.heading}
+                  </Text>
+                  {section.paragraphs.map((para, i) => (
+                    <Text key={i} fontSize="xs" color="#475569" lineHeight="1.8" mb={1}>
+                      {para}
+                    </Text>
+                  ))}
+                </Box>
+              ))}
+            </Box>
+            <Box
+              px={5}
+              py={3}
+              borderTop="1px solid #e2e8f0"
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+              flexShrink={0}
+            >
+              <Text fontSize="2xs" color="#94a3b8">
+                手机端建议直接在线阅读
+              </Text>
+              {/* Word 版下载：桌面浏览器直链下载；App WebView 无下载监听，
+                  静默 no-op 属已知限制，线上以弹层阅读为主（Chakra v3 Button/Box
+                  不吃 href，用原生 a 元素） */}
+              <a
+                data-agreement-download
+                href={withToken(`/api/agreements/${agreement.key}`)}
+                download={`${agreement.title}.docx`}
+                style={{
+                  padding: '6px 12px',
+                  background: brand,
+                  color: 'white',
+                  fontSize: '12px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = siteTheme.redDark;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = brand;
+                }}
+              >
+                下载 Word 版
+              </a>
+            </Box>
+          </Box>
+        </Box>
+      )}
     </Box>
   );
 }

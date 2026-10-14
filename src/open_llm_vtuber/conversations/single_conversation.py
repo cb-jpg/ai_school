@@ -21,7 +21,7 @@ from ..service_context import ServiceContext
 from ..utils.turn_latency import begin_turn, current_span
 
 # Import necessary types from agent outputs
-from ..agent.output_types import SentenceOutput, AudioOutput
+from ..agent.output_types import Actions, DisplayText, SentenceOutput, AudioOutput
 
 
 async def process_single_conversation(
@@ -69,6 +69,61 @@ async def process_single_conversation(
         )
 
         logger.info(f"User input: {input_text}")
+
+        # 敏感词拦截（2026-10-14 合规：输出为文本的敏感词拦截）：
+        # 命中即走 TTS 拒答，不进 LLM/RAG；留痕到内容审核（状态=已拦截）。
+        # 开关 OLLV_SENSITIVE_FILTER（默认开，=0 关）；词表 knowledge/sensitive_words.txt。
+        hit_words: List[str] = []
+        try:
+            from ..knowledge.content_moderation import check_text, get_refusal_text
+            from ..knowledge.content_review import record as review_record
+
+            hit_words = check_text(input_text)
+        except Exception as e:
+            logger.warning(f"敏感词检查异常，本轮放行: {e}")
+
+        if hit_words:
+            refusal = get_refusal_text()
+            logger.warning(f"输入命中敏感词 {hit_words}，已拦截")
+            try:
+                review_record(
+                    username=context.username,
+                    input_text=input_text,
+                    output_text=refusal,
+                    status="已拦截",
+                    hit_words=hit_words,
+                )
+            except Exception as e:
+                logger.warning(f"拦截记录写入失败：{e}")
+            # 与正常回复同构：full-text 进字幕/气泡，SentenceOutput 走 TTS+表情，
+            # 结尾与主流程一致（synth-complete + finalize），前端无感差异
+            await websocket_send(
+                json.dumps({"type": "full-text", "text": refusal}, ensure_ascii=False)
+            )
+            await process_agent_output(
+                output=SentenceOutput(
+                    display_text=DisplayText(text=refusal),
+                    tts_text=refusal,
+                    actions=Actions(),
+                ),
+                character_config=context.character_config,
+                live2d_model=context.live2d_model,
+                tts_engine=context.tts_engine,
+                websocket_send=websocket_send,
+                tts_manager=tts_manager,
+                translate_engine=None,
+            )
+            if tts_manager.task_list:
+                await asyncio.gather(*tts_manager.task_list)
+                await websocket_send(
+                    json.dumps({"type": "backend-synth-complete"}, ensure_ascii=False)
+                )
+            await finalize_conversation_turn(
+                tts_manager=tts_manager,
+                websocket_send=websocket_send,
+                client_uid=client_uid,
+            )
+            return refusal
 
         # Initialize enriched_input_text with original input (MUST be before any usage)
         enriched_input_text = input_text
@@ -254,6 +309,20 @@ async def process_single_conversation(
                 username=context.username,
             )
             logger.info(f"AI response: {full_response}")
+
+        # 内容审核留痕（2026-10-14 合规）：正常回复记「通过」，与拦截记录同表可查
+        if full_response:
+            try:
+                from ..knowledge.content_review import record as review_record
+
+                review_record(
+                    username=context.username,
+                    input_text=input_text,
+                    output_text=full_response,
+                    status="通过",
+                )
+            except Exception as e:
+                logger.warning(f"内容审核记录失败：{e}")
 
         return full_response  # Return accumulated full_response
 

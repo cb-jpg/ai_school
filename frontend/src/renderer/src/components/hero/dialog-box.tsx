@@ -318,6 +318,21 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
                 boxShadow={msg.role === 'human' ? 'none' : 'sm'}
               >
                 {removeEmojiTags(msg.content)}
+                {/* AI 生成内容显式标识（合规要求：文本模态输出带 AI 生成显示标识） */}
+                {msg.role !== 'human' && (
+                  <Text
+                    as="span"
+                    display="block"
+                    textAlign="right"
+                    fontSize={isPortraitBoard ? '13px' : '10px'}
+                    color={schoolColors.textSecondary}
+                    opacity={0.75}
+                    mt={1}
+                    data-testid="ai-generated-tag"
+                  >
+                    AI生成
+                  </Text>
+                )}
               </Box>
             ))}
 

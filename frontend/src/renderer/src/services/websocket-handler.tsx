@@ -410,11 +410,30 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
     };
   }, [authUsername, setModelInfo]);
 
+  // 开场语音声明（合规 2026-10-14：音频模态显式标识）——连接成功后播报一次
+  // 「内容由 AI 生成」提示，走 static-narration 通道直接 TTS，不经 LLM。
+  // 每页面加载至多一次；后台管理页（#/main*）不播；延迟 1.2s 等连接收尾消息落定。
+  const aiDisclaimerSentRef = useRef(false);
+  const sendAiDisclaimerOnce = useCallback(() => {
+    if (aiDisclaimerSentRef.current) return;
+    if (window.location.hash.startsWith('#/main')) return;
+    aiDisclaimerSentRef.current = true;
+    window.setTimeout(() => {
+      wsService.sendMessage({
+        type: 'static-narration',
+        title: '开场提示',
+        segments: ['你好呀，我是小石同学。我的部分内容由人工智能生成，请注意甄别哦。'],
+        narration_id: `ai-disclaimer-${Date.now()}`,
+      });
+    }, 1200);
+  }, []);
+
   useEffect(() => {
     const stateSubscription = wsService.onStateChange((state) => {
       setWsState(state);
       if (state === 'OPEN') {
         pendingRestoreRef.current = true;
+        sendAiDisclaimerOnce();
       }
     });
     const messageSubscription = wsService.onMessage(handleWebSocketMessage);
