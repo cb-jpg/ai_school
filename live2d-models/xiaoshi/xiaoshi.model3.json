@@ -1,0 +1,205 @@
+{
+ "Version": 3,
+ "FileReferences": {
+  "Moc": "xiaoshi.moc3",
+  "Textures": [
+   "textures/000_tex_01_hair_back.png",
+   "textures/001_tex_02_ear_l.png",
+   "textures/002_tex_03_ear_r.png",
+   "textures/003_tex_04_neck.png",
+   "textures/004_tex_06_arm_l_up.png",
+   "textures/005_tex_06_arm_l_lo.png",
+   "textures/006_tex_07_arm_r_up.png",
+   "textures/007_tex_07_arm_r_lo.png",
+   "textures/008_tex_08_leg_l.png",
+   "textures/009_tex_09_leg_r.png",
+   "textures/010_tex_10_clothing.png",
+   "textures/011_tex_11_clothing.png",
+   "textures/012_tex_12_clothing.png",
+   "textures/013_tex_13_face_base.png",
+   "textures/014_tex_14_blush_l.png",
+   "textures/015_tex_14_blush_r.png",
+   "textures/016_tex_15_eye_l.png",
+   "textures/017_tex_15_eye_closed_l.png",
+   "textures/018_tex_16_eye_r.png",
+   "textures/019_tex_16_eye_closed_r.png",
+   "textures/020_tex_17_eyebrow_l.png",
+   "textures/021_tex_18_eyebrow_r.png",
+   "textures/022_tex_19_mouth_cavity.png",
+   "textures/023_tex_19_mouth.png",
+   "textures/024_tex_20_hair_front.png",
+   "textures/025_tex_21_accessory.png"
+  ],
+  "Physics": "xiaoshi.physics3.json",
+  "DisplayInfo": "xiaoshi.cdi3.json",
+  "Motions": {
+   "Idle": [
+    {
+     "File": "xiaoshi.idle.motion3.json"
+    }
+   ],
+   "Smile": [
+    {
+     "File": "xiaoshi.smile.motion3.json"
+    },
+    {
+     "File": "xiaoshi.smile.motion3.json"
+    }
+   ],
+   "Surprise": [
+    {
+     "File": "xiaoshi.surprise.motion3.json"
+    }
+   ],
+   "Sad": [
+    {
+     "File": "xiaoshi.sad.motion3.json"
+    }
+   ],
+   "Angry": [
+    {
+     "File": "xiaoshi.angry.motion3.json"
+    }
+   ],
+   "Shy": [
+    {
+     "File": "xiaoshi.shy.motion3.json"
+    }
+   ],
+   "Head_yaw": [
+    {
+     "File": "xiaoshi.head_yaw.motion3.json"
+    }
+   ],
+   "Head_pitch": [
+    {
+     "File": "xiaoshi.head_pitch.motion3.json"
+    }
+   ],
+   "Head_roll": [
+    {
+     "File": "xiaoshi.head_roll.motion3.json"
+    }
+   ],
+   "Head_shake": [
+    {
+     "File": "xiaoshi.head_shake.motion3.json"
+    }
+   ],
+   "Body_sway": [
+    {
+     "File": "xiaoshi.body_sway.motion3.json"
+    }
+   ],
+   "Body_bow": [
+    {
+     "File": "xiaoshi.body_bow.motion3.json"
+    }
+   ],
+   "Arms_raise": [
+    {
+     "File": "xiaoshi.arms_raise.motion3.json"
+    }
+   ],
+   "Arms_swing": [
+    {
+     "File": "xiaoshi.arms_swing.motion3.json"
+    }
+   ],
+   "Legs_swing": [
+    {
+     "File": "xiaoshi.legs_swing.motion3.json"
+    }
+   ],
+   "Legs_sway": [
+    {
+     "File": "xiaoshi.legs_sway.motion3.json"
+    }
+   ],
+   "Talk": [
+    {
+     "File": "xiaoshi.talk.motion3.json"
+    }
+   ],
+   "Smirk": [
+    {
+     "File": "xiaoshi.smirk.motion3.json"
+    }
+   ],
+   "Cheek": [
+    {
+     "File": "xiaoshi.cheek.motion3.json"
+    }
+   ],
+   "Blink": [
+    {
+     "File": "xiaoshi.blink.motion3.json"
+    }
+   ],
+   "Brows": [
+    {
+     "File": "xiaoshi.brows.motion3.json"
+    }
+   ],
+   "Brow_form": [
+    {
+     "File": "xiaoshi.brow_form.motion3.json"
+    }
+   ],
+   "Sweep": [
+    {
+     "File": "xiaoshi.sweep.motion3.json"
+    }
+   ]
+  },
+  "Expressions": [
+   {
+    "Name": "neutral",
+    "File": "expressions/neutral.exp3.json"
+   },
+   {
+    "Name": "joy",
+    "File": "expressions/joy.exp3.json"
+   },
+   {
+    "Name": "smirk",
+    "File": "expressions/smirk.exp3.json"
+   },
+   {
+    "Name": "anger",
+    "File": "expressions/anger.exp3.json"
+   },
+   {
+    "Name": "sadness",
+    "File": "expressions/sadness.exp3.json"
+   },
+   {
+    "Name": "surprise",
+    "File": "expressions/surprise.exp3.json"
+   }
+  ]
+ },
+ "Groups": [
+  {
+   "Target": "Parameter",
+   "Name": "EyeBlink",
+   "Ids": [
+    "ParamEyeLOpen",
+    "ParamEyeROpen"
+   ]
+  },
+  {
+   "Target": "Parameter",
+   "Name": "LipSync",
+   "Ids": [
+    "ParamMouthOpenY"
+   ]
+  }
+ ],
+ "HitAreas": [
+  {
+   "Id": "13_face_base",
+   "Name": "Head"
+  }
+ ]
+}

@@ -172,7 +172,13 @@ export class LAppLive2DManager {
       if (model.getModel()) {
         if (model.getModel().getCanvasWidth() > 1.0 && width < height) {
           // 横に長いモデルを縦長ウィンドウに表示する際モデルの横サイズでscaleを算出する
-          model.getModelMatrix().setWidth(2.0);
+          // 站位适配过的模型（use-live2d-model 打 __keepScale 标志，自研小石/小萌）
+          // 不再每帧 setWidth：它会按画布利用率重置矩阵缩放，把 fitFactor 的
+          // 绝对缩放踩掉（2026-10-16 手机端人物巨大根因）。未打标志的存量模型
+          // 保持原行为零变化。
+          if (!(model.getModelMatrix() as any).__keepScale) {
+            model.getModelMatrix().setWidth(2.0);
+          }
           projection.scale(1.0, width / height);
         } else {
           projection.scale(height / width, 1.0);

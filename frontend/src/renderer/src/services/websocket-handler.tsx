@@ -387,10 +387,10 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
     fetchLive2dModels()
       .then((characters) => {
         if (cancelled || characters.length === 0) return;
-        // 默认角色与服务器当前角色一致（站位校准/表情映射都按 hiyori_pro 调）；
+        // 默认角色与服务器当前角色一致（2026-10-16 起为自研「小石同学」校服版模型）；
         // 列表里没有时退回第一项
         const character =
-          characters.find((item) => item.id === 'hiyori_pro') ?? characters[0];
+          characters.find((item) => item.id === 'xiaoshi') ?? characters[0];
         setModelInfo({
           name: character.id,
           url: character.modelPath,

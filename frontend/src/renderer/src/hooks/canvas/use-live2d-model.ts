@@ -70,6 +70,12 @@ const HOME_BANNER_OFFSET_F = 0.72;
 // 下缘；桌面横屏仍用上方 0.72（红面板更窄，72% 处不压字且不贴边）。
 const HOME_BANNER_OFFSET_F_PHONE = 0.91;
 
+// 自研模型（小石/小萌）手机/一体机存在感系数：kScale 归一后人物屏占与 hiyori
+// 一致（首页 ≈29% 屏高），但手机/kiosk 竖屏窄、人物贴边站（91%），16% 屏高只露
+// 半张脸存在感不足（2026-10-16 实测）→ 手机样式视口再 ×1.5。仅对 context
+// kScale<1 的自研模型生效（存量模型 kScale=1 走不到），hiyori 等零变化。
+const PHONE_SELF_MODEL_BOOST = 1.5;
+
 // 桌面栏目/新闻页站位（2026-09-22 官网 v2 用户反馈修正）：画布是右侧 55% 竖条、
 // 页面顶部有 ~128+132px 的不透明栏目 banner 条（页面 z30 盖过画布 z1）。人物若按
 // 加载默认（满高居中）站，头肩正好被 banner 条盖住——用户反馈"照片挡到人物"。
@@ -395,6 +401,16 @@ export const useLive2DModel = ({
       xViewStatic = COLUMN_DESKTOP_X_VIEW;
       yView = COLUMN_DESKTOP_CENTER_Y;
     }
+    // fit 常量按存量模型（model_dict kScale 0.5，经 Live2DConfigProvider ×2 后
+    // context kScale=1.0）校准；全身高占比模型（自研小石/小萌，dict kScale 0.31
+    // → context 0.62）按 context kScale 折算：fitFactor × kScale/1.0。
+    // 存量模型 context kScale 恰为 1，系数为 1，零变化。
+    if (fitFactor !== null && modelInfo?.kScale && modelInfo.kScale > 0) {
+      fitFactor *= modelInfo.kScale;
+      if (isPhoneStyleViewport() && modelInfo.kScale < 1) {
+        fitFactor *= PHONE_SELF_MODEL_BOOST;
+      }
+    }
     // 桌面对话（else 隐含）：baseScaleMul=1 / x=0 / y=0 → 恢复加载默认居中
     let cancelled = false;
     let outerStop: (() => void) | null = null;
@@ -427,6 +443,11 @@ export const useLive2DModel = ({
         try {
           // 先按当前实际画布尺寸重算投影（重建后可能按过渡尺寸建过投影），再适配站位
           LAppDelegate.getInstance()?.onResize?.();
+          // 竖屏画布渲染循环每帧 setWidth(2.0)（lapplive2dmanager onUpdate，横长
+          // 模型适配竖窗用），会按画布利用率重置矩阵缩放、踩掉本适配的绝对缩放
+          // （2026-10-16 手机端人物巨大根因）。适配开始即打 __keepScale 让管理器
+          // 跳过 setWidth；未走适配的模型不打标志，行为不变。
+          (matrix as any).__keepScale = true;
           const current = matrix.getScaleX?.() || matrix.getArray()[0] || 1;
           // 加载默认缩放捕获：模型实例首次就绪的此刻即默认态（任何适配之前）
           if (baseModelRef.current !== model) {
@@ -532,7 +553,7 @@ export const useLive2DModel = ({
     };
     // heroAlign 变化（首页 ↔ 对话 ↔ 栏目/新闻）时重新适配站位；
     // 已适配过时比例≈1 不再缩放，只平移到目标站位
-  }, [touchThrough, modelInfo?.url, heroAlign, isBoard, isHomeAlign]);
+  }, [touchThrough, modelInfo?.url, modelInfo?.kScale, heroAlign, isBoard, isHomeAlign]);
 
   const getCanvasScale = useCallback(() => {
     const canvas = document.getElementById("canvas") as HTMLCanvasElement;

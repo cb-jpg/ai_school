@@ -82,5 +82,45 @@
                 "": 1
             }
         }
+    },
+    {
+        "name": "xiaoshi",
+        "description": "小石同学 - 校服版数字人",
+        "url": "/live2d-models/xiaoshi/xiaoshi.model3.json",
+        "kScale": 0.31,
+        "initialXshift": 0,
+        "initialYshift": 0,
+        "kXOffset": 1150,
+        "idleMotionGroupName": "Idle",
+        "emotionMap": {
+            "neutral": "neutral",
+            "anger": "anger",
+            "disgust": "anger",
+            "fear": "surprise",
+            "joy": "joy",
+            "smirk": "smirk",
+            "sadness": "sadness",
+            "surprise": "surprise"
+        }
+    },
+    {
+        "name": "xiaomeng",
+        "description": "小萌 - 校服版数字人",
+        "url": "/live2d-models/xiaomeng/xiaomeng.model3.json",
+        "kScale": 0.31,
+        "initialXshift": 0,
+        "initialYshift": 0,
+        "kXOffset": 1150,
+        "idleMotionGroupName": "Idle",
+        "emotionMap": {
+            "neutral": "neutral",
+            "anger": "anger",
+            "disgust": "anger",
+            "fear": "surprise",
+            "joy": "joy",
+            "smirk": "smirk",
+            "sadness": "sadness",
+            "surprise": "surprise"
+        }
     }
 ]

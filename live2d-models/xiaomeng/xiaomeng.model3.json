@@ -1,0 +1,204 @@
+{
+ "Version": 3,
+ "FileReferences": {
+  "Moc": "xiaomeng.moc3",
+  "Textures": [
+   "textures/000_tex_01_hair_back.png",
+   "textures/001_tex_02_ear_l.png",
+   "textures/002_tex_03_ear_r.png",
+   "textures/003_tex_06_arm_l_up.png",
+   "textures/004_tex_06_arm_l_lo.png",
+   "textures/005_tex_07_arm_r_up.png",
+   "textures/006_tex_07_arm_r_lo.png",
+   "textures/007_tex_08_leg_l.png",
+   "textures/008_tex_09_leg_r.png",
+   "textures/009_tex_10_clothing.png",
+   "textures/010_tex_11_clothing.png",
+   "textures/011_tex_12_clothing.png",
+   "textures/012_tex_13_face_base.png",
+   "textures/013_tex_14_blush_l.png",
+   "textures/014_tex_14_blush_r.png",
+   "textures/015_tex_15_eye_l.png",
+   "textures/016_tex_15_eye_closed_l.png",
+   "textures/017_tex_16_eye_r.png",
+   "textures/018_tex_16_eye_closed_r.png",
+   "textures/019_tex_19_mouth_cavity.png",
+   "textures/020_tex_19_mouth.png",
+   "textures/021_tex_20_hair_front.png",
+   "textures/022_tex_17_eyebrow_l.png",
+   "textures/023_tex_21_accessory.png",
+   "textures/024_tex_18_eyebrow_r.png"
+  ],
+  "Physics": "xiaomeng.physics3.json",
+  "DisplayInfo": "xiaomeng.cdi3.json",
+  "Motions": {
+   "Idle": [
+    {
+     "File": "xiaomeng.idle.motion3.json"
+    }
+   ],
+   "Smile": [
+    {
+     "File": "xiaomeng.smile.motion3.json"
+    },
+    {
+     "File": "xiaomeng.smile.motion3.json"
+    }
+   ],
+   "Surprise": [
+    {
+     "File": "xiaomeng.surprise.motion3.json"
+    }
+   ],
+   "Sad": [
+    {
+     "File": "xiaomeng.sad.motion3.json"
+    }
+   ],
+   "Angry": [
+    {
+     "File": "xiaomeng.angry.motion3.json"
+    }
+   ],
+   "Shy": [
+    {
+     "File": "xiaomeng.shy.motion3.json"
+    }
+   ],
+   "Head_yaw": [
+    {
+     "File": "xiaomeng.head_yaw.motion3.json"
+    }
+   ],
+   "Head_pitch": [
+    {
+     "File": "xiaomeng.head_pitch.motion3.json"
+    }
+   ],
+   "Head_roll": [
+    {
+     "File": "xiaomeng.head_roll.motion3.json"
+    }
+   ],
+   "Head_shake": [
+    {
+     "File": "xiaomeng.head_shake.motion3.json"
+    }
+   ],
+   "Body_sway": [
+    {
+     "File": "xiaomeng.body_sway.motion3.json"
+    }
+   ],
+   "Body_bow": [
+    {
+     "File": "xiaomeng.body_bow.motion3.json"
+    }
+   ],
+   "Arms_raise": [
+    {
+     "File": "xiaomeng.arms_raise.motion3.json"
+    }
+   ],
+   "Arms_swing": [
+    {
+     "File": "xiaomeng.arms_swing.motion3.json"
+    }
+   ],
+   "Legs_swing": [
+    {
+     "File": "xiaomeng.legs_swing.motion3.json"
+    }
+   ],
+   "Legs_sway": [
+    {
+     "File": "xiaomeng.legs_sway.motion3.json"
+    }
+   ],
+   "Talk": [
+    {
+     "File": "xiaomeng.talk.motion3.json"
+    }
+   ],
+   "Smirk": [
+    {
+     "File": "xiaomeng.smirk.motion3.json"
+    }
+   ],
+   "Cheek": [
+    {
+     "File": "xiaomeng.cheek.motion3.json"
+    }
+   ],
+   "Blink": [
+    {
+     "File": "xiaomeng.blink.motion3.json"
+    }
+   ],
+   "Brows": [
+    {
+     "File": "xiaomeng.brows.motion3.json"
+    }
+   ],
+   "Brow_form": [
+    {
+     "File": "xiaomeng.brow_form.motion3.json"
+    }
+   ],
+   "Sweep": [
+    {
+     "File": "xiaomeng.sweep.motion3.json"
+    }
+   ]
+  },
+  "Expressions": [
+   {
+    "Name": "neutral",
+    "File": "expressions/neutral.exp3.json"
+   },
+   {
+    "Name": "joy",
+    "File": "expressions/joy.exp3.json"
+   },
+   {
+    "Name": "smirk",
+    "File": "expressions/smirk.exp3.json"
+   },
+   {
+    "Name": "anger",
+    "File": "expressions/anger.exp3.json"
+   },
+   {
+    "Name": "sadness",
+    "File": "expressions/sadness.exp3.json"
+   },
+   {
+    "Name": "surprise",
+    "File": "expressions/surprise.exp3.json"
+   }
+  ]
+ },
+ "Groups": [
+  {
+   "Target": "Parameter",
+   "Name": "EyeBlink",
+   "Ids": [
+    "ParamEyeLOpen",
+    "ParamEyeROpen"
+   ]
+  },
+  {
+   "Target": "Parameter",
+   "Name": "LipSync",
+   "Ids": [
+    "ParamMouthOpenY"
+   ]
+  }
+ ],
+ "HitAreas": [
+  {
+   "Id": "13_face_base",
+   "Name": "Head"
+  }
+ ]
+}

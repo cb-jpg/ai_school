@@ -11,6 +11,9 @@ conf.yaml
 !/live2d-models/mao_pro
 !/live2d-models/shizuku
 !/live2d-models/hiyori_pro
+# 自研校服版模型（2026-10-16 分层转换产物，备案溯源需版本化）
+!/live2d-models/xiaoshi
+!/live2d-models/xiaomeng
 
 # ignore non-default character configs
 /characters/*
