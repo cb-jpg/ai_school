@@ -37,6 +37,60 @@ interface Position {
 const TAP_DURATION_THRESHOLD_MS = 200; // Max duration for a tap
 const DRAG_DISTANCE_THRESHOLD_PX = 5; // Min distance to be considered a drag
 
+/**
+ * 画布 CSS 坐标 → scene 平面（P⁻¹V⁻¹NDC），即渲染链 device=V·P·M·v 中
+ * isHitOnModel（内部只逆乘 M）所期望的输入坐标系。
+ *
+ * 推导（2026-10-18 cdp_chain_probe.py 同帧实证，PV 链预测 fb 包盒误差 9px）：
+ *   NDC: nx=2bx/w−1, ny=1−2by/h（GL 视口映射）；
+ *   V⁻¹：站位 fit/pan 若挂 view 矩阵则在此兜底（当前实现 V=单位阵）；
+ *   P⁻¹：manager.onUpdate() 的 projection 宽高比补偿——竖屏(自研模型)
+ *   scale(1.0, w/h) ⇒ scene_y = ly·h/w；横屏 scale(h/w, 1.0) ⇒
+ *   scene_x = lx·w/h。分支条件与 onUpdate 完全一致（getCanvasWidth()>1）。
+ *
+ * 旧代码喂 deviceToScreen（归一恒 2/h），竖屏下与 P⁻¹ 差 h/w 倍 → 命中区
+ * 畸变上移（手机「按到人物却 miss/拖不动/拖人变滚屏」根因；横屏逐值相等，
+ * 桌面从未暴露）。横屏下本函数仍与 deviceToScreen 逐值相等（零行为变化）。
+ * 返回 null：画布/模型未就绪。调用方按未命中处理。
+ */
+function canvasLogicalAt(
+  canvas: HTMLCanvasElement | null,
+  clientX: number,
+  clientY: number,
+): { modelX: number; modelY: number } | null {
+  if (!canvas) return null;
+  const rect = canvas.getBoundingClientRect();
+  const { width: w, height: h } = canvas;
+  if (!rect.width || !rect.height || !w || !h) return null;
+  const scale = canvas.width / rect.width; // CSS→backing px（kiosk 缩放同此）
+  const bx = (clientX - rect.left) * scale;
+  const by = (clientY - rect.top) * scale;
+  let lx = (2 * bx) / w - 1;
+  let ly = 1 - (2 * by) / h;
+  // V⁻¹：view 矩阵非单位阵（pan/scale 站位）时兜底；2D 仿射逆
+  const adapter = (window as any).getLAppAdapter?.();
+  const vm = adapter?.getMgr ? adapter.getMgr()._viewMatrix : undefined;
+  if (vm) {
+    const t = vm.getArray();
+    const det = t[0] * t[5] - t[1] * t[4];
+    if (Math.abs(det) > 1e-6) {
+      const dx = lx - t[12];
+      const dy = ly - t[13];
+      const nx = (t[5] * dx - t[4] * dy) / det;
+      const ny = (-t[1] * dx + t[0] * dy) / det;
+      lx = nx;
+      ly = ny;
+    }
+  }
+  // P⁻¹：与 onUpdate 的 projection 分支一致（自研模型 canvasWidth>1）
+  const cm = adapter?.getModel?.()?.getModel?.();
+  const canvasWidth = cm ? cm.getCanvasWidth() : 2.0;
+  const portraitProj = canvasWidth > 1.0 && w < h;
+  const modelX = portraitProj ? lx : lx * (w / h);
+  const modelY = portraitProj ? ly * (h / w) : ly;
+  return { modelX, modelY };
+}
+
 // hero 全屏穿透模式的模型初始适配参数（真机校准值，Hiyori/荣耀X60Pro）：
 // ⚠️ 竖屏画布下 Live2D 视图空间按【高度】等比映射，视图 X 的 ±1 不对应全屏宽！
 //    屏宽比例 f 处 x_view = (2f-1)×画布宽高比（旧机 0.475 = 荣耀X60Pro 的宽高比；
@@ -588,17 +642,14 @@ export const useLive2DModel = ({
       if (!view || !model) return;
 
       const canvas = canvasRef.current;
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left; // Screen X relative to canvas
-      const y = e.clientY - rect.top; // Screen Y relative to canvas
 
       // --- Check if click is on model ---
-      // kiosk：rect 是缩放后物理尺寸，clientWidth 是缩放前布局宽——按后者换算命中点会放大 2.29×
-      const scale = canvas.width / rect.width;
-      const scaledX = x * scale;
-      const scaledY = y * scale;
-      const modelX = view._deviceToScreen.transformX(scaledX);
-      const modelY = view._deviceToScreen.transformY(scaledY);
+      // 竖屏画布的宽高比修正见 canvasLogicalAt（deviceToScreen 的 y 在竖屏下
+      // 与投影差 h/w 倍，手机/竖屏 kiosk 命中区整体畸变的根因）
+      const hitPt = canvasLogicalAt(canvas, e.clientX, e.clientY);
+      if (!hitPt) return;
+      const modelX = hitPt.modelX;
+      const modelY = hitPt.modelY;
 
       const hitAreaName = model.anyhitTest(modelX, modelY);
       const isHitOnModel = model.isHitOnModel(modelX, modelY);
@@ -666,24 +717,18 @@ export const useLive2DModel = ({
       if (isDragging && adapter && view && model && canvasRef.current) {
         const canvas = canvasRef.current;
         const rect = canvas.getBoundingClientRect();
-        const currentX = e.clientX - rect.left; // Current screen X relative to canvas
-        const currentY = e.clientY - rect.top; // Current screen Y relative to canvas
 
-        // Convert screen delta to model delta
-        // kiosk：rect 是缩放后物理尺寸，clientWidth 是缩放前布局宽——按后者换算命中点会放大 2.29×
-        const scale = canvas.width / rect.width;
-        const startScaledX = dragStartPos.current.x * scale;
-        const startScaledY = dragStartPos.current.y * scale;
-        const startModelX = view._deviceToScreen.transformX(startScaledX);
-        const startModelY = view._deviceToScreen.transformY(startScaledY);
+        // Convert screen delta to model delta（宽高比修正换算，竖屏 y 不再缩水）
+        const startPt = canvasLogicalAt(
+          canvas,
+          rect.left + dragStartPos.current.x,
+          rect.top + dragStartPos.current.y,
+        );
+        const curPt = canvasLogicalAt(canvas, e.clientX, e.clientY);
+        if (!startPt || !curPt) return;
 
-        const currentScaledX = currentX * scale;
-        const currentScaledY = currentY * scale;
-        const currentModelX = view._deviceToScreen.transformX(currentScaledX);
-        const currentModelY = view._deviceToScreen.transformY(currentScaledY);
-
-        const dx = currentModelX - startModelX;
-        const dy = currentModelY - startModelY;
+        const dx = curPt.modelX - startPt.modelX;
+        const dy = curPt.modelY - startPt.modelY;
 
         const newX = modelStartPos.current.x + dx;
         const newY = modelStartPos.current.y + dy;
@@ -715,20 +760,14 @@ export const useLive2DModel = ({
         model &&
         canvasRef.current
       ) {
-        const canvas = canvasRef.current;
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        // kiosk：rect 是缩放后物理尺寸，clientWidth 是缩放前布局宽——按后者换算命中点会放大 2.29×
-        const scale = canvas.width / rect.width;
-        const scaledX = x * scale;
-        const scaledY = y * scale;
-        const modelX = view._deviceToScreen.transformX(scaledX);
-        const modelY = view._deviceToScreen.transformY(scaledY);
+        const hitPt = canvasLogicalAt(canvasRef.current, e.clientX, e.clientY);
+        const modelX = hitPt?.modelX ?? 0;
+        const modelY = hitPt?.modelY ?? 0;
 
         const currentHitState =
-          model.anyhitTest(modelX, modelY) !== null ||
-          model.isHitOnModel(modelX, modelY);
+          hitPt !== null &&
+          (model.anyhitTest(modelX, modelY) !== null ||
+            model.isHitOnModel(modelX, modelY));
 
         if (currentHitState !== isHoveringModelRef.current) {
           isHoveringModelRef.current = currentHitState;
@@ -784,17 +823,18 @@ export const useLive2DModel = ({
           const allowTapMotion = modelInfo?.pointerInteractive !== false;
 
           if (allowTapMotion && modelInfo?.tapMotions) {
-            // Use mouse down position for hit testing
-            const canvas = canvasRef.current;
-            const rect = canvas.getBoundingClientRect();
-            // kiosk：rect 是缩放后物理尺寸，clientWidth 是缩放前布局宽——按后者换算命中点会放大 2.29×
-            const scale = canvas.width / rect.width;
-            const downX = (mouseDownPosRef.current.x - rect.left) * scale;
-            const downY = (mouseDownPosRef.current.y - rect.top) * scale;
-            const modelX = view._deviceToScreen.transformX(downX);
-            const modelY = view._deviceToScreen.transformY(downY);
+            // Use mouse down position for hit testing（宽高比修正换算）
+            const hitPt = canvasLogicalAt(
+              canvasRef.current,
+              mouseDownPosRef.current.x,
+              mouseDownPosRef.current.y,
+            );
+            const modelX = hitPt?.modelX ?? 0;
+            const modelY = hitPt?.modelY ?? 0;
 
-            const hitAreaName = model.anyhitTest(modelX, modelY);
+            const hitAreaName = hitPt
+              ? model.anyhitTest(modelX, modelY)
+              : null;
             // Trigger tap motion using the specific hit area name or null for general body tap
             model.startTapMotion(hitAreaName, modelInfo.tapMotions);
           }
@@ -915,30 +955,24 @@ export const useLive2DModel = ({
     // 首指是否命中模型（决定双指缩放会话是否启动）
     const startHitRef = { current: false };
 
-    /** 触点是否落在模型上（与 handleMouseDown 同一套换算）。
+    /** 触点是否落在模型上（与 handleMouseDown 同一套宽高比修正换算）。
      *  2026-10-17: 模型加载/重建窗口期内部状态可能短暂不可用，此前 isHit 会
      *  直接抛 TypeError → 按下人物静默失灵（用户报"挪不动"）。这里兜底为
-     *  未命中，加载完成前触摸一律放行给下层 UI。 */
+     *  未命中，加载完成前触摸一律放行给下层 UI。
+     *  2026-10-18: 换用 canvasLogicalAt —— deviceToScreen 的 y 归一在竖屏下
+     *  与 projection 差 h/w 倍，命中区整体畸变（手机按到人物判定 miss 的根因）。 */
     const hitTestAt = (clientX: number, clientY: number): boolean => {
       const canvas = canvasRef.current;
       if (!canvas) return false;
       const adapter = (window as any).getLAppAdapter?.();
-      const view = LAppDelegate.getInstance().getView();
       const model = adapter?.getModel();
-      if (!view || !model) return false;
-      const rect = canvas.getBoundingClientRect();
-      // kiosk：rect 是缩放后物理尺寸，clientWidth 是缩放前布局宽——按后者换算命中点会放大 2.29×
-      const scale = canvas.width / rect.width;
-      const modelX = view._deviceToScreen.transformX(
-        (clientX - rect.left) * scale,
-      );
-      const modelY = view._deviceToScreen.transformY(
-        (clientY - rect.top) * scale,
-      );
+      if (!model) return false;
+      const hitPt = canvasLogicalAt(canvas, clientX, clientY);
+      if (!hitPt) return false;
       try {
         return (
-          model.anyhitTest(modelX, modelY) !== null ||
-          model.isHitOnModel(modelX, modelY)
+          model.anyhitTest(hitPt.modelX, hitPt.modelY) !== null ||
+          model.isHitOnModel(hitPt.modelX, hitPt.modelY)
         );
       } catch {
         return false;
