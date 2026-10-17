@@ -891,6 +891,12 @@ export class LAppModel extends CubismUserModel {
       return null;
     }
 
+    // 2026-10-17: 模型仍在加载/被释放重建的窗口期 _model 为 null，
+    // isHit 内层会直接 TypeError（按下人物静默失灵），这里与 isHitOnModel 一并守卫
+    if (this._model == null) {
+      return null;
+    }
+
     // Check if model setting is initialized
     if (this._modelSetting == null) {
       console.warn('[LAppModel] Model setting not initialized yet');
@@ -1095,17 +1101,22 @@ export class LAppModel extends CubismUserModel {
       return false;
     }
 
+    // 2026-10-17: 加载/重建窗口期 _model 为 null，与 anyhitTest 一并守卫
+    if (this._model == null) {
+      return false;
+    }
+
     // Get drawable count
     const drawableCount = this._model.getDrawableCount();
-    
+
     // Get model matrix
     const matrix = this._modelMatrix.getArray();
-    
+
     // Calculate determinant
-    const det = 
-      matrix[0] * matrix[5] - 
+    const det =
+      matrix[0] * matrix[5] -
       matrix[1] * matrix[4];
-    
+
     if (Math.abs(det) < 0.0001) {
       return false; // Matrix is not invertible
     }
@@ -1120,46 +1131,62 @@ export class LAppModel extends CubismUserModel {
       tx: (matrix[4] * matrix[13] - matrix[5] * matrix[12]) * invDet,
       ty: (matrix[1] * matrix[12] - matrix[0] * matrix[13]) * invDet
     };
-    
-    // Transform point
-    const transformedPoint = {
-      x: x * invMatrix.a + y * invMatrix.c + invMatrix.tx,
-      y: x * invMatrix.b + y * invMatrix.d + invMatrix.ty
-    };
 
-    // Check each drawable area
+    // Transform point
+    const px = x * invMatrix.a + y * invMatrix.c + invMatrix.tx;
+    const py = x * invMatrix.b + y * invMatrix.d + invMatrix.ty;
+
+    // 2026-10-17: 由「每部件包围盒」改为「三角形级」命中判定。包围盒并集会把
+    // 两腿间隙、手臂与身体间的透明区、以及网格外扩圈全部算成命中——人物被拖到
+    // 页面按钮上方后，一片不可见矩形吞掉下层所有点击（用户报"挪完其他按键
+    // 用不了"）。三角形测试精确到网格形状，间隙不再命中。
     for (let i = 0; i < drawableCount; i++) {
       // Skip if drawable is not visible
       if (!this._model.getDrawableDynamicFlagIsVisible(i)) {
         continue;
       }
-
-      // Get drawable vertex positions
-      const vertices = this._model.getDrawableVertices(i);
-      
-      // Calculate bounds
-      let minX = vertices[0];
-      let minY = vertices[1];
-      let maxX = vertices[0];
-      let maxY = vertices[1];
-
-      for (let j = 2; j < vertices.length; j += 2) {
-        const vx = vertices[j];
-        const vy = vertices[j + 1];
-        minX = Math.min(minX, vx);
-        minY = Math.min(minY, vy);
-        maxX = Math.max(maxX, vx);
-        maxY = Math.max(maxY, vy);
+      if (this._model.getDrawableOpacity(i) <= 0) {
+        continue;
       }
 
-      // Check if point is inside bounds
-      if (
-        transformedPoint.x >= minX &&
-        transformedPoint.x <= maxX &&
-        transformedPoint.y >= minY &&
-        transformedPoint.y <= maxY
-      ) {
-        return true;
+      const vertices = this._model.getDrawableVertices(i);
+      const indices = this._model.getDrawableVertexIndices(i);
+
+      if (!indices || indices.length < 3) {
+        // 无索引（理论不出现）：退回包围盒近似
+        let minX = vertices[0];
+        let minY = vertices[1];
+        let maxX = vertices[0];
+        let maxY = vertices[1];
+        for (let j = 2; j < vertices.length; j += 2) {
+          minX = Math.min(minX, vertices[j]);
+          minY = Math.min(minY, vertices[j + 1]);
+          maxX = Math.max(maxX, vertices[j]);
+          maxY = Math.max(maxY, vertices[j + 1]);
+        }
+        if (px >= minX && px <= maxX && py >= minY && py <= maxY) {
+          return true;
+        }
+        continue;
+      }
+
+      for (let t = 0; t < indices.length; t += 3) {
+        const ax = vertices[indices[t] * 2];
+        const ay = vertices[indices[t] * 2 + 1];
+        const bx = vertices[indices[t + 1] * 2];
+        const by = vertices[indices[t + 1] * 2 + 1];
+        const cx = vertices[indices[t + 2] * 2];
+        const cy = vertices[indices[t + 2] * 2 + 1];
+
+        // 符号法点在三角形内（兼容退化三角形：面积 0 时自然不命中）
+        const d1 = (px - bx) * (ay - by) - (ax - bx) * (py - by);
+        const d2 = (px - cx) * (by - cy) - (bx - cx) * (py - cy);
+        const d3 = (px - ax) * (cy - ay) - (cx - ax) * (py - ay);
+        const hasNeg = d1 < 0 || d2 < 0 || d3 < 0;
+        const hasPos = d1 > 0 || d2 > 0 || d3 > 0;
+        if (!(hasNeg && hasPos)) {
+          return true;
+        }
       }
     }
 

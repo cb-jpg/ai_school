@@ -102,6 +102,11 @@
       "Name": "ParamHairBackV"
     },
     {
+      "Id": "ParamSkirtT1",
+      "GroupId": "",
+      "Name": "ParamSkirtT1"
+    },
+    {
       "Id": "ParamSkirtL",
       "GroupId": "",
       "Name": "ParamSkirtL"

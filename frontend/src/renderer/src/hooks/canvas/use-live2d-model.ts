@@ -915,7 +915,10 @@ export const useLive2DModel = ({
     // 首指是否命中模型（决定双指缩放会话是否启动）
     const startHitRef = { current: false };
 
-    /** 触点是否落在模型上（与 handleMouseDown 同一套换算） */
+    /** 触点是否落在模型上（与 handleMouseDown 同一套换算）。
+     *  2026-10-17: 模型加载/重建窗口期内部状态可能短暂不可用，此前 isHit 会
+     *  直接抛 TypeError → 按下人物静默失灵（用户报"挪不动"）。这里兜底为
+     *  未命中，加载完成前触摸一律放行给下层 UI。 */
     const hitTestAt = (clientX: number, clientY: number): boolean => {
       const canvas = canvasRef.current;
       if (!canvas) return false;
@@ -932,10 +935,14 @@ export const useLive2DModel = ({
       const modelY = view._deviceToScreen.transformY(
         (clientY - rect.top) * scale,
       );
-      return (
-        model.anyhitTest(modelX, modelY) !== null ||
-        model.isHitOnModel(modelX, modelY)
-      );
+      try {
+        return (
+          model.anyhitTest(modelX, modelY) !== null ||
+          model.isHitOnModel(modelX, modelY)
+        );
+      } catch {
+        return false;
+      }
     };
 
     const distBetween = (touches: TouchList) => {
@@ -948,6 +955,26 @@ export const useLive2DModel = ({
     (window as any).__live2dHitTest = hitTestAt;
 
     const onStart = (e: TouchEvent) => {
+      // 2026-10-17: 陈旧会话复位。单指 touchstart（屏上仅此一指）不可能属于
+      // 仍在进行的会话——旧会话若活着，touches.length 必 >= 2。走到这里说明
+      // 旧会话的 touchend 丢了（部分深度定制 ROM 手势接管时吞事件）：
+      // 不复位则 touchActive/waitAllUp 残留为真，onMove/onEnd 对全页触摸一律
+      // preventDefault → 所有按钮/滚动静默失灵。双指落下（length>=2）不走
+      // 这支，正常捏合会话不受影响。
+      if (
+        e.touches.length === 1 &&
+        (touchActiveRef.current ||
+          isPinchingRef.current ||
+          waitAllUpRef.current)
+      ) {
+        touchActiveRef.current = false;
+        startHitRef.current = false;
+        isPinchingRef.current = false;
+        waitAllUpRef.current = false;
+        pinchStartDistRef.current = 0;
+        isPotentialTapRef.current = false;
+        setIsDragging(false);
+      }
       if (touchThrough) {
         // 穿透模式：首指未命中模型 → 完全放行给下层 UI
         if (e.touches.length === 1) {
@@ -1035,7 +1062,13 @@ export const useLive2DModel = ({
         return;
       }
       if (waitAllUpRef.current) {
-        if (e.touches.length === 0) waitAllUpRef.current = false;
+        if (e.touches.length === 0) {
+          waitAllUpRef.current = false;
+          // 捏合收尾：会话标记一并清干净，否则残留 touchActive 会让下一次
+          // 未命中模型的触摸也被 preventDefault 吞掉
+          touchActiveRef.current = false;
+          startHitRef.current = false;
+        }
         return;
       }
       const t = e.changedTouches[0];
