@@ -48,6 +48,23 @@ def read_version_from_gradle() -> tuple[int, str]:
     return code, name
 
 
+def assert_build_baked(gradle_code: int) -> None:
+    """防呆（2026-10-17 v2.31 首发踩雷）：dist/web 里烙的 __APP_BUILD__ 必须等于
+    当前 gradle versionCode。npm run build:web 若跑在 gradle bump 之前，包里是旧
+    构建号 → App 装完热更仍判「有新版」→ 每次启动反复提示/静默更新死循环。
+    构建产物里 OTA 比较式的压缩形态为 version_code><数字>。"""
+    import re
+    bakes: set[str] = set()
+    for js in (DIST_WEB / "assets").glob("main-*.js"):
+        bakes |= set(re.findall(r"version_code>(\d+)", js.read_text(encoding="utf-8", errors="ignore")))
+    if str(gradle_code) not in bakes:
+        sys.exit(
+            f"dist/web 里没烙上 versionCode {gradle_code}（只有 {sorted(bakes)}）。\n"
+            f"构建顺序铁律：先 bump android/app/build.gradle → 再 npm run build:web → 再发 OTA。"
+        )
+    print(f"构建号防呆通过：dist/web 烙有 versionCode {gradle_code}")
+
+
 def make_zip(version: str) -> Path:
     if not (DIST_WEB / "index.html").exists():
         sys.exit(f"dist/web 不存在：{DIST_WEB}（先 npm run build:web）")
@@ -88,6 +105,7 @@ def main():
     gradle_code, gradle_name = read_version_from_gradle()
     version = args.version or gradle_name
     print(f"OTA 版本 {version}（本机原生包 versionCode {gradle_code} / versionName {gradle_name}）")
+    assert_build_baked(gradle_code)
 
     zpath = Path(args.zip) if args.zip else make_zip(version)
     digest = sha256_of(zpath)
