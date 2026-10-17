@@ -8,8 +8,6 @@ conf.yaml
 
 # ignore non-default live2d models
 /live2d-models/*
-!/live2d-models/mao_pro
-!/live2d-models/shizuku
 !/live2d-models/hiyori_pro
 # 自研校服版模型（2026-10-16 分层转换产物，备案溯源需版本化）
 !/live2d-models/xiaoshi
@@ -131,3 +129,6 @@ screenshots/
 # 灌库清单含学生/家长 PII（手机号/家长姓名工作单位），只留服务器本地，勿入库
 scripts/knowledge_data/*.json
 scripts/knowledge_data/docs_text_v3/
+
+# 本地部署打包产物（勿入库）
+*_deploy_web_*.tar.gz

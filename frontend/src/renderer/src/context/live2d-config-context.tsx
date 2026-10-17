@@ -1,5 +1,5 @@
 import {
-  createContext, useContext, useState, useMemo,
+  createContext, useContext, useState, useMemo, useCallback,
 } from 'react';
 import { useLocalStorage } from '@/hooks/utils/use-local-storage';
 
@@ -116,7 +116,13 @@ export function Live2DConfigProvider({ children }: { children: React.ReactNode }
 
   // const [modelInfo, setModelInfoState] = useState<ModelInfo | undefined>(DEFAULT_CONFIG.modelInfo);
 
-  const setModelInfo = (info: ModelInfo | undefined) => {
+  // setModelInfo 必须保持身份稳定（useCallback 空依赖）：websocket-handler 的
+  // 匿名模型回退 effect 把它列在依赖里——此前裸函数每次渲染都换新身份，
+  // effect 反复重跑→setModelInfo 再触发渲染→无限循环（"Setting model info"
+  // 刷屏），且用户在侧栏切换角色后会被循环下一拍立刻覆盖回默认模型，
+  // 表现为"切换不了模型"（2026-10-17）。指针/滚轮偏好的缺省改由函数式更新
+  // 读取上一个 state，避免闭包依赖 modelInfo。
+  const setModelInfo = useCallback((info: ModelInfo | undefined) => {
     if (!info?.url) {
       setModelInfoState(undefined);
       return;
@@ -126,19 +132,19 @@ export function Live2DConfigProvider({ children }: { children: React.ReactNode }
     const finalScale = Number(info.kScale || 0.5) * 2;
     console.log("Setting model info with default scale:", finalScale);
 
-    setModelInfoState({
+    setModelInfoState((prev) => ({
       ...info,
       kScale: finalScale,
       pointerInteractive:
         "pointerInteractive" in info
           ? info.pointerInteractive
-          : (modelInfo?.pointerInteractive ?? true),
+          : (prev?.pointerInteractive ?? true),
       scrollToResize:
         "scrollToResize" in info
           ? info.scrollToResize
-          : (modelInfo?.scrollToResize ?? true),
-    });
-  };
+          : (prev?.scrollToResize ?? true),
+    }));
+  }, []);
 
   const contextValue = useMemo(
     () => ({

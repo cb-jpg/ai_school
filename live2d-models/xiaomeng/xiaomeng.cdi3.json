@@ -102,16 +102,6 @@
       "Name": "ParamHairBack3"
     },
     {
-      "Id": "ParamHairBack4",
-      "GroupId": "",
-      "Name": "ParamHairBack4"
-    },
-    {
-      "Id": "ParamHairBack5",
-      "GroupId": "",
-      "Name": "ParamHairBack5"
-    },
-    {
       "Id": "ParamHairFrontV",
       "GroupId": "",
       "Name": "ParamHairFrontV"
@@ -130,11 +120,6 @@
       "Id": "ParamSkirtC",
       "GroupId": "",
       "Name": "ParamSkirtC"
-    },
-    {
-      "Id": "ParamSkirtC1",
-      "GroupId": "",
-      "Name": "ParamSkirtC1"
     },
     {
       "Id": "ParamSkirtR",
@@ -311,28 +296,28 @@
       "Name": "Blush"
     },
     {
-      "Id": "15_eye_l",
-      "Name": "Eye L"
-    },
-    {
       "Id": "15_eye_closed_l",
       "Name": "Eye Closed L"
     },
     {
-      "Id": "16_eye_r",
-      "Name": "Eye R"
+      "Id": "15_eye_l",
+      "Name": "Eye L"
     },
     {
       "Id": "16_eye_closed_r",
       "Name": "Eye Closed R"
     },
     {
-      "Id": "19_mouth_cavity",
-      "Name": "Mouth Cavity"
+      "Id": "16_eye_r",
+      "Name": "Eye R"
     },
     {
       "Id": "19_mouth",
       "Name": "Mouth"
+    },
+    {
+      "Id": "19_mouth_cavity",
+      "Name": "Mouth Cavity"
     },
     {
       "Id": "20_hair_front",
