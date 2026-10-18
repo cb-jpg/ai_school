@@ -1,0 +1,22 @@
+[
+  {
+    "name": "xiaoshi",
+    "result": "PASS",
+    "expressions": 8,
+    "headPoses": 27,
+    "jawDrift": 0.018289493551178163,
+    "clothControls": 5,
+    "dragReversals": 4,
+    "talkClips": 15
+  },
+  {
+    "name": "xiaomeng",
+    "result": "PASS",
+    "expressions": 8,
+    "headPoses": 27,
+    "jawDrift": 0.015089312568306923,
+    "clothControls": 5,
+    "dragReversals": 4,
+    "talkClips": 15
+  }
+]

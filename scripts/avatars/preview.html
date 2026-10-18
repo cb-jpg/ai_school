@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>小石与小萌 · 表情预览</title>
+  <link rel="stylesheet" href="./preview.css">
+</head>
+<body>
+  <header><h1>小石与小萌 <span>表情预览</span></h1><a href="./runtime-check.html">运行自动检查</a></header>
+  <main>
+    <section class="stage" aria-label="实时人物预览">
+      <div class="characters" role="group" aria-label="选择人物">
+        <button data-character="xiaoshi" aria-pressed="true">小石</button>
+        <button data-character="xiaomeng" aria-pressed="false">小萌</button>
+      </div>
+      <canvas id="canvas" width="800" height="800" aria-label="实时人物；可用右侧滑杆转头"></canvas>
+      <p class="stage-hint">拖动人物区域可以转头</p>
+      <p id="status" role="status">正在加载小石…</p>
+    </section>
+    <aside aria-label="预览控制">
+      <fieldset id="controls" disabled>
+        <section><h2>切换表情</h2><p class="hint">来自学校 IP 终稿的 8 种表情</p>
+          <div class="expressions" role="group" aria-label="表情">
+            <button data-expression="neutral" aria-pressed="true">喜</button>
+            <button data-expression="anger" aria-pressed="false">怒</button>
+            <button data-expression="sadness" aria-pressed="false">哀</button>
+            <button data-expression="joy" aria-pressed="false">乐</button>
+            <button data-expression="surprise" aria-pressed="false">惊恐</button>
+            <button data-expression="bored" aria-pressed="false">无语</button>
+            <button data-expression="shy" aria-pressed="false">害羞</button>
+            <button data-expression="cry" aria-pressed="false">哭</button>
+          </div>
+        </section>
+        <section><h2>转头与动作</h2>
+          <label class="slider" for="yaw">左右转头<input id="yaw" type="range" min="-30" max="30" value="0"></label>
+          <label class="slider" for="pitch">抬头低头<input id="pitch" type="range" min="-30" max="30" value="0"></label>
+          <div class="row"><label><input id="animate" type="checkbox" checked> 自动动作</label><button id="reset">恢复正面</button></div>
+        </section>
+        <section><h2>试试说话</h2>
+          <label for="speech-text" class="hint">试听文字</label>
+          <textarea id="speech-text" rows="3" maxlength="300">你好！很高兴见到你。试着切换我的表情，再看看我说话时的样子。</textarea>
+          <div class="row"><button class="primary" id="speak">朗读这段话</button><button id="demo">口型演示</button><button id="stop">停止</button></div>
+          <p class="hint">朗读使用本机浏览器语音，口型为模拟开合。</p>
+          <label for="audio-file" class="upload">上传音频，测试随声音开合<input id="audio-file" type="file" accept="audio/*"></label>
+          <audio id="audio" controls hidden></audio>
+        </section>
+      </fieldset>
+    </aside>
+  </main>
+  <script src="/WebSDK/Core/live2dcubismcore.min.js"></script>
+  <script type="module" src="./preview.js"></script>
+</body>
+</html>

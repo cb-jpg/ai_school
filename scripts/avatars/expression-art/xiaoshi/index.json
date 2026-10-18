@@ -1,0 +1,90 @@
+[
+  {
+    "name": "neutral",
+    "label": "喜",
+    "bbox": [
+      607,
+      576,
+      997,
+      762
+    ],
+    "sheetPage": 18
+  },
+  {
+    "name": "anger",
+    "label": "怒",
+    "bbox": [
+      599,
+      462,
+      1051,
+      760
+    ],
+    "sheetPage": 18
+  },
+  {
+    "name": "sadness",
+    "label": "哀",
+    "bbox": [
+      603,
+      580,
+      1011,
+      760
+    ],
+    "sheetPage": 18
+  },
+  {
+    "name": "joy",
+    "label": "乐",
+    "bbox": [
+      608,
+      576,
+      997,
+      762
+    ],
+    "sheetPage": 18
+  },
+  {
+    "name": "surprise",
+    "label": "惊恐",
+    "bbox": [
+      566,
+      576,
+      1032,
+      838
+    ],
+    "sheetPage": 18
+  },
+  {
+    "name": "bored",
+    "label": "无语",
+    "bbox": [
+      599,
+      572,
+      1007,
+      760
+    ],
+    "sheetPage": 18
+  },
+  {
+    "name": "shy",
+    "label": "害羞",
+    "bbox": [
+      608,
+      576,
+      997,
+      791
+    ],
+    "sheetPage": 18
+  },
+  {
+    "name": "cry",
+    "label": "哭",
+    "bbox": [
+      612,
+      576,
+      994,
+      847
+    ],
+    "sheetPage": 18
+  }
+]

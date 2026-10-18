@@ -1,0 +1,19 @@
+[
+  {
+    "name": "xiaoshi",
+    "expressionButtons": 8,
+    "mouthDemo": "PASS",
+    "turnAndReset": "PASS"
+  },
+  {
+    "name": "xiaomeng",
+    "expressionButtons": 8,
+    "mouthDemo": "PASS",
+    "turnAndReset": "PASS"
+  },
+  {
+    "audioUpload": "PASS",
+    "silenceClosesMouth": "PASS",
+    "mobileOverflow": false
+  }
+]

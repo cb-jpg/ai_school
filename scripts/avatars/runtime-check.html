@@ -1,0 +1,210 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Avatar runtime regression check</title>
+<pre id="result">Running…</pre>
+<script src="/WebSDK/Core/live2dcubismcore.min.js"></script>
+<script type="module">
+import { CubismFramework } from '/WebSDK/Framework/src/live2dcubismframework.ts';
+import { CubismModelSettingJson } from '/WebSDK/Framework/src/cubismmodelsettingjson.ts';
+import { LAppModel } from '/WebSDK/src/lappmodel.ts';
+import { LAppPal } from '/WebSDK/src/lapppal.ts';
+
+const assert = (ok, message) => { if (!ok) throw Error(message); };
+window.checkDone = false;
+window.checkResult = [];
+window.frameSamples = {};
+try {
+  CubismFramework.startUp();
+  CubismFramework.initialize();
+  LAppPal.getDeltaTime = () => 1 / 60;
+  const root = location.pathname.split('/scripts/avatars/')[0];
+  for (const name of ['xiaoshi', 'xiaomeng']) {
+    const base = `${root}/live2d-models/${name}/`;
+    const settings = await (await fetch(`${base}${name}.model3.json`)).arrayBuffer();
+    const json = JSON.parse(new TextDecoder().decode(settings));
+    const app = new LAppModel();
+    app._modelSetting = new CubismModelSettingJson(settings, settings.byteLength);
+    app.loadModel(await (await fetch(base + json.FileReferences.Moc)).arrayBuffer(), true);
+    const physics = await (await fetch(base + json.FileReferences.Physics)).arrayBuffer();
+    app.loadPhysics(physics, physics.byteLength);
+    for (const reference of json.FileReferences.Expressions) {
+      const buffer = await (await fetch(base + reference.File)).arrayBuffer();
+      app._expressions.setValue(reference.Name, app.loadExpression(buffer, buffer.byteLength, reference.Name));
+    }
+    for (const id of json.Groups.find(g => g.Name === 'LipSync').Ids) {
+      app._lipSyncIds.pushBack(CubismFramework.getIdManager().getId(id));
+    }
+    const parameters = app._model.getModel().parameters;
+    const core = app._model.getModel();
+    core.update();
+    const outlines = ['01_hair_back', '13_face_base'];
+    const rest = outlines.map(id => Array.from(core.drawables.vertexPositions[core.drawables.ids.indexOf(id)]));
+    const breathIndex = parameters.ids.indexOf('ParamBreath');
+    parameters.values[breathIndex] = 1;
+    core.update();
+    outlines.forEach((id, i) => {
+      const vertices = core.drawables.vertexPositions[core.drawables.ids.indexOf(id)];
+      assert(vertices.some((v, j) => Math.abs(v - rest[i][j]) > 0.001), `${name}: ${id} lost the shared breath deformation`);
+    });
+    parameters.values[breathIndex] = 0;
+    core.update();
+    const outlineIndex = core.drawables.ids.indexOf('01_hair_back');
+    const outlineRest = Array.from(core.drawables.vertexPositions[outlineIndex]);
+    parameters.ids.forEach((id, i) => { if (id.startsWith('ParamHairBack')) parameters.values[i] = parameters.maximumValues[i]; });
+    core.update();
+    assert(core.drawables.vertexPositions[outlineIndex].every((v, j) => Math.abs(v - outlineRest[j]) < 0.00001), `${name}: hair physics moved the jaw outline`);
+    parameters.ids.forEach((id, i) => { if (id.startsWith('ParamHairBack')) parameters.values[i] = parameters.defaultValues[i]; });
+    core.update();
+    // The centre of the chin must stay seated on the neck at combined turn extremes.
+    const faceIndex = core.drawables.ids.indexOf('13_face_base');
+    const faceRest = Array.from(core.drawables.vertexPositions[faceIndex]);
+    const jawY = Math.min(...faceRest.filter((_, i) => i % 2));
+    let jawVertex = 0, closest = Infinity;
+    for (let i = 0; i < faceRest.length; i += 2) {
+      const distance = Math.hypot(faceRest[i], faceRest[i + 1] - jawY);
+      if (distance < closest) { closest = distance; jawVertex = i; }
+    }
+    let jawDrift = 0;
+    for (const x of [-30, 0, 30]) for (const y of [-30, 0, 30]) for (const z of [-30, 0, 30]) {
+      for (const [id, value] of [['ParamAngleX', x], ['ParamAngleY', y], ['ParamAngleZ', z]]) {
+        parameters.values[parameters.ids.indexOf(id)] = value;
+      }
+      core.update();
+      const face = core.drawables.vertexPositions[faceIndex];
+      jawDrift = Math.max(jawDrift, Math.hypot(face[jawVertex] - faceRest[jawVertex], face[jawVertex + 1] - faceRest[jawVertex + 1]));
+    }
+    assert(jawDrift < .02, `${name}: chin detached from neck (${jawDrift})`);
+    parameters.values.set(parameters.defaultValues);
+    core.update();
+    // Uniform cutouts include sleeves and must not swing as independent skirt panels.
+    // Exercise every old cloth control, including controls no longer driven by physics.
+    const uniform = core.drawables.ids.map((id, i) => /clothing|arm_|leg_/.test(id) ? i : -1).filter(i => i >= 0);
+    const uniformRest = uniform.map(i => Array.from(core.drawables.vertexPositions[i]));
+    const clothParameters = parameters.ids.map((id, i) => /^Param(Skirt|Cloth)/.test(id) ? i : -1).filter(i => i >= 0);
+    for (const index of clothParameters) {
+      for (const value of [parameters.minimumValues[index], parameters.maximumValues[index]]) {
+        parameters.values[index] = value;
+        core.update();
+        uniform.forEach((part, i) => assert(core.drawables.vertexPositions[part].every((v, j) => Math.abs(v - uniformRest[i][j]) < .00001), `${name}: ${parameters.ids[index]} separated the uniform from limbs`));
+      }
+      parameters.values[index] = parameters.defaultValues[index];
+    }
+    core.update();
+    for (const group of ['Idle', 'Talk']) {
+      for (const [i, reference] of json.FileReferences.Motions[group].entries()) {
+        const buffer = await (await fetch(base + reference.File)).arrayBuffer();
+        const motionJson = JSON.parse(new TextDecoder().decode(buffer));
+        assert(!motionJson.Meta.Loop, `${name}: ${group} must finish to permit reselection`);
+        for (const curve of motionJson.Curves) {
+          const index = parameters.ids.indexOf(curve.Id);
+          assert(index >= 0, `${name}: unknown parameter ${curve.Id}`);
+          assert(group !== 'Talk' || curve.Id !== 'ParamMouthOpenY', 'Talk must not override audio');
+          const values = [curve.Segments[1]];
+          for (let k = 2; k < curve.Segments.length; k += 3) {
+            assert(curve.Segments[k] === 0, 'Expected sampled linear motion');
+            values.push(curve.Segments[k + 2]);
+          }
+          assert(values.every(v => v >= parameters.minimumValues[index] && v <= parameters.maximumValues[index]), `${name}: ${curve.Id} outside range`);
+        }
+        const motion = app.loadMotion(buffer, buffer.byteLength, `${group}_${i}`);
+        motion.setEffectIds(app._eyeBlinkIds, app._lipSyncIds);
+        app._motions.setValue(`${group}_${i}`, motion);
+      }
+    }
+    app._state = 22; // LoadStep.CompleteSetup
+    const selected = [];
+    const start = app.startRandomMotion.bind(app);
+    app.startRandomMotion = (group, priority) => { selected.push(group); return start(group, priority); };
+    const sample = (frames) => {
+      const values = [];
+      for (let i = 0; i < frames; i++) {
+        app.update();
+        assert(Array.from(parameters.values).every(Number.isFinite), 'Non-finite model parameter');
+        values.push(parameters.values[parameters.ids.indexOf('ParamMouthOpenY')]);
+      }
+      return values;
+    };
+    // Reproduce the actual interaction: horizontal dragging drives both head and body,
+    // then physics runs on every frame. Head-only parameter checks miss this path.
+    for (const direction of [-1, 1, -1, 1]) {
+      app.setDragging(direction, 0);
+      sample(120);
+      assert(Math.abs(parameters.values[parameters.ids.indexOf('ParamBodyAngleX')]) > 5, `${name}: drag did not exercise body tracking`);
+      assert(clothParameters.every(i => parameters.values[i] === parameters.defaultValues[i]), `${name}: pointer tracking reactivated loose-cloth physics`);
+    }
+    app.setDragging(0, 0);
+    sample(120);
+    selected.length = 0;
+    app.setSpeaking(true, true);
+    const mouths = sample(1200); // 20 seconds: several successive Talk clips
+    assert(selected.length >= 4 && selected.every(g => g === 'Talk'), `${name}: long speech dropped to Idle`);
+    assert(Math.max(...mouths) - Math.min(...mouths) > 0.4, `${name}: browser speech mouth is static`);
+    window.frameSamples[name] = [];
+    for (let i = 0; i < 60; i++) {
+      sample(4);
+      window.frameSamples[name].push(Object.fromEntries(parameters.ids.map((id, j) => [id, parameters.values[j]])));
+    }
+    app.setSpeaking(false);
+    const stopped = sample(60);
+    assert(selected.at(-1) === 'Idle', `${name}: speech did not return to Idle`);
+    assert(stopped.at(-1) === 0, `${name}: mouth stayed open after stopping`);
+    // Exercise the actual PCM -> RMS -> model parameter path, including a silent segment.
+    app.setSpeaking(true);
+    app.setExpression('surprise');
+    const wav = app._wavFileHandler;
+    wav._wavFileInfo._samplesPerChannel = 16000;
+    wav._wavFileInfo._samplingRate = 16000;
+    wav._wavFileInfo._numberOfChannels = 1;
+    wav._sampleOffset = 0;
+    wav._userTimeSeconds = 0;
+    wav._pcmData = [Float32Array.from({ length: 16000 }, (_, i) => i < 8000 ? 0.3 * Math.sin(i / 8) : 0)];
+    const audioMouth = sample(65);
+    assert(Math.max(...audioMouth.slice(0, 28)) > 0.5, `${name}: PCM did not open mouth`);
+    assert(audioMouth.at(-1) === 0, `${name}: silence did not close mouth`);
+    app.setExpression('neutral');
+    const artNames = ['anger', 'sadness', 'joy', 'surprise', 'bored', 'shy', 'cry'];
+    for (const emotion of ['neutral', ...artNames]) {
+      app.setSpeaking(false);
+      app.setExpression(emotion);
+      sample(60);
+      for (const name of artNames) {
+        const index = core.drawables.ids.indexOf(`art_${name}`);
+        assert(index >= 0, `Missing original-design artwork: ${name}`);
+        const expected = name === emotion ? 1 : 0;
+        assert(Math.abs(core.drawables.opacities[index] - expected) < 0.01, `${emotion}: leaked ${name} artwork`);
+      }
+      const base = parameters.values[parameters.ids.indexOf('ParamArtBase')];
+      assert(Math.abs(base - Number(emotion === 'neutral')) < .01, `${emotion}: original eyes overlap the new artwork`);
+      app.setSpeaking(true, true);
+      const talking = sample(60);
+      assert(Math.max(...talking) - Math.min(...talking) > .4, `${emotion}: speaking mouth stopped animating`);
+    }
+    app.setSpeaking(false);
+    app.setExpression('neutral');
+    sample(60);
+    // A cancelled download must never restart mouth motion after an interruption.
+    const fetchOriginal = window.fetch;
+    let deliver;
+    window.fetch = () => new Promise(resolve => { deliver = resolve; });
+    const pending = wav.loadWavFile('cancelled-test.wav');
+    wav.releasePcmData();
+    deliver({ arrayBuffer: async () => new ArrayBuffer(0) });
+    assert(await pending === false && wav._pcmData === null && wav.getRms() === 0, 'Cancelled PCM load resumed');
+    window.fetch = fetchOriginal;
+    app.setSpeaking(false);
+    sample(60);
+    assert(selected.at(-1) === 'Idle', 'Interrupt did not restore Idle');
+    // Models without a Talk group must continue to animate using Idle.
+    app._modelSetting.getMotionCount = group => group === 'Talk' ? 0 : json.FileReferences.Motions[group].length;
+    app.setSpeaking(true);
+    sample(60);
+    assert(selected.at(-1) === 'Idle', 'Missing Talk group fallback failed');
+    window.checkResult.push({ name, result: 'PASS', expressions: 8, headPoses: 27, jawDrift, clothControls: clothParameters.length, dragReversals: 4, talkClips: selected.filter(g => g === 'Talk').length });
+    app.release();
+  }
+  document.getElementById('result').textContent = JSON.stringify(window.checkResult, null, 2);
+} catch (error) {
+  window.checkResult = { error: String(error), stack: error.stack };
+  document.getElementById('result').textContent = JSON.stringify(window.checkResult, null, 2);
+} finally { window.checkDone = true; }
+</script>

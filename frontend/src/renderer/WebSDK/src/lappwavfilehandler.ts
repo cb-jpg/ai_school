@@ -10,6 +10,7 @@
 export let s_instance: LAppWavFileHandler | null = null;
 
 export class LAppWavFileHandler {
+  private _loadGeneration = 0;
   /**
    * クラスのインスタンス（シングルトン）を返す。
    * インスタンスが生成されていない場合は内部でインスタンスを生成する。
@@ -59,6 +60,7 @@ export class LAppWavFileHandler {
     if (goalOffset > this._wavFileInfo._samplesPerChannel) {
       goalOffset = this._wavFileInfo._samplesPerChannel;
     }
+    if (goalOffset <= this._sampleOffset) return true;
 
     // RMS計測
     rms = 0.0;
@@ -109,6 +111,7 @@ export class LAppWavFileHandler {
       if (this._pcmData != null) {
         this.releasePcmData();
       }
+      const generation = ++this._loadGeneration;
 
       // ファイルロード
       const asyncFileLoad = async () => {
@@ -118,7 +121,12 @@ export class LAppWavFileHandler {
       };
 
       const asyncWavFileManager = (async () => {
-        this._byteReader._fileByte = await asyncFileLoad();
+        const bytes = await asyncFileLoad();
+        if (generation !== this._loadGeneration) {
+          resolveValue(false);
+          return;
+        }
+        this._byteReader._fileByte = bytes;
         this._byteReader._fileDataView = new DataView(
           this._byteReader._fileByte
         );
@@ -292,6 +300,8 @@ export class LAppWavFileHandler {
   }
 
   public releasePcmData(): void {
+    ++this._loadGeneration;
+    this._lastRms = 0;
     if (this._pcmData) {
       for (
         let channelCount = 0;

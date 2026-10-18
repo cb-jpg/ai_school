@@ -39,12 +39,15 @@
         "emotionMap": {
             "neutral": "neutral",
             "anger": "anger",
-            "disgust": "anger",
+            "disgust": "bored",
             "fear": "surprise",
             "joy": "joy",
             "smirk": "smirk",
             "sadness": "sadness",
-            "surprise": "surprise"
+            "surprise": "surprise",
+            "bored": "bored",
+            "shy": "shy",
+            "cry": "cry"
         }
     },
     {
@@ -59,12 +62,15 @@
         "emotionMap": {
             "neutral": "neutral",
             "anger": "anger",
-            "disgust": "anger",
+            "disgust": "bored",
             "fear": "surprise",
             "joy": "joy",
             "smirk": "smirk",
             "sadness": "sadness",
-            "surprise": "surprise"
+            "surprise": "surprise",
+            "bored": "bored",
+            "shy": "shy",
+            "cry": "cry"
         }
     }
 ]

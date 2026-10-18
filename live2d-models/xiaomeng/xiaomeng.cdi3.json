@@ -97,11 +97,6 @@
       "Name": "ParamHairBack2"
     },
     {
-      "Id": "ParamHairBack3",
-      "GroupId": "",
-      "Name": "ParamHairBack3"
-    },
-    {
       "Id": "ParamHairFrontV",
       "GroupId": "",
       "Name": "ParamHairFrontV"
@@ -205,6 +200,46 @@
       "Id": "ParamBreath",
       "GroupId": "Body",
       "Name": "Breath"
+    },
+    {
+      "Id": "ParamArtBase",
+      "GroupId": "",
+      "Name": "ParamArtBase"
+    },
+    {
+      "Id": "ParamArtAnger",
+      "GroupId": "",
+      "Name": "ParamArtAnger"
+    },
+    {
+      "Id": "ParamArtSadness",
+      "GroupId": "",
+      "Name": "ParamArtSadness"
+    },
+    {
+      "Id": "ParamArtJoy",
+      "GroupId": "",
+      "Name": "ParamArtJoy"
+    },
+    {
+      "Id": "ParamArtSurprise",
+      "GroupId": "",
+      "Name": "ParamArtSurprise"
+    },
+    {
+      "Id": "ParamArtBored",
+      "GroupId": "",
+      "Name": "ParamArtBored"
+    },
+    {
+      "Id": "ParamArtShy",
+      "GroupId": "",
+      "Name": "ParamArtShy"
+    },
+    {
+      "Id": "ParamArtCry",
+      "GroupId": "",
+      "Name": "ParamArtCry"
     }
   ],
   "ParameterGroups": [
@@ -240,6 +275,10 @@
     }
   ],
   "Parts": [
+    {
+      "Id": "00_neck",
+      "Name": "Neck"
+    },
     {
       "Id": "01_hair_back",
       "Name": "Hair Back"
@@ -293,36 +332,32 @@
       "Name": "Face Base"
     },
     {
-      "Id": "14_blush_l",
+      "Id": "14_blush",
       "Name": "Blush"
-    },
-    {
-      "Id": "14_blush_r",
-      "Name": "Blush"
-    },
-    {
-      "Id": "15_eye_closed_l",
-      "Name": "Eye Closed L"
     },
     {
       "Id": "15_eye_l",
       "Name": "Eye L"
     },
     {
-      "Id": "16_eye_closed_r",
-      "Name": "Eye Closed R"
+      "Id": "15_eye_closed_l",
+      "Name": "Eye Closed L"
     },
     {
       "Id": "16_eye_r",
       "Name": "Eye R"
     },
     {
-      "Id": "19_mouth",
-      "Name": "Mouth"
+      "Id": "16_eye_closed_r",
+      "Name": "Eye Closed R"
     },
     {
       "Id": "19_mouth_cavity",
       "Name": "Mouth Cavity"
+    },
+    {
+      "Id": "19_mouth",
+      "Name": "Mouth"
     },
     {
       "Id": "20_hair_front",
@@ -339,6 +374,34 @@
     {
       "Id": "18_eyebrow_r",
       "Name": "Eyebrow R"
+    },
+    {
+      "Id": "art_anger",
+      "Name": "Accessory"
+    },
+    {
+      "Id": "art_sadness",
+      "Name": "Accessory"
+    },
+    {
+      "Id": "art_joy",
+      "Name": "Accessory"
+    },
+    {
+      "Id": "art_surprise",
+      "Name": "Accessory"
+    },
+    {
+      "Id": "art_bored",
+      "Name": "Accessory"
+    },
+    {
+      "Id": "art_shy",
+      "Name": "Accessory"
+    },
+    {
+      "Id": "art_cry",
+      "Name": "Accessory"
     }
   ]
 }

@@ -1,0 +1,4 @@
+{
+  "error": "Error: xiaoshi: ParamSkirtT1 separated the uniform from limbs",
+  "stack": "Error: xiaoshi: ParamSkirtT1 separated the uniform from limbs\n    at assert (http://127.0.0.1:3020/@fs/home/ywj/dbh/ai_school/ai_school/scripts/avatars/runtime-check.html?arms=before:12:50)\n    at http://127.0.0.1:3020/@fs/home/ywj/dbh/ai_school/ai_school/scripts/avatars/runtime-check.html?arms=before:88:38\n    at Array.forEach (<anonymous>)\n    at http://127.0.0.1:3020/@fs/home/ywj/dbh/ai_school/ai_school/scripts/avatars/runtime-check.html?arms=before:88:17"
+}

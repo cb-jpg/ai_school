@@ -12,7 +12,6 @@ import { toaster } from '@/components/ui/toaster';
 import { useWebSocket } from '@/context/websocket-context';
 import { DisplayText } from '@/services/websocket-service';
 import { useLive2DExpression } from '@/hooks/canvas/use-live2d-expression';
-import * as LAppDefine from '../../../WebSDK/src/lappdefine';
 
 // Simple type alias for Live2D model
 type Live2DModel = any;
@@ -31,6 +30,7 @@ interface AudioTaskOptions {
 // shared so an interrupt issued from any consumer can stop the real audio task.
 const currentAudioRef: { current: HTMLAudioElement | null } = { current: null };
 const currentModelRef: { current: Live2DModel | null } = { current: null };
+let finishCurrentPlayback: (() => void) | null = null;
 
 // Global function to update volume of currently playing audio
 export const updateCurrentAudioVolume = (volume: number) => {
@@ -72,40 +72,9 @@ export const useAudioTask = () => {
    * Stop current audio playback and lip sync
    */
   const stopCurrentAudioAndLipSync = useCallback(() => {
+    currentModelRef.current?.setSpeaking(false);
+    finishCurrentPlayback?.();
     if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-    if (currentAudioRef.current) {
-      console.log('Stopping current audio and lip sync');
-      const audio = currentAudioRef.current;
-      audio.pause();
-      audio.src = '';
-      audio.load();
-
-      const model = currentModelRef.current;
-      if (model && model._wavFileHandler) {
-        try {
-          // Release PCM data to stop lip sync calculation in update()
-          model._wavFileHandler.releasePcmData();
-          console.log('Called _wavFileHandler.releasePcmData()');
-
-          // Additional reset of state variables as fallback
-          model._wavFileHandler._lastRms = 0.0;
-          model._wavFileHandler._sampleOffset = 0;
-          model._wavFileHandler._userTimeSeconds = 0.0;
-          console.log('Also reset _lastRms, _sampleOffset, _userTimeSeconds as fallback');
-        } catch (e) {
-          console.error('Error stopping/resetting wavFileHandler:', e);
-        }
-      } else if (model) {
-        console.warn('Current model does not have _wavFileHandler to stop/reset.');
-      } else {
-        console.log('No associated model found to stop lip sync.');
-      }
-
-      currentAudioRef.current = null;
-      currentModelRef.current = null;
-    } else {
-      console.log('No current audio playing to stop.');
-    }
   }, []);
 
   /**
@@ -145,6 +114,10 @@ export const useAudioTask = () => {
     }
 
     try {
+      const lappAdapter = (window as any).getLAppAdapter?.();
+      if (lappAdapter && expressions?.[0] !== undefined) {
+        setExpression(expressions[0], lappAdapter, `Set expression to: ${expressions[0]}`);
+      }
       // Process audio if available
       if (audioBase64) {
         const audioDataUrl = `data:audio/wav;base64,${audioBase64}`;
@@ -172,32 +145,6 @@ export const useAudioTask = () => {
           console.log('Model has _wavFileHandler available');
         }
 
-        // Set expression if available
-        const lappAdapter = (window as any).getLAppAdapter?.();
-        if (lappAdapter && expressions?.[0] !== undefined) {
-          setExpression(
-            expressions[0],
-            lappAdapter,
-            `Set expression to: ${expressions[0]}`,
-          );
-        }
-
-        // Start talk motion
-        if (LAppDefine && LAppDefine.PriorityNormal) {
-          // Check if modelSetting is initialized before starting motion
-          if (model._modelSetting) {
-            console.log("Starting random 'Talk' motion");
-            model.startRandomMotion(
-              "Talk",
-              LAppDefine.PriorityNormal,
-            );
-          } else {
-            console.warn("Model setting not initialized - cannot start talk motion");
-          }
-        } else {
-          console.warn("LAppDefine.PriorityNormal not found - cannot start talk motion");
-        }
-
         // Setup audio element
         const audio = new Audio(audioDataUrl);
         audio.volume = stateRef.current.volume / 100; // 设置音量 (0-1)
@@ -218,14 +165,19 @@ export const useAudioTask = () => {
 
         const cleanup = () => {
           if (currentAudioRef.current === audio) {
+            audio.pause();
+            model.setSpeaking(false);
+            model._wavFileHandler?.releasePcmData();
             currentAudioRef.current = null;
             currentModelRef.current = null;
+            finishCurrentPlayback = null;
           }
           if (!isFinished) {
             isFinished = true;
             resolve();
           }
         };
+        finishCurrentPlayback = cleanup;
 
         // Enhance lip sync sensitivity
         const lipSyncScale = 2.0;
@@ -243,6 +195,7 @@ export const useAudioTask = () => {
             console.error("Audio play error:", err);
             cleanup();
           });
+          model.setSpeaking(true);
 
           // Setup lip sync
           if (model._wavFileHandler) {
@@ -265,7 +218,7 @@ export const useAudioTask = () => {
               console.warn('WavFileHandler start skipped - audio was stopped');
             }
           }
-        });
+        }, { once: true });
 
         audio.addEventListener('ended', () => {
           console.log("Audio playback completed");
@@ -300,13 +253,27 @@ export const useAudioTask = () => {
           || voices.find((voice) => voice.lang.toLowerCase().startsWith('zh'))
           || null;
         let finished = false;
+        const model = (window as any).getLive2DManager?.()?.getModel(0);
         const finish = () => {
           if (finished) return;
           finished = true;
           window.clearTimeout(timeout);
+          if (finishCurrentPlayback === finish) {
+            model?.setSpeaking(false);
+            currentModelRef.current = null;
+            finishCurrentPlayback = null;
+          }
           resolve();
         };
-        const timeout = window.setTimeout(finish, Math.min(30000, Math.max(5000, speakableText.length * 500)));
+        finishCurrentPlayback = finish;
+        currentModelRef.current = model;
+        utterance.onstart = () => {
+          if (!finished) model?.setSpeaking(true, true);
+        };
+        const timeout = window.setTimeout(() => {
+          if (finishCurrentPlayback === finish) window.speechSynthesis.cancel();
+          finish();
+        }, Math.min(30000, Math.max(5000, speakableText.length * 500)));
         utterance.onend = finish;
         utterance.onerror = (event) => {
           console.error('Browser speech synthesis error:', event.error);

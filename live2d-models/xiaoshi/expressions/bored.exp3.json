@@ -1,0 +1,92 @@
+{
+  "Type": "Live2D Expression",
+  "FadeInTime": 0.18,
+  "FadeOutTime": 0.18,
+  "Parameters": [
+    {
+      "Id": "ParamArtBase",
+      "Value": 0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamArtAnger",
+      "Value": 0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamArtSadness",
+      "Value": 0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamArtJoy",
+      "Value": 0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamArtSurprise",
+      "Value": 0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamArtBored",
+      "Value": 1,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamArtShy",
+      "Value": 0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamArtCry",
+      "Value": 0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamMouthForm",
+      "Value": -0.8,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamMouthOpenY",
+      "Value": 0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamEyeLSmile",
+      "Value": 0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamEyeRSmile",
+      "Value": 0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamCheek",
+      "Value": 0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamBrowLY",
+      "Value": 0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamBrowRY",
+      "Value": 0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamBrowLForm",
+      "Value": 0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamBrowRForm",
+      "Value": 0,
+      "Blend": "Overwrite"
+    }
+  ]
+}

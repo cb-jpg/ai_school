@@ -1,0 +1,23 @@
+{
+  "models": [
+    {
+      "name": "xiaoshi",
+      "fileProtocol": true,
+      "networkOffline": true,
+      "expressions": 8,
+      "mouthRange": 0.9067897945642471,
+      "drag": "PASS"
+    },
+    {
+      "name": "xiaomeng",
+      "fileProtocol": true,
+      "networkOffline": true,
+      "expressions": 8,
+      "mouthRange": 0.9194238483905792,
+      "drag": "PASS"
+    }
+  ],
+  "localAudio": "PASS",
+  "archive": "/home/ywj/dbh/ai_school/avatar-share-20261018/\u5c0f\u77f3\u4e0e\u5c0f\u840c-\u8868\u60c5\u9884\u89c8.zip",
+  "result": "PASS"
+}

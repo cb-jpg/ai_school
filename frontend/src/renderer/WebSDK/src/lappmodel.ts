@@ -555,6 +555,21 @@ export class LAppModel extends CubismUserModel {
   /**
    * 更新
    */
+  public setSpeaking(speaking: boolean, syntheticLipSync = false): void {
+    if (this._speaking !== speaking && this._state === LoadStep.CompleteSetup) {
+      this.startRandomMotion(
+        speaking && this._modelSetting.getMotionCount('Talk') > 0
+          ? 'Talk' : LAppDefine.MotionGroupIdle,
+        LAppDefine.PriorityForce
+      );
+    }
+    this._speaking = speaking;
+    this._syntheticLipSync = speaking && syntheticLipSync;
+  }
+
+  private _speaking = false;
+  private _syntheticLipSync = false;
+
   public update(): void {
     if (this._state != LoadStep.CompleteSetup) return;
 
@@ -573,8 +588,9 @@ export class LAppModel extends CubismUserModel {
     if (this._motionManager.isFinished()) {
       // モーションの再生がない場合、待機モーションの中からランダムで再生する
       this.startRandomMotion(
-        LAppDefine.MotionGroupIdle,
-        LAppDefine.PriorityIdle
+        this._speaking && this._modelSetting.getMotionCount('Talk') > 0
+          ? 'Talk' : LAppDefine.MotionGroupIdle,
+        this._speaking ? LAppDefine.PriorityNormal : LAppDefine.PriorityIdle
       );
     } else {
       motionUpdated = this._motionManager.updateMotion(
@@ -631,16 +647,21 @@ export class LAppModel extends CubismUserModel {
       let value = 0.0;
       this._wavFileHandler.update(deltaTimeSeconds);
       value = this._wavFileHandler.getRms();
+      // Browser speech synthesis exposes no PCM; use a modest speaking animation.
+      if (this._syntheticLipSync) {
+        value = 0.08 * (1 + Math.sin(this._userTimeSeconds * 19));
+      }
       value = Math.min(1.0, value * 1.5);
 
       const lipSyncWeight = 4.0;
 
       for (let i = 0; i < this._lipSyncIds.getSize(); ++i) {
-        this._model.addParameterValueById(
-          this._lipSyncIds.at(i),
-          value,
-          lipSyncWeight
-        );
+        if (this._speaking) {
+          // Expressions may hold the mouth open; speech must still be able to close it.
+          this._model.setParameterValueById(this._lipSyncIds.at(i), value * lipSyncWeight);
+        } else {
+          this._model.addParameterValueById(this._lipSyncIds.at(i), value, lipSyncWeight);
+        }
       }
     }
 
