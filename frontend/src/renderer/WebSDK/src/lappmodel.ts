@@ -569,6 +569,15 @@ export class LAppModel extends CubismUserModel {
 
   private _speaking = false;
   private _syntheticLipSync = false;
+  private _currentExpression: string | null = null;
+  // 原画换脸表情（ParamArt* 美术图自带画好的嘴）。说话口型若同时驱动 rig 嘴
+  // 会双层叠画（2026-10-19 用户报「张口和表情重叠」）→ 说话期间隐藏 rig 嘴，
+  // 以画中嘴为嘴；neutral / 无表情照常口型。
+  private static ART_MOUTH_EXPRESSIONS = new Set([
+    'anger', 'sadness', 'joy', 'surprise', 'bored', 'shy', 'cry', 'smirk',
+  ]);
+  private _mouthHideIdx: number[] | null = null;
+  private _mouthHideCore: unknown = null;
 
   public update(): void {
     if (this._state != LoadStep.CompleteSetup) return;
@@ -671,6 +680,32 @@ export class LAppModel extends CubismUserModel {
     }
 
     this._model.update();
+    this._applyArtMouthOverride();
+  }
+
+  /**
+   * art 表情（原画换脸）说话期间隐藏 rig 嘴：美术图自带嘴，口型再驱动 rig 嘴
+   * 会双层叠画。在 _model.update() 之后逐帧覆写（update 每帧按部位重算 opacity，
+   * 因此只在隐藏态写、退出时自然恢复，无需还原逻辑）。
+   */
+  private _applyArtMouthOverride(): void {
+    if (!(this._speaking && this._currentExpression != null &&
+          LAppModel.ART_MOUTH_EXPRESSIONS.has(this._currentExpression))) {
+      return;
+    }
+    const core = (this._model as any)?._model;
+    if (!core) return;
+    if (this._mouthHideCore !== core || this._mouthHideIdx == null) {
+      this._mouthHideCore = core;
+      this._mouthHideIdx = [];
+      for (let i = 0; i < core.drawables.count; i++) {
+        const id: string = core.drawables.ids[i];
+        if (/mouth|cavity/i.test(id)) this._mouthHideIdx.push(i);
+      }
+    }
+    for (const i of this._mouthHideIdx) {
+      core.drawables.opacities[i] = 0;
+    }
   }
 
   /**
@@ -824,6 +859,7 @@ export class LAppModel extends CubismUserModel {
    * @param expressionId 表情モーションのID
    */
   public setExpression(expressionId: string): void {
+    this._currentExpression = expressionId;
     const motion: ACubismMotion = this._expressions.getValue(expressionId);
 
     if (this._debugMode) {
