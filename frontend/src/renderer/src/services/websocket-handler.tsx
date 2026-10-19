@@ -410,13 +410,17 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
     };
   }, [authUsername, setModelInfo]);
 
-  // 开场语音声明（合规 2026-10-14：音频模态显式标识）——连接成功后播报一次
+  // 开场语音声明（合规 2026-10-14：音频模态显式标识）——进入对话页时播报一次
   // 「内容由 AI 生成」提示，走 static-narration 通道直接 TTS，不经 LLM。
-  // 每页面加载至多一次；后台管理页（#/main*）不播；延迟 1.2s 等连接收尾消息落定。
+  // 每页面加载至多一次；2026-10-19 起改到 #/hero 触发（用户报：登录重开 App
+  // 落在首页就出声像"对话已开始"）——连接先开则进门即播，先在门户逛则
+  // 进对话页那一刻播；后台管理页（#/main*）不播；延迟 1.2s 等连接收尾消息落定。
   const aiDisclaimerSentRef = useRef(false);
-  const sendAiDisclaimerOnce = useCallback(() => {
+  const wsOpenRef = useRef(false);
+  const maybeSendAiDisclaimer = useCallback(() => {
     if (aiDisclaimerSentRef.current) return;
-    if (window.location.hash.startsWith('#/main')) return;
+    if (!wsOpenRef.current) return;
+    if (!window.location.hash.startsWith('#/hero')) return;
     aiDisclaimerSentRef.current = true;
     window.setTimeout(() => {
       wsService.sendMessage({
@@ -433,15 +437,18 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
       setWsState(state);
       if (state === 'OPEN') {
         pendingRestoreRef.current = true;
-        sendAiDisclaimerOnce();
       }
+      wsOpenRef.current = state === 'OPEN';
+      maybeSendAiDisclaimer();
     });
     const messageSubscription = wsService.onMessage(handleWebSocketMessage);
+    window.addEventListener('hashchange', maybeSendAiDisclaimer);
     return () => {
       stateSubscription.unsubscribe();
       messageSubscription.unsubscribe();
+      window.removeEventListener('hashchange', maybeSendAiDisclaimer);
     };
-  }, [wsUrl, handleWebSocketMessage]);
+  }, [wsUrl, handleWebSocketMessage, maybeSendAiDisclaimer]);
 
   const webSocketContextValue = useMemo(() => ({
     sendMessage: wsService.sendMessage.bind(wsService),
