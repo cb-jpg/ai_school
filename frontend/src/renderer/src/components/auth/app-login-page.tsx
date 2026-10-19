@@ -9,6 +9,7 @@
  */
 import { useState } from 'react';
 import { Box, VStack, Text, Input, Button } from '@chakra-ui/react';
+import { FiArrowLeft } from 'react-icons/fi';
 import { useAuth } from '@/context/auth-context';
 import { changePassword } from '@/services/auth';
 import { withToken } from '@/services/api-base';
@@ -37,6 +38,17 @@ export default function AppLoginPage({ onCancel }: AppLoginPageProps) {
   const [submitting, setSubmitting] = useState(false);
   // 协议弹层（合规 2026-10-14：用户协议/隐私政策放置到登录页）
   const [agreement, setAgreement] = useState<AgreementDoc | null>(null);
+
+  // 返回键（2026-10-19）：没有账号的用户此前只能退出软件。
+  // 浮层模式走 onCancel（留在当前页面继续浏览）；
+  // 对话页/后台的硬门禁没有 onCancel，退回门户首页（#/home 不要求登录）。
+  const handleBack = () => {
+    if (onCancel) {
+      onCancel();
+      return;
+    }
+    window.location.hash = '#/home';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,6 +111,21 @@ export default function AppLoginPage({ onCancel }: AppLoginPageProps) {
       position="relative"
       overflow="hidden"
     >
+      {/* 返回键：左上角常驻（浮层/硬门禁都能退），访客无账号不再被困在本页 */}
+      <Box data-login-back position="absolute" top={{ base: 3, md: 5 }} left={{ base: 3, md: 5 }} zIndex={5}>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          color="rgba(255,255,255,0.85)"
+          _hover={{ background: 'rgba(255,255,255,0.12)', color: 'white' }}
+          onClick={handleBack}
+        >
+          <FiArrowLeft />
+          返回
+        </Button>
+      </Box>
+
       {/* 背景装饰光斑 */}
       <Box
         data-login-spot="1"

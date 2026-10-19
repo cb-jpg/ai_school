@@ -14,6 +14,7 @@ import {
   Button,
   IconButton,
   Badge,
+  Image,
 } from '@chakra-ui/react';
 import {
   FiUser,
@@ -490,7 +491,23 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
                   transition="all 0.2s"
                 >
                   <HStack gap="3">
-                    <Text fontSize="2xl">{character.preview}</Text>
+                    {/* 角色头像：模型目录提供 <目录名>.png 时用真图（后端 /live2d-models/info 的 avatar 字段），
+                        否则回退到按名匹配的 emoji 占位 */}
+                    {character.avatarUrl ? (
+                      <Image
+                        src={apiUrl(character.avatarUrl)}
+                        alt={character.name}
+                        boxSize="10"
+                        rounded="full"
+                        objectFit="cover"
+                        border="1px solid"
+                        borderColor={schoolColors.border}
+                        bg={schoolColors.white}
+                        flexShrink={0}
+                      />
+                    ) : (
+                      <Text fontSize="2xl">{character.preview}</Text>
+                    )}
                     <VStack align="start" gap="0" flex="1">
                       <Text fontSize="sm" fontWeight="medium" color={schoolColors.text}>
                         {character.name}

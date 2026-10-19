@@ -41,8 +41,11 @@ interface RawCharacterEntry {
   tap_motions?: Record<string, Record<string, number>>;
 }
 
-/** 按目录名关键词选一个预览图标；未知模型给通用图标 */
+/** 按目录名关键词选一个预览图标；未知模型给通用图标。
+ *  注意：模型目录提供 <目录名>.png 头像时侧栏优先用真图，emoji 只是兜底 */
 const PREVIEW_ICONS: Array<[RegExp, string]> = [
+  [/xiaoshi/i, '👦'],
+  [/xiaomeng/i, '👧'],
   [/mao/i, '🐱'],
   [/shizuku/i, '🌸'],
   [/hiyori/i, '👩‍🏫'],

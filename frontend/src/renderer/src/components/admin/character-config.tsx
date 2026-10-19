@@ -13,6 +13,7 @@ import {
   Input,
   Textarea,
   Badge,
+  Image,
 } from '@chakra-ui/react';
 import {
   FiUser,
@@ -23,6 +24,7 @@ import {
 import { useLocalStorage } from '@/hooks/utils/use-local-storage';
 import { useLive2DConfig } from '@/context/live2d-config-context';
 import { useLive2dModels } from '@/hooks/live2d/use-live2d-models';
+import { apiUrl } from '@/services/api-base';
 import type { Live2dCharacter } from '@/services/live2d-models-api';
 import { toaster } from '@/components/ui/toaster';
 
@@ -380,7 +382,21 @@ export const CharacterConfig: FC = () => {
                     transition="all 0.2s"
                   >
                     <HStack gap="3">
-                      <Text fontSize="2xl">{character.preview}</Text>
+                      {character.avatarUrl ? (
+                        <Image
+                          src={apiUrl(character.avatarUrl)}
+                          alt={character.name}
+                          boxSize="10"
+                          rounded="full"
+                          objectFit="cover"
+                          border="1px solid"
+                          borderColor={colors.gray200}
+                          bg="white"
+                          flexShrink={0}
+                        />
+                      ) : (
+                        <Text fontSize="2xl">{character.preview}</Text>
+                      )}
                       <VStack alignItems="start" gap="0" flex="1">
                         <Text fontSize="sm" fontWeight="medium" color={colors.gray800}>
                           {character.name}

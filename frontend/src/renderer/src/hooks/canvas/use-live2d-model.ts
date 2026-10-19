@@ -92,24 +92,29 @@ function canvasLogicalAt(
 }
 
 // hero 全屏穿透模式的模型初始适配参数（真机校准值，Hiyori/荣耀X60Pro）：
-// ⚠️ 竖屏画布下 Live2D 视图空间按【高度】等比映射，视图 X 的 ±1 不对应全屏宽！
-//    屏宽比例 f 处 x_view = (2f-1)×画布宽高比（旧机 0.475 = 荣耀X60Pro 的宽高比；
-//    一体机如 1080×1920 是 0.5625，横屏 >1，必须按实际画布换算，否则人物横向跑偏）；
-//    屏高比例 g 处的 y_view = (1-2g)（y 上下翻转，负值=往下，±1 恒对应屏高，与宽高比无关）。
-// 横坐标按【屏宽比例】存（2026-09-14 由荣耀X60Pro 视图坐标反算：f = 0.5 + x_view/0.95），
-// 竖直位置/大小沿用屏高比例，任何宽高比下与手机校准值等价。
-// 首页与对话界面站位（2026-09-09 四轮微调）：
-//   首页 scale 0.88 ≈ 51% 屏高，横 73% 屏宽（用户定：标题"成功"的"成"字正下方），
-//     y=-0.12 ≈ 人物中心在 56% 屏高；
-//   对话界面 scale 0.80（比首页稍小），横 78.4% 屏宽（用户要求再右移，给左侧聊天让位）。
-//   （聊天内容区右缩进 dialog-box 内已避开人物占位）
+// ⚠️ 坐标语义（2026-10-19 probe_phone_stance 实测修正，推翻 09-14 旧注）：
+//    竖屏画布投影 projection.scale(1.0, w/h) ⇒ scene_x=ndc_x【直接】映射屏宽，
+//    屏宽比例 f 处 x_view = 2f-1（与宽高比无关！旧注的 ×宽高比是横屏公式误用到
+//    竖屏，致手机组常量整体偏左）；横屏投影 scale(h/w,1.0) ⇒ x_view=(2f-1)×宽高比。
+//    屏高比例 g 处的 y_view = (1-2g)（y 上下翻转，负值=往下，±1 恒对应屏高，两向同）。
+// 横坐标按【屏宽比例】存；竖直位置/大小沿用屏高比例。
+// 首页与对话界面站位（2026-09-09 四轮微调；2026-10-19 手机组语义修正）：
+//   ⚠️ 2026-10-19 量测实锤（cdp_l2d_size_check + probe_phone_stance）：竖屏画布的
+//   投影是 projection.scale(1.0, w/h) ⇒ scene_x = ndc_x【直接】映射屏宽
+//   （screen_frac=(x+1)/2），下方站位公式里的 ×aspect 只对横屏成立。竖屏下带
+//   aspect 的常量全部偏左（0.784 实渲染 66%、0.91 实渲染 73%——一个月无人察觉）。
+//   现 PHONE 组两常量改为「竖屏精确屏宽比例」语义（适配处不再乘 aspect），数值按
+//   历史实际渲染位置反推，视觉零回退：
+//   对话 0.65 ≈ 历史渲染中心 63.5~66%（聊天卡右缘避让本就是按这个校的）；
+//   首页 0.87 兑现 v2.13 用户参考图（中心贴右、右缘≈98% 屏宽、完整不裁切）。
+//   桌面横屏（×aspect，公式本就正确）与竖屏大屏 board 组保持原值零变化。
 // 验证用 scripts/cdp_fb_dump.py 抓帧缓冲（CDP 整页截图拍不到 GL 图层！）。换角色如大小不合适改这些常量。
 const HERO_FIT_FACTOR = 0.8;
 const HERO_CENTER_Y = -0.12;
-const HERO_OFFSET_F = 0.784; // 对话界面：78.4% 屏宽（原 x_view 0.27）
+const HERO_OFFSET_F = 0.65; // 对话界面（手机/一体机）：65% 屏宽（竖屏精确语义）
 const HOME_FIT_FACTOR = 0.88;
 const HOME_CENTER_Y = -0.12;
-const HOME_OFFSET_F = 0.732; // 首页：73% 屏宽（原 x_view 0.22）
+const HOME_OFFSET_F = 0.732; // 首页：73% 屏宽（原 x_view 0.22；现仅横屏路径引用）
 
 // 首页 hero banner 站位（2026-09-21 简化版省实改版）：手机/一体机（base 组）与
 // 横屏桌面（新增适配，banner 形态改版后原默认居中站位会撞左侧红面板）都让人物
@@ -120,9 +125,10 @@ const HOME_BANNER_FIT_FACTOR = 0.5;
 const HOME_BANNER_CENTER_Y = 0.34;
 const HOME_BANNER_OFFSET_F = 0.72;
 // 手机端（App）首页 banner 站位再右移（2026-09-27 用户参考截图）：人物站到画面
-// 最右侧（中心 ≈91% 屏宽、右缘 ≈97%），完全让开红面板文字区，脚底仍落 banner
-// 下缘；桌面横屏仍用上方 0.72（红面板更窄，72% 处不压字且不贴边）。
-const HOME_BANNER_OFFSET_F_PHONE = 0.91;
+// 最右侧，完全让开红面板文字区，脚底仍落 banner 下缘。2026-10-19 起为「竖屏精确
+// 屏宽比例」语义：0.87 中心 → 右缘 ≈98% 屏宽（存在感 ×1.5 加大后 0.91 会裁切
+// 1.75%），即用户参考图的贴边效果；桌面横屏仍用上方 0.72。
+const HOME_BANNER_OFFSET_F_PHONE = 0.87;
 
 // 自研模型（小石/小萌）手机/一体机存在感系数：kScale 归一后人物屏占与 hiyori
 // 一致（首页 ≈29% 屏高），但手机/kiosk 竖屏窄、人物贴边站（91%），16% 屏高只露
@@ -271,14 +277,10 @@ export const useLive2DModel = ({
   const baseModelRef = useRef<{ _modelMatrix?: unknown } | null>(null);
   // 模型身份（去协议/主机的路径），而非原始 URL 字符串——见下方 effect 内注释
   const prevModelIdentityRef = useRef<string | null>(null);
-  // 站位滑入动画（2026-09-30 优化：页面切换人物从"瞬移"改平滑滑入；
-  // 用户拖动/捏合时立即取消，避免与手势打架）。2026-09-30 二次优化：
-  // 插值不再跑独立 RAF（与渲染循环交错会错拍掉帧，"看着也卡"），
-  // 改为挂在 LAppDelegate.frameTick 上、每渲染帧 render() 前按时间戳求值，
-  // 与实际绘制同帧同步；animActiveRef 只做存活标记。
+  // 站位适配的存活标记（2026-09-30 曾挂 420ms frameTick 滑入插值；
+  // 2026-10-19 用户反馈"人物从别处移过来怪怪的"→ 改瞬时置位，动画已移除。
+  // cancelFitAnimation 及其引用保留为无害空操作，拖动/捏合让位调用点不动）
   const fitAnimActiveRef = useRef(false);
-  // 只在动画启动时捕获当时的 delegate 实例（startPoll 内模型已就绪=实例必在），
-  // cancel 不经 getInstance()——后者会惰性新建单例，release/重建窗口期会造出僵尸实例
   const fitAnimDelegateRef = useRef<{ frameTick: ((n: number) => void) | null } | null>(null);
   const cancelFitAnimation = useCallback(() => {
     fitAnimActiveRef.current = false;
@@ -438,6 +440,9 @@ export const useLive2DModel = ({
     let baseScaleMul = 1;
     let xViewStatic = 0;
     let yView = 0;
+    // PHONE 组常量为「竖屏精确屏宽比例」语义（2026-10-19）：竖屏画布投影
+    // scene_x=ndc_x 直接映射，适配时不再乘 aspect（见顶部常量注释）
+    let xScreenFracExactPortrait = false;
     if (isBoard) {
       fitFactor = isHomeAlign ? HOME_BOARD_FIT_FACTOR : HERO_BOARD_FIT_FACTOR;
       xScreenFrac = isHomeAlign ? HOME_BOARD_OFFSET_F : HERO_BOARD_OFFSET_F;
@@ -446,6 +451,7 @@ export const useLive2DModel = ({
       fitFactor = isHomeAlign ? HOME_BANNER_FIT_FACTOR : HERO_FIT_FACTOR;
       xScreenFrac = isHomeAlign ? HOME_BANNER_OFFSET_F_PHONE : HERO_OFFSET_F;
       yView = isHomeAlign ? HOME_BANNER_CENTER_Y : HERO_CENTER_Y;
+      xScreenFracExactPortrait = true;
     } else if (isHomeAlign) {
       fitFactor = HOME_BANNER_FIT_FACTOR;
       xScreenFrac = HOME_BANNER_OFFSET_F;
@@ -512,60 +518,40 @@ export const useLive2DModel = ({
           const targetScale =
             fitFactor !== null ? fitFactor : base * baseScaleMul;
           if (fitFactor !== null) {
-            // 横坐标按实际画布宽高比换算（竖屏手机 0.475 / 一体机 0.5625 / 横屏 >1），
-            // 屏宽比例 f 处 x_view = (2f-1)×宽高比，人物落在与手机校准一致的屏宽比例处
+            // 横坐标换算：横屏 P=scale(h/w,1.0) ⇒ scene_x=ndc_x×w/h，屏宽比例 f 处
+            // x_view=(2f-1)×宽高比；竖屏 P=scale(1.0,w/h) ⇒ scene_x=ndc_x 直接映射，
+            // x_view=2f-1（2026-10-19 probe_phone_stance 实锤，此前误用横屏公式致
+            // 手机组常量整体偏左）。横屏语义留给桌面/board 组；手机组竖屏走精确值，
+            // 手机横屏（画布 w>h）回横屏公式。
             const aspect = canvasEl.width / canvasEl.height;
-            xViewStatic = (2 * xScreenFrac - 1) * aspect;
+            const portraitCanvas = canvasEl.height > canvasEl.width;
+            xViewStatic =
+              (2 * xScreenFrac - 1) *
+              (xScreenFracExactPortrait && portraitCanvas ? 1 : aspect);
           }
 
-          // 平滑滑入（2026-09-30）：此前缩放+平移一帧打完=页面切换人物瞬移（用户反馈
-          // "数字人变换太卡顿"）。首版独立 RAF 插值仍被反馈"看着也卡"——独立 RAF 与
-          // 渲染循环交错执行，矩阵更新常落到本帧绘制之后（等效掉一半帧+错拍抖动）。
-          // 现挂 LAppDelegate.frameTick：每渲染帧 render() 前按时间戳求值，与绘制同帧
-          // 同步。用户拖动/捏合会先 cancelFitAnimation，不会与手势打架。
+          // 站位置位（2026-10-19）：瞬时打到目标站位，不再做 420ms 滑入插值。
+          // 历史：2026-09-30 用户反馈"瞬移太卡顿"加了 frameTick 同帧滑入；
+          // 2026-10-19 用户反馈"初次打开/切换页面人物从别处移过来，怪怪的"
+          // → 滑入整个移除，缩放+平移一次到位（拖动/捏合让位逻辑 cancelFitAnimation 保留）。
           cancelFitAnimation();
           const startArr = matrix.getArray();
-          const sx0 = startArr[12];
-          const sy0 = startArr[13];
           const s0 = matrix.getScaleX?.() || startArr[0] || 1;
-          const moveDist = Math.hypot(xViewStatic - sx0, yView - sy0);
+          const moveDist = Math.hypot(xViewStatic - startArr[12], yView - startArr[13]);
           const scaleDelta = Math.abs(targetScale / s0 - 1);
           if (moveDist < 0.002 && scaleDelta < 0.001) {
             modelPositionRef.current = { x: xViewStatic, y: yView };
             return;
           }
-          const DURATION_MS = 420;
-          const t0 = performance.now();
-          const ease = (t: number) =>
-            t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-          const delegate = LAppDelegate.getInstance();
-          if (!delegate) return;
-          fitAnimDelegateRef.current = delegate;
-          fitAnimActiveRef.current = true;
-          delegate.frameTick = (now: number) => {
-            if (!fitAnimActiveRef.current) return;
-            const k = Math.min(1, (now - t0) / DURATION_MS);
-            const e = ease(k);
-            const tx = sx0 + (xViewStatic - sx0) * e;
-            const ty = sy0 + (yView - sy0) * e;
-            const ts = s0 + (targetScale - s0) * e;
-            const arr = matrix.getArray();
-            const curScale = matrix.getScaleX?.() || arr[0] || 1;
-            const frameRatio = ts / curScale;
-            if (Math.abs(frameRatio - 1) > 0.0001) {
-              // CubismMatrix44.scale 是绝对赋值，相对缩放必须 scaleRelative（捏合同坑）
-              matrix.scaleRelative(frameRatio, frameRatio);
-            }
-            arr[12] = tx;
-            arr[13] = ty;
-            matrix.setMatrix(arr);
-            modelPositionRef.current = { x: tx, y: ty };
-            if (k >= 1) {
-              fitAnimActiveRef.current = false;
-              fitAnimDelegateRef.current = null;
-              delegate.frameTick = null;
-            }
-          };
+          if (scaleDelta > 0.0001) {
+            // CubismMatrix44.scale 是绝对赋值，相对缩放必须 scaleRelative（捏合同坑）
+            matrix.scaleRelative(targetScale / s0, targetScale / s0);
+          }
+          const arr = matrix.getArray();
+          arr[12] = xViewStatic;
+          arr[13] = yView;
+          matrix.setMatrix(arr);
+          modelPositionRef.current = { x: xViewStatic, y: yView };
         } catch (err) {
           console.error("[useLive2DModel] hero fit failed:", err);
         }
