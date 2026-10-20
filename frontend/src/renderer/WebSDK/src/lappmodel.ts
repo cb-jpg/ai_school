@@ -570,12 +570,18 @@ export class LAppModel extends CubismUserModel {
   private _speaking = false;
   private _syntheticLipSync = false;
   private _currentExpression: string | null = null;
-  // 原画换脸表情（ParamArt* 美术图自带画好的嘴）。说话口型若同时驱动 rig 嘴
-  // 会双层叠画（2026-10-19 用户报「张口和表情重叠」）→ 说话期间隐藏 rig 嘴，
-  // 以画中嘴为嘴；neutral / 无表情照常口型。
-  private static ART_MOUTH_EXPRESSIONS = new Set([
-    'anger', 'sadness', 'joy', 'surprise', 'bored', 'shy', 'cry', 'smirk',
+  // 原画换脸表情（ParamArt* 美术图整脸替换、嘴画死在图里动不了）。
+  // 2026-10-19 曾改为「说话期间藏 rig 嘴、以画中嘴为嘴」——副作用是说话时
+  // 表情脸定格、口型完全看不见（2026-10-20 用户报「张嘴还在微笑」）。
+  // 现改为：说话期间把 art 脸按 _artSuppress 淡出、rig 脸接管口型，说完淡回。
+  // neutral/smirk 本就是 rig 脸，口型天然正常，不参与淡出。
+  private static ART_FACE_EXPRESSIONS = new Set([
+    'anger', 'sadness', 'joy', 'surprise', 'bored', 'shy', 'cry',
   ]);
+  private _artSuppress = 0; // 0=表情脸 1=rig脸（说话中）
+  private _artParamIds: CubismIdHandle[] | null = null;
+  private _idParamArtBase: CubismIdHandle = null;
+  private _idParamMouthForm: CubismIdHandle = null;
   private _mouthHideIdx: number[] | null = null;
   private _mouthHideCore: unknown = null;
 
@@ -620,6 +626,50 @@ export class LAppModel extends CubismUserModel {
 
     if (this._expressionManager != null) {
       this._expressionManager.updateMotion(this._model, deltaTimeSeconds); // 表情でパラメータ更新（相対変化）
+    }
+
+    // 说话期间 art 换脸淡出（w: 0→1，约 0.22s），rig 脸接管口型；说完淡回表情脸
+    const suppressTarget =
+      this._speaking && this._currentExpression != null &&
+      LAppModel.ART_FACE_EXPRESSIONS.has(this._currentExpression)
+        ? 1
+        : 0;
+    const ramp = Math.min(1, deltaTimeSeconds * 4.5);
+    if (this._artSuppress < suppressTarget) {
+      this._artSuppress = Math.min(suppressTarget, this._artSuppress + ramp);
+    } else if (this._artSuppress > suppressTarget) {
+      this._artSuppress = Math.max(suppressTarget, this._artSuppress - ramp);
+    }
+    if (this._artSuppress > 0.001) {
+      if (this._artParamIds == null) {
+        const idManager = CubismFramework.getIdManager();
+        this._artParamIds = Array.from(LAppModel.ART_FACE_EXPRESSIONS).map(
+          name => idManager.getId(
+            `ParamArt${name[0].toUpperCase()}${name.slice(1)}`
+          )
+        );
+        this._idParamArtBase = idManager.getId('ParamArtBase');
+        this._idParamMouthForm = idManager.getId('ParamMouthForm');
+      }
+      const keep = 1 - this._artSuppress;
+      for (const id of this._artParamIds) {
+        this._model.setParameterValueById(
+          id,
+          this._model.getParameterValueById(id) * keep
+        );
+      }
+      this._model.setParameterValueById(
+        this._idParamArtBase,
+        Math.max(
+          this._model.getParameterValueById(this._idParamArtBase),
+          this._artSuppress
+        )
+      );
+      // 嘴形被表情定格在「笑」；淡出期间归向中性，口型开合才自然
+      this._model.setParameterValueById(
+        this._idParamMouthForm,
+        this._model.getParameterValueById(this._idParamMouthForm) * keep
+      );
     }
 
     // ドラッグによる変化
@@ -680,19 +730,18 @@ export class LAppModel extends CubismUserModel {
     }
 
     this._model.update();
-    this._applyArtMouthOverride();
+    this._applyArtSuppressMouth();
   }
 
   /**
-   * art 表情（原画换脸）说话期间隐藏 rig 嘴：美术图自带嘴，口型再驱动 rig 嘴
-   * 会双层叠画。在 _model.update() 之后逐帧覆写（update 每帧按部位重算 opacity，
-   * 因此只在隐藏态写、退出时自然恢复，无需还原逻辑）。
+   * art 换脸淡出期间保证 rig 嘴可见：表情态下 rig 嘴被美术脸盖住（opacity
+   * 恒 1，口型一动就穿帮 → v2.35 曾整体藏掉）。淡出期间口型必须可见，逐帧在
+   * _model.update() 之后抬到 ≥w（update 每帧按部位重算 opacity，只在 w>0 时
+   * 写、退出自然恢复，无需还原逻辑）。
    */
-  private _applyArtMouthOverride(): void {
-    if (!(this._speaking && this._currentExpression != null &&
-          LAppModel.ART_MOUTH_EXPRESSIONS.has(this._currentExpression))) {
-      return;
-    }
+  private _applyArtSuppressMouth(): void {
+    const w = this._artSuppress;
+    if (w <= 0.001) return;
     const core = (this._model as any)?._model;
     if (!core) return;
     if (this._mouthHideCore !== core || this._mouthHideIdx == null) {
@@ -704,7 +753,7 @@ export class LAppModel extends CubismUserModel {
       }
     }
     for (const i of this._mouthHideIdx) {
-      core.drawables.opacities[i] = 0;
+      core.drawables.opacities[i] = Math.max(core.drawables.opacities[i], w);
     }
   }
 
