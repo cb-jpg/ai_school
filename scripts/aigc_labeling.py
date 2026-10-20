@@ -4,7 +4,7 @@
 
 写入的元数据（JSON 序列化后按容器类型落盘，键统一为 "AIGC"）：
   Label             "1"
-  ContentProducer   md5(提供者名称)          生成合成服务提供者编码
+  ContentProducer   企业信用代码（明文，2026-10-20 校方要求两字段均用明码）
   ProduceID         md5(算法版本+文件唯一ID)  算法服务版本号+生成文件ID
   ReservedCode1     md5(文件名+生成时间)
   ContentPropagator 企业社会信用代码（明文，供传播链路核验）
@@ -58,13 +58,17 @@ def load_config() -> dict:
 
 
 def build_aigc_payload(path: Path, cfg: dict) -> dict:
-    """组装 7 字段标识。ProduceID 每个文件独立（uuid4），ReservedCode1 绑定文件名+生成时刻。"""
+    """组装 7 字段标识。ProduceID 每个文件独立（uuid4），ReservedCode1 绑定文件名+生成时刻。
+
+    ContentProducer / ContentPropagator 均写企业信用代码明文（2026-10-20 校方要求
+    「这两个字段改为企业信用代码明码」）；provider_name 保留在配置中供文档引用。
+    """
     produce_uuid = uuid.uuid4().hex
     now = time.strftime("%Y-%m-%d %H:%M:%S")
     credit = cfg["credit_code"]
     return {
         "Label": "1",
-        "ContentProducer": md5(cfg["provider_name"]),
+        "ContentProducer": credit,
         "ProduceID": md5(f"{cfg['algorithm_version']}+{produce_uuid}"),
         "ReservedCode1": md5(f"{path.name}+{now}"),
         "ContentPropagator": credit,

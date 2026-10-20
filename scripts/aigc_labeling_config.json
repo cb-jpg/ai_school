@@ -4,8 +4,8 @@
   "_隐私铁律": "原始手机号只允许经本工具进 MD5，绝不写入任何文件/元数据明文。",
 
   "provider_name": "佛山市南海区石实实验学校",
-  "credit_code": "91440605MAAAAAAA0X",
-  "_credit_code_note": "占位信用代码（18位结构合规），待校方提供真实统一社会信用代码后替换重跑",
+  "credit_code": "91440112MAEG3P8C0T",
+  "_credit_code_note": "校方真实统一社会信用代码（2026-10-20 提供）；ContentProducer 与 ContentPropagator 均按校方要求写入本代码明文",
   "algorithm_version": "2.28",
   "_algorithm_version_note": "算法服务版本号，与 App versionName 同步",
 
