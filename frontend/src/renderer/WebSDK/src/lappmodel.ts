@@ -570,20 +570,12 @@ export class LAppModel extends CubismUserModel {
   private _speaking = false;
   private _syntheticLipSync = false;
   private _currentExpression: string | null = null;
-  // 原画换脸表情（ParamArt* 美术图整脸替换、嘴画死在图里动不了）。
-  // 2026-10-19 曾改为「说话期间藏 rig 嘴、以画中嘴为嘴」——副作用是说话时
-  // 表情脸定格、口型完全看不见（2026-10-20 用户报「张嘴还在微笑」）。
-  // 现改为：说话期间把 art 脸按 _artSuppress 淡出、rig 脸接管口型，说完淡回。
-  // neutral/smirk 本就是 rig 脸，口型天然正常，不参与淡出。
-  private static ART_FACE_EXPRESSIONS = new Set([
-    'anger', 'sadness', 'joy', 'surprise', 'bored', 'shy', 'cry',
-  ]);
-  private _artSuppress = 0; // 0=表情脸 1=rig脸（说话中）
-  private _artParamIds: CubismIdHandle[] | null = null;
-  private _idParamArtBase: CubismIdHandle = null;
-  private _idParamMouthForm: CubismIdHandle = null;
-  private _mouthHideIdx: number[] | null = null;
-  private _mouthHideCore: unknown = null;
+  // 一张嘴原则（v2.38）：art_* 美术补丁只盖眉眼（贴图里没有有效画嘴——
+  // alpha=0 的「画嘴/腮红」是打包残留 RGB，引擎按 alpha 采样根本不渲染），
+  // rig 嘴是唯一可见的嘴：永远可见、由口型驱动，表情经 exp3 参数捏其形状。
+  // 故说话期间既不淡 art 脸也不藏 rig 嘴——v2.35 藏嘴（表情脸定格无口型）、
+  // v2.37 淡脸（后端按句流式推音频，setSpeaking 逐句翻转把 0.22s 淡出打成
+  // 来回振荡的半透鬼影）两代 hack 均删，此处仅留 _currentExpression 供探针。
 
   public update(): void {
     if (this._state != LoadStep.CompleteSetup) return;
@@ -626,50 +618,6 @@ export class LAppModel extends CubismUserModel {
 
     if (this._expressionManager != null) {
       this._expressionManager.updateMotion(this._model, deltaTimeSeconds); // 表情でパラメータ更新（相対変化）
-    }
-
-    // 说话期间 art 换脸淡出（w: 0→1，约 0.22s），rig 脸接管口型；说完淡回表情脸
-    const suppressTarget =
-      this._speaking && this._currentExpression != null &&
-      LAppModel.ART_FACE_EXPRESSIONS.has(this._currentExpression)
-        ? 1
-        : 0;
-    const ramp = Math.min(1, deltaTimeSeconds * 4.5);
-    if (this._artSuppress < suppressTarget) {
-      this._artSuppress = Math.min(suppressTarget, this._artSuppress + ramp);
-    } else if (this._artSuppress > suppressTarget) {
-      this._artSuppress = Math.max(suppressTarget, this._artSuppress - ramp);
-    }
-    if (this._artSuppress > 0.001) {
-      if (this._artParamIds == null) {
-        const idManager = CubismFramework.getIdManager();
-        this._artParamIds = Array.from(LAppModel.ART_FACE_EXPRESSIONS).map(
-          name => idManager.getId(
-            `ParamArt${name[0].toUpperCase()}${name.slice(1)}`
-          )
-        );
-        this._idParamArtBase = idManager.getId('ParamArtBase');
-        this._idParamMouthForm = idManager.getId('ParamMouthForm');
-      }
-      const keep = 1 - this._artSuppress;
-      for (const id of this._artParamIds) {
-        this._model.setParameterValueById(
-          id,
-          this._model.getParameterValueById(id) * keep
-        );
-      }
-      this._model.setParameterValueById(
-        this._idParamArtBase,
-        Math.max(
-          this._model.getParameterValueById(this._idParamArtBase),
-          this._artSuppress
-        )
-      );
-      // 嘴形被表情定格在「笑」；淡出期间归向中性，口型开合才自然
-      this._model.setParameterValueById(
-        this._idParamMouthForm,
-        this._model.getParameterValueById(this._idParamMouthForm) * keep
-      );
     }
 
     // ドラッグによる変化
@@ -717,7 +665,11 @@ export class LAppModel extends CubismUserModel {
       for (let i = 0; i < this._lipSyncIds.getSize(); ++i) {
         if (this._speaking) {
           // Expressions may hold the mouth open; speech must still be able to close it.
-          this._model.setParameterValueById(this._lipSyncIds.at(i), value * lipSyncWeight);
+          // v2.38：×4.0 无上限会冲满 OpenY（张满=腔体黑块），限幅到 0.7
+          this._model.setParameterValueById(
+            this._lipSyncIds.at(i),
+            Math.min(value * 2.5, 0.7)
+          );
         } else {
           this._model.addParameterValueById(this._lipSyncIds.at(i), value, lipSyncWeight);
         }
@@ -730,31 +682,6 @@ export class LAppModel extends CubismUserModel {
     }
 
     this._model.update();
-    this._applyArtSuppressMouth();
-  }
-
-  /**
-   * art 换脸淡出期间保证 rig 嘴可见：表情态下 rig 嘴被美术脸盖住（opacity
-   * 恒 1，口型一动就穿帮 → v2.35 曾整体藏掉）。淡出期间口型必须可见，逐帧在
-   * _model.update() 之后抬到 ≥w（update 每帧按部位重算 opacity，只在 w>0 时
-   * 写、退出自然恢复，无需还原逻辑）。
-   */
-  private _applyArtSuppressMouth(): void {
-    const w = this._artSuppress;
-    if (w <= 0.001) return;
-    const core = (this._model as any)?._model;
-    if (!core) return;
-    if (this._mouthHideCore !== core || this._mouthHideIdx == null) {
-      this._mouthHideCore = core;
-      this._mouthHideIdx = [];
-      for (let i = 0; i < core.drawables.count; i++) {
-        const id: string = core.drawables.ids[i];
-        if (/mouth|cavity/i.test(id)) this._mouthHideIdx.push(i);
-      }
-    }
-    for (const i of this._mouthHideIdx) {
-      core.drawables.opacities[i] = Math.max(core.drawables.opacities[i], w);
-    }
   }
 
   /**
