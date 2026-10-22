@@ -32,6 +32,20 @@ const currentAudioRef: { current: HTMLAudioElement | null } = { current: null };
 const currentModelRef: { current: Live2DModel | null } = { current: null };
 let finishCurrentPlayback: (() => void) | null = null;
 
+// 最近一段播报（字幕条重播按钮用）：模块级持有，Subtitle 组件无需挂音频 hook。
+interface LastSpokenSegment {
+  audioBase64?: string
+  expressions?: string[] | number[] | null
+  text: string
+}
+const lastSpokenRef: { current: LastSpokenSegment | null } = { current: null };
+let requestReplayFn: (() => void) | null = null;
+
+/** 重播字幕条当前显示的那段话（带 Live2D 口型；由 useAudioTask 内部接线）。 */
+export const replayLastSpokenSegment = () => {
+  requestReplayFn?.();
+};
+
 // Global function to update volume of currently playing audio
 export const updateCurrentAudioVolume = (volume: number) => {
   if (currentAudioRef.current) {
@@ -66,6 +80,41 @@ export const useAudioTask = () => {
     appendResponse,
     appendAIMessage,
     volume,
+  };
+
+  // 字幕条重播入口：走正常播放任务（口型/表情同真播报），displayText 置空
+  // 避免字幕与聊天历史重复入库；无 PCM 的段（浏览器 TTS 兜底）走本地语音。
+  requestReplayFn = () => {
+    const seg = lastSpokenRef.current;
+    if (!seg) return;
+    if (seg.audioBase64) {
+      addAudioTask({
+        audioBase64: seg.audioBase64,
+        volumes: [],
+        sliceLength: 0,
+        displayText: null,
+        expressions: seg.expressions ?? null,
+      });
+    } else if (seg.text && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window) {
+      const speakableText = seg.text
+        .replace(/\[[^\]]+\]/g, '')
+        .replace(/[\s.,!?，。！？'"“”‘’（）()【】\[\]]+/g, ' ')
+        .trim();
+      if (!speakableText) return;
+      const model = (window as any).getLive2DManager?.()?.getModel(0);
+      const utterance = new SpeechSynthesisUtterance(speakableText);
+      utterance.lang = 'zh-CN';
+      utterance.volume = stateRef.current.volume / 100;
+      const voices = window.speechSynthesis.getVoices();
+      utterance.voice = voices.find((voice) => voice.lang.toLowerCase() === 'zh-cn')
+        || voices.find((voice) => voice.lang.toLowerCase().startsWith('zh'))
+        || null;
+      utterance.onstart = () => model?.setSpeaking(true, true);
+      utterance.onend = () => model?.setSpeaking(false);
+      utterance.onerror = () => model?.setSpeaking(false);
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    }
   };
 
   /**
@@ -325,6 +374,15 @@ export const useAudioTask = () => {
     if (currentState === 'interrupted') {
       console.log('Skipping audio task due to interrupted state');
       return;
+    }
+
+    // 记录最近播报段，供字幕条重播按钮使用
+    if (options.audioBase64 || options.displayText?.text) {
+      lastSpokenRef.current = {
+        audioBase64: options.audioBase64 || undefined,
+        expressions: options.expressions ?? null,
+        text: options.displayText?.text ?? '',
+      };
     }
 
     console.log(`Adding audio task ${options.displayText?.text} to queue`);

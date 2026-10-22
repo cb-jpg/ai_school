@@ -577,6 +577,7 @@ export class LAppModel extends CubismUserModel {
   // v2.37 淡脸（后端按句流式推音频，setSpeaking 逐句翻转把 0.22s 淡出打成
   // 来回振荡的半透鬼影）两代 hack 均删，此处仅留 _currentExpression 供探针。
   private _idParamMouthForm: CubismIdHandle = null;
+  private _idParamMouthOpenY: CubismIdHandle = null;
 
   public update(): void {
     if (this._state != LoadStep.CompleteSetup) return;
@@ -663,7 +664,7 @@ export class LAppModel extends CubismUserModel {
 
       const lipSyncWeight = 4.0;
 
-      // 说话中：绝对写 OpenY（表情基线不顶嘴）；并按瞬时开口比例松开表情嘴形
+      // 说话中：绝对写 OpenY（表情基线不顶嘴）
       if (this._speaking) {
         const open = Math.min(value * 2.5, 0.7);
         for (let i = 0; i < this._lipSyncIds.getSize(); ++i) {
@@ -671,26 +672,35 @@ export class LAppModel extends CubismUserModel {
           // v2.38：×4.0 无上限会冲满 OpenY（张满=腔体黑块），限幅到 0.7
           this._model.setParameterValueById(this._lipSyncIds.at(i), open);
         }
-        // 该 rig 的笑线/撇嘴线是独立闭合形状、不随张嘴形变：开口时若保留
-        // MouthForm，会「闭合笑线 + 底下开口腔体」双形状同屏（10-21 用户复报）。
-        // ×10 速降（开口≥0.1 即归零）：×1/×3 在低开口段（真说话的大多数时间）
-        // 仍残留 40%~90% 嘴形，双形状依旧；组合矩阵逐点实拍确认落点全干净。
-        // 闭嘴瞬间 open→0 嘴形全额恢复，表情神态不丢。
-        if (open > 0.001) {
-          if (this._idParamMouthForm == null) {
-            this._idParamMouthForm = CubismFramework.getIdManager()
-              .getId('ParamMouthForm');
-          }
-          this._model.setParameterValueById(
-            this._idParamMouthForm,
-            this._model.getParameterValueById(this._idParamMouthForm) *
-              Math.max(0, 1 - open * 10)
-          );
-        }
       } else {
         for (let i = 0; i < this._lipSyncIds.getSize(); ++i) {
           this._model.addParameterValueById(this._lipSyncIds.at(i), value, lipSyncWeight);
         }
+      }
+
+      // 「一张嘴」不变量（v2.41 起全状态生效）：该 rig 的笑线/撇嘴线是独立闭合
+      // 形状、不随张嘴形变——有效 OpenY 一抬起来，闭合线底下就露出开口腔体。
+      // v2.40 只在 _speaking 分支松开，漏掉三个同源场景：①表情自带开口基线
+      // （joy OpenY=0.25，而 setSpeaking 按句翻转，句子间隙/回复结束后整段
+      // 时间都在双形状——10-22 用户三复报的正是它）②非 speaking 分支的
+      // wavHandler 残余 RMS ③Talk 待机动作的嘴形帧。改为写完口型后读实际
+      // OpenY，>0 即按 ×10 速降松开嘴形（开口≥0.1 归零，落点经组合矩阵
+      // 逐点实拍全干净）；闭嘴瞬间 open→0 嘴形全额恢复，表情神态不丢。
+      if (this._idParamMouthOpenY == null) {
+        this._idParamMouthOpenY = CubismFramework.getIdManager()
+          .getId('ParamMouthOpenY');
+      }
+      if (this._idParamMouthForm == null) {
+        this._idParamMouthForm = CubismFramework.getIdManager()
+          .getId('ParamMouthForm');
+      }
+      const openNow = this._model.getParameterValueById(this._idParamMouthOpenY);
+      if (openNow > 0.001) {
+        this._model.setParameterValueById(
+          this._idParamMouthForm,
+          this._model.getParameterValueById(this._idParamMouthForm) *
+            Math.max(0, 1 - openNow * 10)
+        );
       }
     }
 

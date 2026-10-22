@@ -520,10 +520,12 @@ function AppContent(): JSX.Element {
             }
           />
           {/* AI 生成内容显式标识（合规 2026-10-14：虚拟场景模态角标，随数字人画布出现；
-              真实校园照片是背景层不在此画布内，不会被误标。pointerEvents 继承 none） */}
+              真实校园照片是背景层不在此画布内，不会被误标。pointerEvents 继承 none。
+              手机端 bottom 8px：原 76px 正压在输入区右缘悬浮麦克风上
+              （画布 z35 > 内容 z20，实测重叠 641px²），下移到自动停止开关行的右侧空档） */}
           <Box
             position="absolute"
-            bottom={{ base: "76px", md: "12px" }}
+            bottom={{ base: "8px", md: "12px" }}
             right="10px"
             px={2}
             py="2px"
