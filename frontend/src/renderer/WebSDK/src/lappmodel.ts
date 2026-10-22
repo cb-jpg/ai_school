@@ -576,6 +576,7 @@ export class LAppModel extends CubismUserModel {
   // 故说话期间既不淡 art 脸也不藏 rig 嘴——v2.35 藏嘴（表情脸定格无口型）、
   // v2.37 淡脸（后端按句流式推音频，setSpeaking 逐句翻转把 0.22s 淡出打成
   // 来回振荡的半透鬼影）两代 hack 均删，此处仅留 _currentExpression 供探针。
+  private _idParamMouthForm: CubismIdHandle = null;
 
   public update(): void {
     if (this._state != LoadStep.CompleteSetup) return;
@@ -662,15 +663,29 @@ export class LAppModel extends CubismUserModel {
 
       const lipSyncWeight = 4.0;
 
-      for (let i = 0; i < this._lipSyncIds.getSize(); ++i) {
-        if (this._speaking) {
+      // 说话中：绝对写 OpenY（表情基线不顶嘴）；并按瞬时开口比例松开表情嘴形
+      if (this._speaking) {
+        const open = Math.min(value * 2.5, 0.7);
+        for (let i = 0; i < this._lipSyncIds.getSize(); ++i) {
           // Expressions may hold the mouth open; speech must still be able to close it.
           // v2.38：×4.0 无上限会冲满 OpenY（张满=腔体黑块），限幅到 0.7
+          this._model.setParameterValueById(this._lipSyncIds.at(i), open);
+        }
+        // 该 rig 的笑线/撇嘴线是独立闭合形状、不随张嘴形变：开口时若保留
+        // MouthForm，会「闭合笑线 + 底下开口腔体」双形状同屏（10-21 用户复报）。
+        // 闭嘴瞬间 open→0 嘴形全额恢复，表情神态不丢。
+        if (open > 0.001) {
+          if (this._idParamMouthForm == null) {
+            this._idParamMouthForm = CubismFramework.getIdManager()
+              .getId('ParamMouthForm');
+          }
           this._model.setParameterValueById(
-            this._lipSyncIds.at(i),
-            Math.min(value * 2.5, 0.7)
+            this._idParamMouthForm,
+            this._model.getParameterValueById(this._idParamMouthForm) * (1 - open)
           );
-        } else {
+        }
+      } else {
+        for (let i = 0; i < this._lipSyncIds.getSize(); ++i) {
           this._model.addParameterValueById(this._lipSyncIds.at(i), value, lipSyncWeight);
         }
       }
