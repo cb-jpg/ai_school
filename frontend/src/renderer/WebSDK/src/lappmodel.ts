@@ -673,6 +673,8 @@ export class LAppModel extends CubismUserModel {
         }
         // 该 rig 的笑线/撇嘴线是独立闭合形状、不随张嘴形变：开口时若保留
         // MouthForm，会「闭合笑线 + 底下开口腔体」双形状同屏（10-21 用户复报）。
+        // ×10 速降（开口≥0.1 即归零）：×1/×3 在低开口段（真说话的大多数时间）
+        // 仍残留 40%~90% 嘴形，双形状依旧；组合矩阵逐点实拍确认落点全干净。
         // 闭嘴瞬间 open→0 嘴形全额恢复，表情神态不丢。
         if (open > 0.001) {
           if (this._idParamMouthForm == null) {
@@ -681,7 +683,8 @@ export class LAppModel extends CubismUserModel {
           }
           this._model.setParameterValueById(
             this._idParamMouthForm,
-            this._model.getParameterValueById(this._idParamMouthForm) * (1 - open)
+            this._model.getParameterValueById(this._idParamMouthForm) *
+              Math.max(0, 1 - open * 10)
           );
         }
       } else {
