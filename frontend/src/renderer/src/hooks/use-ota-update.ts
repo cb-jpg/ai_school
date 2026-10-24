@@ -28,8 +28,18 @@ export function useOtaUpdate(): void {
   }, []);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void (async () => {
+    let checking = false;
+    let lastCheckAt = 0;
+
+    // v2.42：检查不再只做一次。原先「启动后 5s 查一次」意味着手机端错过
+    // 15s toast、或设备长期不重启（展机 7×24）就永远停在旧包——10-23 用户
+    // 报障时 App 仍在跑旧版即此因。补两条路径：回前台（手机切走再切回 /
+    // 一体机熄屏唤醒）与每 4h 周期；30min 节流防抖。
+    const runCheck = async () => {
+      if (checking) return;
+      checking = true;
+      lastCheckAt = Date.now();
+      try {
         let manifest: OtaManifest | undefined;
         try {
           const res = await checkForOtaUpdate();
@@ -83,8 +93,29 @@ export function useOtaUpdate(): void {
             },
           },
         });
-      })();
+      } finally {
+        checking = false;
+      }
+    };
+
+    const timer = window.setTimeout(() => {
+      void runCheck();
     }, 5000);
-    return () => window.clearTimeout(timer);
+
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastCheckAt < 30 * 60 * 1000) return;
+      void runCheck();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    const periodic = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void runCheck();
+    }, 4 * 60 * 60 * 1000);
+
+    return () => {
+      window.clearTimeout(timer);
+      window.clearInterval(periodic);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 }

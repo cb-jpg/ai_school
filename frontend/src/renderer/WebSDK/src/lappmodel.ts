@@ -664,9 +664,18 @@ export class LAppModel extends CubismUserModel {
 
       const lipSyncWeight = 4.0;
 
-      // 说话中：绝对写 OpenY（表情基线不顶嘴）
+      // 说话中：绝对写 OpenY（表情基线不顶嘴）。
+      // v2.42 死区+陡坡：合成器逐帧实拍（screenshots/truth_242）证明该 rig 的
+      // form=0 嘴在 open 0.1~0.35 带内画的是「弧线+一线腔」，肉眼即「微笑嘴叠
+      // 在开口上」——10-22 用户四连报的就是它，与 form 无关（v2.41 已把说话时
+      // 的 form 松成 0，0.7 大开口实拍干净）。真语音包络约三成帧落在该带
+      // （实测 284/1846）。改为：轻声/静默帧（value≤0.06）直接闭嘴（露表情本
+      // 色），发声帧一开口就到 ≥0.45 的「干净张开」区（0.45 起实拍无可辨识弧
+      // 线），上限仍 0.7（张满=腔体黑块，v2.38 实证）。句子间隙 _speaking 翻
+      // false 露表情基线（微张微笑）＝「说话间带笑」的自然观感。
       if (this._speaking) {
-        const open = Math.min(value * 2.5, 0.7);
+        const open =
+          value <= 0.06 ? 0 : Math.min(0.45 + (value - 0.06) * 0.8, 0.7);
         for (let i = 0; i < this._lipSyncIds.getSize(); ++i) {
           // Expressions may hold the mouth open; speech must still be able to close it.
           // v2.38：×4.0 无上限会冲满 OpenY（张满=腔体黑块），限幅到 0.7
