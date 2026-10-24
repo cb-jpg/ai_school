@@ -220,6 +220,17 @@ export class LAppLive2DManager {
     // Use the directory name and file name from our configuration
     const model: string = LAppDefine.ModelDir[index];
 
+    // 配置未就绪守卫（2026-10-24 手机端"人物消失"修复之一）：管理器构造函数
+    // 无条件 changeScene(0)，而 ModelDir/ModelFileNames 初始为空数组——冷启动时
+    // 若 /info 尚未回填 updateModelConfig，这里会拼出 /undefined/undefined.model3.json
+    // 并把坏状态留成最终态（慢设备上初始化时序颠倒时人物永远空白，服务器日志
+    // 实证 401 后再无任何模型请求）。配置未就绪时跳过加载；等模型列表回填后
+    // useLive2DModel 会 releaseInstance+重建，那时才真正加载。
+    if (!model) {
+      console.warn('[LAppLive2DManager] changeScene: model config not ready, skip load');
+      return;
+    }
+
     console.log('[LAppLive2DManager] Model directory from config:', model);
     console.log('[LAppLive2DManager] ResourcesPath:', LAppDefine.ResourcesPath);
 

@@ -35,7 +35,7 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
   const setWsUrl = (url: string) => persistWsUrl(url);
   const setBaseUrl = (url: string) => persistBaseUrl(url);
   const { aiState, setAiState, backendSynthComplete, setBackendSynthComplete } = useAiState();
-  const { setModelInfo } = useLive2DConfig();
+  const { modelInfo, setModelInfo } = useLive2DConfig();
   const { setSubtitleText } = useSubtitle();
   const { clearResponse, setForceNewMessage, appendHumanMessage, appendOrUpdateToolCallMessage } = useChatHistory();
   const { addAudioTask } = useAudioTask();
@@ -377,38 +377,54 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
     wsService.connect(wsUrl);
   }, [wsUrl, authUsername]);
 
-  // 匿名模型展示（2026-09-22 官网 v2）：上方门禁未登录不连 WebSocket，model_info
-  // 无从下发，公开页（首页 banner 人物）会按空配置拼出 undefined 模型路径。
-  // 匿名会话改走公开的 /live2d-models/info 直接取默认角色展示——仅展示不对话
-  // （对话仍须登录）。登录后 WS 正常下发 model_info 覆盖（同模型则不重载）。
+  // 模型兜底（2026-10-24 手机端「人物消失」修复，取代 2026-09-22 的仅匿名版）：
+  // 原版 `if (authUsername) return` 让登录态的模型完全依赖 WS set-model-and-conf
+  // 下发——手机真机 WS 可能因陈旧本地状态（wsUrl/令牌过期）静默连不上，模型
+  // url 一直为空，人物永久空白（10-24 用户报障，服务器日志实证：/info 拉到、
+  // /undefined/undefined.model3.json 401、无任何模型文件请求、无 WS 握手）。
+  // 改为：无论登录与否，modelInfo.url 为空即兜底——匿名立即拉公开 /info；
+  // 登录态给 WS 下发 6s 宽限，仍无模型再拉同一公开 /info 展示默认角色（仅展示，
+  // 对话仍须 WS）。WS 恢复后 set-model-and-conf 推同模型时 use-live2d-model 按
+  // 身份比对不重载，推异模型则正常覆盖。
   useEffect(() => {
-    if (authUsername) return undefined; // 登录态走 WS set-model-and-conf
+    if (modelInfo?.url) return undefined;
     let cancelled = false;
-    fetchLive2dModels()
-      .then((characters) => {
-        if (cancelled || characters.length === 0) return;
-        // 默认角色与服务器当前角色一致（2026-10-16 起为自研「小石同学」校服版模型）；
-        // 列表里没有时退回第一项
-        const character =
-          characters.find((item) => item.id === 'xiaoshi') ?? characters[0];
-        setModelInfo({
-          name: character.id,
-          url: character.modelPath,
-          kScale: character.kScale,
-          initialXshift: character.initialXshift,
-          initialYshift: character.initialYshift,
-          idleMotionGroupName: character.idleMotionGroupName,
-          emotionMap: character.emotionMap,
-          tapMotions: character.tapMotions,
+    const applyDefault = () => {
+      fetchLive2dModels()
+        .then((characters) => {
+          if (cancelled || characters.length === 0) return;
+          // 默认角色与服务器当前角色一致（2026-10-16 起为自研「小石同学」校服版模型）；
+          // 列表里没有时退回第一项
+          const character =
+            characters.find((item) => item.id === 'xiaoshi') ?? characters[0];
+          setModelInfo({
+            name: character.id,
+            url: character.modelPath,
+            kScale: character.kScale,
+            initialXshift: character.initialXshift,
+            initialYshift: character.initialYshift,
+            idleMotionGroupName: character.idleMotionGroupName,
+            emotionMap: character.emotionMap,
+            tapMotions: character.tapMotions,
+          });
+        })
+        .catch((error) => {
+          console.warn('[WebSocket] default model fallback failed:', error);
         });
-      })
-      .catch((error) => {
-        console.warn('[WebSocket] anonymous model fallback failed:', error);
-      });
+    };
+    if (authUsername) {
+      // 登录态：等 WS 推送 6s（连接+下发通常 1~2s），逾期才兜底
+      const timer = window.setTimeout(applyDefault, 6000);
+      return () => {
+        cancelled = true;
+        window.clearTimeout(timer);
+      };
+    }
+    applyDefault();
     return () => {
       cancelled = true;
     };
-  }, [authUsername, setModelInfo]);
+  }, [authUsername, modelInfo?.url, setModelInfo]);
 
   // 开场语音声明（合规 2026-10-14：音频模态显式标识）——进入对话页时播报一次
   // 「内容由 AI 生成」提示，走 static-narration 通道直接 TTS，不经 LLM。
