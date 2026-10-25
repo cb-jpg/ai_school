@@ -50,7 +50,7 @@
     },
     {
       "Id": "ParamMouthOpenY",
-      "Value": 0.25,
+      "Value": 0,
       "Blend": "Overwrite"
     },
     {

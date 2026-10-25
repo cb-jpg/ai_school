@@ -122,6 +122,22 @@ class AvatarStaticFiles(CORSStaticFiles):
         return response
 
 
+class RevalidateStaticFiles(CORSStaticFiles):
+    """「就地更新」目录专用：live2d-models（exp3/贴图会被同 URL 覆盖）与
+    app-releases（manifest.json 固定 URL 指向新版本）。
+
+    无 Cache-Control 时 WebView 按启发式缓存（Last-Modified 年龄的 ~10%）
+    长期复用旧文件——模型参数/OTA 清单更新后设备可能几天拿不到新版
+    （2026-10-25 v2.44：手机端 joy.exp3.json 更新送达即受此威胁）。
+    no-cache=强制 revalidate，etag 未变仍回 304，代价可忽略。
+    """
+
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 class WebSocketServer:
     """
     API server for Open-LLM-VTuber. This contains the websocket endpoint for the client, hosts the web tool, and serves static files.
@@ -237,7 +253,7 @@ class WebSocketServer:
         # Mount static files with CORS-enabled handlers
         self.app.mount(
             "/live2d-models",
-            CORSStaticFiles(directory="live2d-models"),
+            RevalidateStaticFiles(directory="live2d-models"),
             name="live2d-models",
         )
         self.app.mount(
@@ -265,7 +281,7 @@ class WebSocketServer:
             os.makedirs(os.path.join("data", "app-releases"), exist_ok=True)
         self.app.mount(
             "/app-releases",
-            CORSStaticFiles(directory=os.path.join("data", "app-releases")),
+            RevalidateStaticFiles(directory=os.path.join("data", "app-releases")),
             name="app-releases",
         )
 

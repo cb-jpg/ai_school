@@ -36,7 +36,10 @@ export interface OtaCheckResult {
 export async function checkForOtaUpdate(): Promise<OtaCheckResult> {
   if (!Capacitor.isNativePlatform()) return { available: false }; // 浏览器/桌面端不参与
   const base = resolveApiBaseUrl();
-  const resp = await fetch(`${base}/app-releases/manifest.json`, {
+  // v2.44 双保险：no-store 之外再加 cache-bust 查询参数——部分 WebView 对
+  // 同 URL 静态文件的启发式缓存不遵守 fetch 的 no-store，manifest 就地更新
+  // 后设备会一直拿到旧版（"永远提示不到更新"）。
+  const resp = await fetch(`${base}/app-releases/manifest.json?t=${Date.now()}`, {
     cache: 'no-store',
   });
   if (!resp.ok) throw new Error(`manifest 拉取失败 HTTP ${resp.status}`);

@@ -565,10 +565,18 @@ export class LAppModel extends CubismUserModel {
     }
     this._speaking = speaking;
     this._syntheticLipSync = speaking && syntheticLipSync;
+    // v2.44 说话窗余晖：离开说话态时把窗口延到 1.5s 后。后端按句流式推音频，
+    // setSpeaking 逐句翻转——余晖让整段回复构成一个连续说话窗，句间残余 RMS
+    // 不再走非说话分支叠表情基线，口型接管（闭嘴+form=0）在句间不中断；
+    // 出窗后表情基线自然回归（思考/待机神态不受影响）。
+    if (!speaking) {
+      this._speechHoldUntil = this._userTimeSeconds + 1.5;
+    }
   }
 
   private _speaking = false;
   private _syntheticLipSync = false;
+  private _speechHoldUntil = 0;
   private _currentExpression: string | null = null;
   // 一张嘴原则（v2.38）：art_* 美术补丁只盖眉眼（贴图里没有有效画嘴——
   // alpha=0 的「画嘴/腮红」是打包残留 RGB，引擎按 alpha 采样根本不渲染），
@@ -664,16 +672,34 @@ export class LAppModel extends CubismUserModel {
 
       const lipSyncWeight = 4.0;
 
+      if (this._idParamMouthOpenY == null) {
+        this._idParamMouthOpenY = CubismFramework.getIdManager()
+          .getId('ParamMouthOpenY');
+      }
+      if (this._idParamMouthForm == null) {
+        this._idParamMouthForm = CubismFramework.getIdManager()
+          .getId('ParamMouthForm');
+      }
+
+      // 说话窗（v2.44）：_speaking 本体 + 出窗 1.5s 余晖（见 setSpeaking）。
+      const speechWindow =
+        this._speaking || this._userTimeSeconds < this._speechHoldUntil;
+
       // 说话中：绝对写 OpenY（表情基线不顶嘴）。
       // v2.42 死区+陡坡：合成器逐帧实拍（screenshots/truth_242）证明该 rig 的
       // form=0 嘴在 open 0.1~0.35 带内画的是「弧线+一线腔」，肉眼即「微笑嘴叠
       // 在开口上」——10-22 用户四连报的就是它，与 form 无关（v2.41 已把说话时
       // 的 form 松成 0，0.7 大开口实拍干净）。真语音包络约三成帧落在该带
-      // （实测 284/1846）。改为：轻声/静默帧（value≤0.06）直接闭嘴（露表情本
-      // 色），发声帧一开口就到 ≥0.45 的「干净张开」区（0.45 起实拍无可辨识弧
-      // 线），上限仍 0.7（张满=腔体黑块，v2.38 实证）。句子间隙 _speaking 翻
-      // false 露表情基线（微张微笑）＝「说话间带笑」的自然观感。
-      if (this._speaking) {
+      // （实测 284/1846）。改为：轻声/静默帧（value≤0.06）直接闭嘴，发声帧一
+      // 开口就到 ≥0.45 的「干净张开」区（0.45 起实拍无可辨识弧线），上限仍
+      // 0.7（张满=腔体黑块，v2.38 实证）。
+      // v2.44 一张嘴·第二半：静默帧同时绝对压 form=0。9 个表情全部自带
+      // Overwrite 嘴形基线（joy 微笑弧 1.0 / anger 撇嘴 −1.0 / surprise 惊恐
+      // …），v2.42 只绝对写了 OpenY——每个闭嘴帧 form 弹回表情基线＝说话中
+      // 每个音节间隙都闪现表情专属嘴形（10-25 用户报「所有表情的嘴说话时都
+      // 在」即此，实测 236 个说话帧里 82 帧闭嘴）；句间余晖窗内同理。出窗后
+      // form 交还表情（exp3 fade 0.18s）。
+      if (speechWindow) {
         const open =
           value <= 0.06 ? 0 : Math.min(0.45 + (value - 0.06) * 0.8, 0.7);
         for (let i = 0; i < this._lipSyncIds.getSize(); ++i) {
@@ -681,6 +707,7 @@ export class LAppModel extends CubismUserModel {
           // v2.38：×4.0 无上限会冲满 OpenY（张满=腔体黑块），限幅到 0.7
           this._model.setParameterValueById(this._lipSyncIds.at(i), open);
         }
+        this._model.setParameterValueById(this._idParamMouthForm, 0);
       } else {
         for (let i = 0; i < this._lipSyncIds.getSize(); ++i) {
           this._model.addParameterValueById(this._lipSyncIds.at(i), value, lipSyncWeight);
@@ -690,19 +717,12 @@ export class LAppModel extends CubismUserModel {
       // 「一张嘴」不变量（v2.41 起全状态生效）：该 rig 的笑线/撇嘴线是独立闭合
       // 形状、不随张嘴形变——有效 OpenY 一抬起来，闭合线底下就露出开口腔体。
       // v2.40 只在 _speaking 分支松开，漏掉三个同源场景：①表情自带开口基线
-      // （joy OpenY=0.25，而 setSpeaking 按句翻转，句子间隙/回复结束后整段
-      // 时间都在双形状——10-22 用户三复报的正是它）②非 speaking 分支的
-      // wavHandler 残余 RMS ③Talk 待机动作的嘴形帧。改为写完口型后读实际
-      // OpenY，>0 即按 ×10 速降松开嘴形（开口≥0.1 归零，落点经组合矩阵
-      // 逐点实拍全干净）；闭嘴瞬间 open→0 嘴形全额恢复，表情神态不丢。
-      if (this._idParamMouthOpenY == null) {
-        this._idParamMouthOpenY = CubismFramework.getIdManager()
-          .getId('ParamMouthOpenY');
-      }
-      if (this._idParamMouthForm == null) {
-        this._idParamMouthForm = CubismFramework.getIdManager()
-          .getId('ParamMouthForm');
-      }
+      // （joy OpenY 基线 v2.44 起归零见 exp3，历史上 0.25——setSpeaking 按句
+      // 翻转，句子间隙/回复结束后整段时间都在双形状——10-22 用户三复报的正
+      // 是它）②非 speaking 分支的 wavHandler 残余 RMS ③Talk 待机动作的嘴形
+      // 帧。改为写完口型后读实际 OpenY，>0 即按 ×10 速降松开嘴形（开口≥0.1
+      // 归零，落点经组合矩阵逐点实拍全干净）；闭嘴瞬间 open→0 嘴形全额恢复，
+      // 表情神态不丢。参数 id 解析已上移到说话窗分支之前。
       const openNow = this._model.getParameterValueById(this._idParamMouthOpenY);
       if (openNow > 0.001) {
         this._model.setParameterValueById(
