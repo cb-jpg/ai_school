@@ -10,6 +10,7 @@ import sys
 import tempfile
 from pathlib import Path
 from art_expressions import attach, write_expressions
+from image2live2d.irr.schema import Keyform
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -65,6 +66,37 @@ def main() -> None:
                 if parameter.id.startswith(("ParamSkirt", "ParamCloth")):
                     for keyform in parameter.keyforms:
                         keyform.mesh_offsets.clear()
+                # The stock mouth rig opens geometrically: the drawn smile line stays put while
+                # the synthesised cavity grows behind it, so mid-opening frames stack both
+                # drawings and speech reads as a smile with a slit under it. The blink rig
+                # never has this problem because it crossfades two complete drawings — do the
+                # same here: fade the line out early, fade the cavity in while it is still
+                # collapsed, then let the full drawn open mouth grow on its own.
+                if parameter.id == "ParamMouthOpenY" and len(parameter.keyforms) == 2:
+                    shut, opened = parameter.keyforms
+                    if not shut.deformer_offsets and not opened.deformer_offsets:
+                        cavity = sorted(
+                            pid for pid, offsets in shut.mesh_offsets.items()
+                            if any(delta for vertex in offsets for delta in vertex)
+                        )
+                        lips = [pid for pid in shut.mesh_offsets if pid not in cavity]
+                        if cavity and lips:
+                            span = opened.value - shut.value
+                            collapsed = {pid: shut.mesh_offsets[pid] for pid in cavity}
+                            line = {pid: shut.mesh_offsets[pid] for pid in lips}
+                            rest = {pid: opened.mesh_offsets[pid] for pid in cavity}
+                            gone = {pid: [(0.0, 0.0)] * len(line[pid]) for pid in lips}
+                            line_on = {**{pid: 1.0 for pid in lips}, **{pid: 0.0 for pid in cavity}}
+                            line_off = {**{pid: 0.0 for pid in lips}, **{pid: 1.0 for pid in cavity}}
+                            parameter.keyforms = [
+                                Keyform(value=shut.value, mesh_offsets={**line, **collapsed},
+                                        opacity_overrides=line_on),
+                                Keyform(value=shut.value + 0.18 * span,
+                                        mesh_offsets={**line, **collapsed},
+                                        opacity_overrides=line_off),
+                                Keyform(value=opened.value, mesh_offsets={**gone, **rest},
+                                        opacity_overrides=line_off),
+                            ]
             rig.physics = [p for p in rig.physics
                            if not p.output_param.startswith(("ParamSkirt", "ParamCloth"))]
             attach(rig, layers, name)
