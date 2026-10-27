@@ -277,6 +277,8 @@ export const useLive2DModel = ({
   const baseModelRef = useRef<{ _modelMatrix?: unknown } | null>(null);
   // 模型身份（去协议/主机的路径），而非原始 URL 字符串——见下方 effect 内注释
   const prevModelIdentityRef = useRef<string | null>(null);
+  // GL 重建的 500ms 延迟定时器（identity 连续翻转时只让最后一个落地，见下）
+  const initTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // 站位适配的存活标记（2026-09-30 曾挂 420ms frameTick 滑入插值；
   // 2026-10-19 用户反馈"人物从别处移过来怪怪的"→ 改瞬时置位，动画已移除。
   // cancelFitAnimation 及其引用保留为无害空操作，拖动/捏合让位调用点不动）
@@ -341,7 +343,15 @@ export const useLive2DModel = ({
         );
 
         // Wait for canvas to be rendered before initializing Live2D
-        setTimeout(() => {
+        //（2026-10-27 双影报障修复：定时器挂到 ref 上并在 effect 清理时取消——
+        // 模型 identity 短时间连续翻转时（WS 推送/兜底/重载叠加），旧实现会让
+        // 两个定时器先后各做一次 GL 全量重建，真机 WebView 上串行重建正是
+        // 人物消失/双影这类设备级渲染事故的触发器）
+        if (initTimerRef.current !== undefined) {
+          clearTimeout(initTimerRef.current);
+        }
+        initTimerRef.current = setTimeout(() => {
+          initTimerRef.current = undefined;
           // Check if canvas exists before proceeding
           const canvasElement = document.getElementById("canvas");
           if (!canvasElement) {
@@ -375,6 +385,12 @@ export const useLive2DModel = ({
     } catch (error) {
       console.error("[useLive2DModel] Error processing model URL:", error);
     }
+    return () => {
+      if (initTimerRef.current !== undefined) {
+        clearTimeout(initTimerRef.current);
+        initTimerRef.current = undefined;
+      }
+    };
   }, [modelInfo?.url, modelInfo?.kScale]);
 
   const getModelPosition = useCallback(() => {

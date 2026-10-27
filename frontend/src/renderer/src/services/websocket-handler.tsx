@@ -42,6 +42,13 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
   const bgUrlContext = useBgUrl();
   const { confUid, setConfName, setConfUid, setConfigFiles } = useConfig();
   const [pendingModelInfo, setPendingModelInfo] = useState<ModelInfo | undefined>(undefined);
+  // WS 模型推送的“对话页外暂存”（2026-10-27 双影报障修复）：真机上
+  // releaseInstance+initializeLive2D 的 GL 全量重建是已知脆弱操作，
+  // 用户在首页/栏目/新闻浏览时收到推送（kiosk 自动重登、断线重连、后台
+  // 换模型）不就地换模型，暂存到进入对话页（#/hero）再应用。
+  const pendingDialogModelRef = useRef<ModelInfo | undefined>(undefined);
+  // setModelInfo 的去重需要当前模型 identity；避免把 modelInfo 塞进大回调依赖
+  const modelUrlRef = useRef<string | undefined>(undefined);
   const { setSelfUid, setGroupMembers, setIsOwner } = useGroup();
   const { startMic, stopMic, autoStartMicOnConvEnd } = useVAD();
   const autoStartMicOnConvEndRef = useRef(autoStartMicOnConvEnd);
@@ -69,6 +76,47 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
       setPendingModelInfo(undefined);
     }
   }, [pendingModelInfo, setModelInfo, confUid]);
+
+  useEffect(() => {
+    modelUrlRef.current = modelInfo?.url;
+  }, [modelInfo?.url]);
+
+  // 同模型推送去重 + 对话页外暂存（2026-10-27 双影报障修复）
+  const applyOrStashModel = useCallback((incoming: ModelInfo) => {
+    // identity = 去协议/主机的路径（与 use-live2d-model 的身份比对同法）：
+    // WS 每次重连都会推 set-model-and-conf，同模型重复推送不值得触发
+    // 状态涟漪和加载闪烁
+    const pathOf = (u: string) => {
+      try {
+        return new URL(u, window.location.origin).pathname;
+      } catch {
+        return u;
+      }
+    };
+    const sameModel =
+      !!modelUrlRef.current &&
+      pathOf(incoming.url) === pathOf(modelUrlRef.current);
+    if (sameModel) return;
+    if (window.location.hash !== '#/hero') {
+      pendingDialogModelRef.current = incoming;
+      return;
+    }
+    setModelInfo(incoming);
+  }, [setModelInfo]);
+
+  // 进入对话页时应用暂存的模型推送（浏览中收到的推送在此刻才动画布）
+  useEffect(() => {
+    const flush = () => {
+      if (window.location.hash !== '#/hero') return;
+      const pending = pendingDialogModelRef.current;
+      if (!pending) return;
+      pendingDialogModelRef.current = undefined;
+      setModelInfo(pending);
+    };
+    window.addEventListener('hashchange', flush);
+    flush();
+    return () => window.removeEventListener('hashchange', flush);
+  }, [setModelInfo]);
 
   const {
     setCurrentHistoryUid, setMessages, setHistoryList,
@@ -141,7 +189,7 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
             // eslint-disable-next-line no-param-reassign
             message.model_info.url = modelUrl;
           }
-          setModelInfo(message.model_info);
+          applyOrStashModel(message.model_info);
           console.log('Model info set:', message.model_info);
         }
 
@@ -341,7 +389,7 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
       default:
         console.warn('Unknown message type:', message.type);
     }
-  }, [aiState, addAudioTask, appendHumanMessage, baseUrl, bgUrlContext, setAiState, setConfName, setConfUid, setConfigFiles, setCurrentHistoryUid, setHistoryList, setMessages, setModelInfo, setSubtitleText, startMic, stopMic, setSelfUid, setGroupMembers, setIsOwner, backendSynthComplete, setBackendSynthComplete, clearResponse, handleControlMessage, appendOrUpdateToolCallMessage, interrupt, setBrowserViewData, t]);
+  }, [aiState, addAudioTask, appendHumanMessage, applyOrStashModel, baseUrl, bgUrlContext, setAiState, setConfName, setConfUid, setConfigFiles, setCurrentHistoryUid, setHistoryList, setMessages, setModelInfo, setSubtitleText, startMic, stopMic, setSelfUid, setGroupMembers, setIsOwner, backendSynthComplete, setBackendSynthComplete, clearResponse, handleControlMessage, appendOrUpdateToolCallMessage, interrupt, setBrowserViewData, t]);
 
   // 登录门禁：未登录不连 WebSocket；登录/切换账号后以新身份（user_token）重连。
   // 必须消费 AuthContext（而非渲染时读 localStorage）：本组件不是 AuthContext
