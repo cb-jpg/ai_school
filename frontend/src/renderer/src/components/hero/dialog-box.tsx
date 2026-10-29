@@ -31,6 +31,7 @@ import { useChatHistory } from '@/context/chat-history-context';
 import { useLive2DConfig } from '@/context/live2d-config-context';
 import { useSidebar } from '@/hooks/sidebar/use-sidebar';
 import { resolveApiBaseUrl } from '@/services/api-base';
+import { wsService } from '@/services/websocket-service';
 import { siteTheme } from './site-theme';
 
 // 全站官网主题（site-theme.ts 石实IP官方色）语义别名：
@@ -172,10 +173,17 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
       minHeight={isPortraitBoard ? '0px' : { base: '0px', md: '500px' }}
     >
       {/* Connection Status Alert（一体机现场排查：把实际在连的后端地址亮出来，
-          一眼区分"连哪儿失败"——网络不通/地址错/服务器没开） */}
-      {wsState !== 'OPEN' && (
+          一眼区分"连哪儿失败"——网络不通/地址错/服务器没开。
+          熔断态（2026-10-29）：重连循环被 wsService 熔断后不再闪横幅，
+          改为给出可操作的指引 */}
+      {wsState !== 'OPEN' && !wsService.isLoopBroken() && (
         <Alert status="warning" mb={4} title="正在连接服务器..." endElement={<Spinner size="sm" />}>
           目标 {backendHost} · 请检查本机网络是否可达该地址
+        </Alert>
+      )}
+      {wsState !== 'OPEN' && wsService.isLoopBroken() && (
+        <Alert status="error" mb={4} title="连接异常，已暂停自动重连">
+          请关闭本应用后重新打开；仍失败请检查网络或稍后再试
         </Alert>
       )}
 

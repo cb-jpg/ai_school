@@ -90,7 +90,13 @@ def init_client_ws_route(default_context_cache: ServiceContext) -> APIRouter:
         try:
             await ws_handler.handle_new_connection(websocket, client_uid, username=username)
             await ws_handler.handle_websocket_communication(websocket, client_uid)
-        except WebSocketDisconnect:
+        except WebSocketDisconnect as e:
+            # 断开码定层（2026-10-29 手机端重连循环排查）：1000=客户端主动 close，
+            # 1001=页面卸载/刷新，1005=无状态码，1006=网络/进程异常（对端消失）
+            logger.info(
+                f"WS closed by client {client_uid} ({username or 'guest'}): "
+                f"code={e.code} reason={e.reason!r}"
+            )
             await ws_handler.handle_disconnect(client_uid)
         except Exception as e:
             logger.error(f"Error in WebSocket connection: {e}")

@@ -161,20 +161,34 @@ class WebSocketService {
     this.clearReconnectTimer();
     this.manualClose = false;
     this.lastUrl = url;
+    // 熔断复位：显式 connect（身份切换/手动重连）视为新的连接尝试
+    this.loopBroken = false;
+    this.recentCloseTimes = [];
 
     try {
-      this.ws = new WebSocket(withUserToken(withToken(url)));
+      const sock = new WebSocket(withUserToken(withToken(url)));
+      this.ws = sock;
       this.currentState = 'CONNECTING';
       this.stateSubject.next('CONNECTING');
 
-      this.ws.onopen = () => {
+      // 陈旧套接字守卫（2026-10-29 手机端重连循环修复）：close() 是异步的，
+      // 被替换/关闭的旧 socket 其回调仍会触发（CONNECTING 的甚至会先 onopen）。
+      // 不拦的话，旧 onclose 会把状态打回 CLOSED（"正在连接服务器"横幅闪现），
+      // 且此时 manualClose 已被上面的 connect() 重置回 false——旧 socket 的
+      // 关闭被误判为网络断开而排起重连，重连又踩到已打开的新 socket……
+      // 一次多余的 connect 就此滚成无限重连循环（真机 83 次/90 秒实录）。
+      const isCurrent = () => this.ws === sock;
+
+      sock.onopen = () => {
+        if (!isCurrent()) return;
         this.currentState = 'OPEN';
         this.stateSubject.next('OPEN');
         this.reconnectAttempts = 0;
         this.initializeConnection();
       };
 
-      this.ws.onmessage = (event) => {
+      sock.onmessage = (event) => {
+        if (!isCurrent()) return;
         try {
           const message = JSON.parse(event.data);
           this.messageSubject.next(message);
@@ -188,17 +202,25 @@ class WebSocketService {
         }
       };
 
-      this.ws.onclose = () => {
+      sock.onclose = () => {
+        if (!isCurrent()) return;
         this.currentState = 'CLOSED';
         this.stateSubject.next('CLOSED');
         // 非人为断开（网络抖动、心跳超时等）时自动重连
         if (!this.manualClose) {
+          if (this.recordCloseAndBreakLoop()) {
+            console.error('[WebSocketService] reconnect loop detected '
+              + '(rapid repeated closes) — auto-reconnect suspended; '
+              + 'waiting for an explicit reconnect (identity switch / app restart)');
+            return;
+          }
           this.probeAuthOnRepeatedFailure();
           this.scheduleReconnect();
         }
       };
 
-      this.ws.onerror = () => {
+      sock.onerror = () => {
+        if (!isCurrent()) return;
         this.currentState = 'CLOSED';
         this.stateSubject.next('CLOSED');
       };
@@ -210,6 +232,30 @@ class WebSocketService {
         this.scheduleReconnect();
       }
     }
+  }
+
+  /**
+   * 重连循环熔断：30 秒内 ≥6 次非人为断开（正常网络抖动远达不到这个密度）
+   * 就停止自动重连，避免"正在连接服务器"无限闪现、服务器端每秒被建连。
+   * 返回 true 表示已熔断（本次不再排重连）。isLoopBroken() 供 UI 提示。
+   */
+  private recentCloseTimes: number[] = [];
+
+  private loopBroken = false;
+
+  private recordCloseAndBreakLoop(): boolean {
+    const now = Date.now();
+    this.recentCloseTimes.push(now);
+    this.recentCloseTimes = this.recentCloseTimes.filter((t) => now - t <= 30_000);
+    if (this.recentCloseTimes.length >= 6) {
+      this.loopBroken = true;
+      this.recentCloseTimes = [];
+    }
+    return this.loopBroken;
+  }
+
+  isLoopBroken() {
+    return this.loopBroken;
   }
 
   /** 指数退避重连：1s 起步，翻倍，封顶 15s */
