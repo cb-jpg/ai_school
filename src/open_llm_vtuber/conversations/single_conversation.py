@@ -147,7 +147,9 @@ async def process_single_conversation(
         rag_hit_flag = False
         rag_attempted = False  # 只有"确实做过 RAG 且未命中"才允许联网兜底，寒暄不搜
         try:
-            from ..knowledge.rag_service import CHAT_TOP_K, get_rag_service
+            from ..knowledge.rag_service import (
+                CHAT_TOP_K, GUEST_EXCLUDED_CATEGORIES, get_rag_service,
+            )
             rag_service = get_rag_service()
 
             if rag_service.needs_rag_retrieval(input_text):
@@ -156,6 +158,11 @@ async def process_single_conversation(
                 rag_result = await rag_service.retrieve_and_enrich_input(
                     query=input_text,
                     top_k=CHAT_TOP_K,  # 调用点曾硬编码 6，会覆盖默认值——改它瘦身才生效
+                    # 游客（未登录连接）不检索名单类条目（2026-10-29 游客模式）
+                    exclude_categories=(
+                        GUEST_EXCLUDED_CATEGORIES
+                        if context.username is None else None
+                    ),
                 )
 
                 if rag_result.get("has_context"):

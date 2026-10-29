@@ -2,6 +2,9 @@ from typing import Dict, List, Optional, Callable, TypedDict
 from fastapi import WebSocket, WebSocketDisconnect
 import asyncio
 import json
+import os
+import threading
+import time
 from enum import Enum
 import numpy as np
 from loguru import logger
@@ -72,6 +75,15 @@ class WSMessage(TypedDict, total=False):
     title: Optional[str]
     segments: Optional[List[str]]
     narration_id: Optional[str]
+
+
+# 游客（未登录）对话软限流（2026-10-29 游客模式）：每个匿名连接每天最多
+# OLLV_GUEST_DAILY_LIMIT 次对话触发（默认 20），超出后当天礼貌收口，登录用户不受限。
+# 计数按连接维度存在本进程内存——多 worker 各自计数、断开即清，软限流足够
+# （目的不是硬防滥用，硬防有敏感词过滤和内容审核兜着）。
+_GUEST_DAILY_LIMIT = int(os.environ.get("OLLV_GUEST_DAILY_LIMIT", "20"))
+_guest_usage: dict[str, tuple[str, int]] = {}
+_guest_usage_lock = threading.Lock()
 
 
 class WebSocketHandler:
@@ -355,6 +367,8 @@ class WebSocketHandler:
 
     async def handle_disconnect(self, client_uid: str) -> None:
         """Handle client disconnection"""
+        with _guest_usage_lock:
+            _guest_usage.pop(client_uid, None)  # 游客限流计数随连接清理
         group = self.chat_group_manager.get_client_group(client_uid)
         if group:
             await handle_group_interrupt(
@@ -494,6 +508,13 @@ class WebSocketHandler:
     ) -> None:
         """Handle request for chat history list"""
         context = self.client_contexts[client_uid]
+        if context.username is None:
+            # 游客（2026-10-29 游客模式）：对话不存档，也不暴露共享历史目录，
+            # 否则匿名连接能互相翻到对方的对话内容（隐私隔离）
+            await websocket.send_text(
+                json.dumps({"type": "history-list", "histories": []})
+            )
+            return
         histories = get_history_list(
             context.character_config.conf_uid, username=context.username
         )
@@ -510,6 +531,9 @@ class WebSocketHandler:
             return
 
         context = self.client_contexts[client_uid]
+        if context.username is None:
+            # 游客：无历史可取，钉住 history_uid=None 即天然不落盘
+            return
         # Update history_uid in service context
         context.history_uid = history_uid
         context.agent_engine.set_memory_from_history(
@@ -536,6 +560,9 @@ class WebSocketHandler:
     ) -> None:
         """Handle creation of new chat history"""
         context = self.client_contexts[client_uid]
+        if context.username is None:
+            # 游客：不建历史（对话仅在连接内存里，刷新即清），history_uid 保持 None
+            return
         history_uid = create_new_history(
             context.character_config.conf_uid, username=context.username
         )
@@ -564,6 +591,9 @@ class WebSocketHandler:
             return
 
         context = self.client_contexts[client_uid]
+        if context.username is None:
+            # 游客：无历史可删
+            return
         success = delete_history(
             context.character_config.conf_uid,
             history_uid,
@@ -620,6 +650,28 @@ class WebSocketHandler:
         self, websocket: WebSocket, client_uid: str, data: WSMessage
     ) -> None:
         """Handle triggers that start a conversation"""
+        context = self.client_contexts.get(client_uid)
+        if context is not None and context.username is None:
+            # 游客每日对话软限流（2026-10-29 游客模式）：超限当天礼貌收口
+            today = time.strftime("%Y-%m-%d")
+            with _guest_usage_lock:
+                used_date, count = _guest_usage.get(client_uid, (today, 0))
+                if used_date != today:
+                    used_date, count = today, 0
+                if count >= _GUEST_DAILY_LIMIT:
+                    exceeded = True
+                else:
+                    _guest_usage[client_uid] = (used_date, count + 1)
+                    exceeded = False
+            if exceeded:
+                await websocket.send_text(json.dumps({
+                    "type": "full-text",
+                    "text": (
+                        "今天的游客体验次数用完啦，欢迎明天再来，"
+                        "或登录账号继续和小石同学聊～"
+                    ),
+                }))
+                return
         await handle_conversation_trigger(
             msg_type=data.get("type", ""),
             data=data,

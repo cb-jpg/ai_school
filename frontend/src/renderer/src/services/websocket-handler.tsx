@@ -23,6 +23,7 @@ import { useGroup } from '@/context/group-context';
 import { useInterrupt } from '@/hooks/utils/use-interrupt';
 import { useBrowser } from '@/context/browser-context';
 import { useAuth } from '@/context/auth-context';
+import { setGuestMode, useGuestMode } from '@/utils/guest-mode';
 import { fetchLive2dModels } from '@/services/live2d-models-api';
 
 function WebSocketHandler({ children }: { children: React.ReactNode }) {
@@ -391,39 +392,46 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
     }
   }, [aiState, addAudioTask, appendHumanMessage, applyOrStashModel, baseUrl, bgUrlContext, setAiState, setConfName, setConfUid, setConfigFiles, setCurrentHistoryUid, setHistoryList, setMessages, setModelInfo, setSubtitleText, startMic, stopMic, setSelfUid, setGroupMembers, setIsOwner, backendSynthComplete, setBackendSynthComplete, clearResponse, handleControlMessage, appendOrUpdateToolCallMessage, interrupt, setBrowserViewData, t]);
 
-  // 登录门禁：未登录不连 WebSocket；登录/切换账号后以新身份（user_token）重连。
+  // 连接门禁：按身份三元组决定连不连（2026-10-29 游客模式扩展）——
+  // 登录用户（user:<name>，带 user_token）/ 游客（'guest'，匿名连接，
+  // 服务端不存档+名单类资料不检索+每日限次）/ 匿名浏览（null，不连）。
   // 必须消费 AuthContext（而非渲染时读 localStorage）：本组件不是 AuthContext
   // 消费者时，登录/登出不会引发重渲染，门禁 effect 不跑 → App 内登录后永远不连接。
   const { user: authUser } = useAuth();
   const authUsername = authUser?.username ?? null;
-  const prevUsernameRef = useRef<string | null>(null);
+  const guestMode = useGuestMode();
+  // 登录即退出游客模式：门禁/横幅都按登录态隐藏，残留的游客标记会让下次
+  // 登出后直接以游客态落进对话页
   useEffect(() => {
-    if (!authUsername) {
-      // 登出：断开并阻止自动重连；对话存档属上个账号，一并清除
-      if (prevUsernameRef.current !== null) {
+    if (authUsername && guestMode) {
+      setGuestMode(false);
+    }
+  }, [authUsername, guestMode]);
+  // 身份变化即断开重连：登出、切账号、进出游客模式都走同一条路径；
+  // 旧身份的对话存档不再适用，交给恢复逻辑回退（游客没有存档可回退）
+  const activeIdentity = authUsername
+    ? `user:${authUsername}`
+    : guestMode
+      ? 'guest'
+      : null;
+  const prevIdentityRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (prevIdentityRef.current !== activeIdentity) {
+      if (prevIdentityRef.current !== null) {
         wsService.disconnect();
+        try {
+          localStorage.removeItem('chatHistoryUid');
+        } catch {
+          // ignore
+        }
       }
-      try {
-        localStorage.removeItem('chatHistoryUid');
-      } catch {
-        // ignore
-      }
-      prevUsernameRef.current = null;
+      prevIdentityRef.current = activeIdentity;
+    }
+    if (!activeIdentity) {
       return;
     }
-    if (prevUsernameRef.current !== null && prevUsernameRef.current !== authUsername) {
-      // 账号切换：先断开旧连接，connect 内部会带新 user_token 重开；
-      // 旧账号的对话存档不再适用，交给恢复逻辑回退到新账号最新对话
-      wsService.disconnect();
-      try {
-        localStorage.removeItem('chatHistoryUid');
-      } catch {
-        // ignore
-      }
-    }
-    prevUsernameRef.current = authUsername;
     wsService.connect(wsUrl);
-  }, [wsUrl, authUsername]);
+  }, [wsUrl, activeIdentity]);
 
   // 模型兜底（2026-10-24 手机端「人物消失」修复，取代 2026-09-22 的仅匿名版）：
   // 原版 `if (authUsername) return` 让登录态的模型完全依赖 WS set-model-and-conf

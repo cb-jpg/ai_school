@@ -42,6 +42,7 @@ import { useState, useEffect, useRef } from "react";
 // 导入工作台字体
 import "@/styles/admin-fonts.css";
 import { IS_KIOSK, KIOSK_LAYOUT_WIDTH } from "@/utils/device-profile";
+import { setGuestMode, useGuestMode } from "./utils/guest-mode";
 // import Canvas from './components/canvas/canvas'; // Likely unused now
 import Footer from "./components/footer/footer";
 import { AiStateProvider } from "./context/ai-state-context";
@@ -254,6 +255,8 @@ function AppContent(): JSX.Element {
   const [authPrompt, setAuthPrompt] = useState(false);
   const { mode } = useMode();
   const { user: authUser } = useAuth();
+  // 游客模式（2026-10-29）：登录门禁上提供「游客身份先聊聊」，匿名连接对话页
+  const guestMode = useGuestMode();
   const isElectron = window.api !== undefined;
   // 竖屏大屏（壁挂数字屏/竖放平板）：hero 路由的画布层与文案样式走手机竖屏
   // 同款的全宽穿透形态，而非 md 档"右侧 55% / 低层级"的横屏布局
@@ -445,8 +448,12 @@ function AppContent(): JSX.Element {
   // 改为 z100 不透明浮层盖在 hero 树上（与下方 authPromptOverlay 同法）：
   // 画布全程不卸载，登录页期间模型照常预加载，登录成功浮层退去人物原地不动。
   // 强制改密（2026-10-14）：首次登录/被重置的账号视同未登录，先改密再进对话。
+  // 游客模式（2026-10-29）：门禁提供「游客身份先聊聊」入口，进入后浮层退去、
+  // WS 以匿名身份连接（对话不存档/名单类资料不检索/每日限次）。
   const authGateOverlay =
-    isDialogViewGate && (!authUser || authUser.must_change_password) ? (
+    isDialogViewGate &&
+    !guestMode &&
+    (!authUser || authUser.must_change_password) ? (
       <Box
         position="fixed"
         top={0}
@@ -455,7 +462,44 @@ function AppContent(): JSX.Element {
         height="100vh"
         zIndex={100}
       >
-        <AppLoginPage />
+        <AppLoginPage onGuest={() => setGuestMode(true)} />
+      </Box>
+    ) : null;
+
+  // 游客模式横幅：贴在对话页左下角（与右下角 AI生成 角标对称），点「登录」
+  // 退出游客态 → 门禁浮层立即回来。手机端对话卡满宽，横幅贴视口底缘空档。
+  const guestBanner =
+    isDialogViewGate && guestMode && !authUser ? (
+      <Box
+        position="absolute"
+        bottom={{ base: "8px", md: "12px" }}
+        left="12px"
+        zIndex={25}
+        px={3}
+        py="4px"
+        rounded="full"
+        bg="rgba(13, 34, 65, 0.72)"
+        color="white"
+        fontSize={{ base: "10px", md: "11px" }}
+        lineHeight="1.6"
+        display="flex"
+        alignItems="center"
+        gap={2}
+        data-testid="guest-mode-banner"
+      >
+        游客模式 · 对话不保存
+        <Box
+          as="button"
+          px={2}
+          rounded="full"
+          bg="rgba(255,255,255,0.16)"
+          _hover={{ bg: "rgba(255,255,255,0.28)" }}
+          cursor="pointer"
+          onClick={() => setGuestMode(false)}
+          data-testid="guest-login-button"
+        >
+          登录
+        </Box>
       </Box>
     ) : null;
 
@@ -591,8 +635,9 @@ function AppContent(): JSX.Element {
         />
 
         {/* WebSocketStatus indicator（专题/栏目/新闻页打开时隐藏，避免浮在页面导航上；
-            未登录时隐藏——匿名浏览不连 WS，亮着红色断连提示反而困惑） */}
-        {!isOverlayView && authUser && (
+            未登录时隐藏——匿名浏览不连 WS，亮着红色断连提示反而困惑。
+            游客模式例外：匿名 WS 已连接，状态灯照常显示） */}
+        {!isOverlayView && (authUser || (guestMode && isDialogViewGate)) && (
           <Box position="absolute" top="20px" left="20px" zIndex={10}>
             <WebSocketStatus />
           </Box>
@@ -654,6 +699,7 @@ function AppContent(): JSX.Element {
 
         {/* 专题页匿名点「讲解」触发的登录浮层（盖在当前页面上，可取消） */}
         {authPromptOverlay}
+        {guestBanner}
         {authGateOverlay}
       </>
     );

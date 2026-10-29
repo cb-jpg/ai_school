@@ -22,9 +22,12 @@ const brand = siteTheme.red;
 interface AppLoginPageProps {
   /** 作为浮层弹出时的"暂不登录"回调；提供时显示返回按钮 */
   onCancel?: () => void;
+  /** 游客入口（2026-10-29 游客模式）：提供时显示「游客身份，先聊聊看」，
+      点击进入匿名对话（对话不存档、名单类资料不检索、每日限次） */
+  onGuest?: () => void;
 }
 
-export default function AppLoginPage({ onCancel }: AppLoginPageProps) {
+export default function AppLoginPage({ onCancel, onGuest }: AppLoginPageProps) {
   const { login, user, refreshUser } = useAuth();
   // 已登录但带强制改密标记（门禁重新挂载本页）→ 直接进改密步骤
   const [step, setStep] = useState<'login' | 'change'>(
@@ -230,6 +233,22 @@ export default function AppLoginPage({ onCancel }: AppLoginPageProps) {
                 >
                   登 录
                 </Button>
+
+                {/* 游客入口（2026-10-29 游客模式）：没有账号的家长/访客
+                    可先以游客身份对话体验，名单类资料不对游客开放 */}
+                {onGuest && (
+                  <Button
+                    data-login-guest
+                    type="button"
+                    variant="ghost"
+                    width="full"
+                    size="sm"
+                    color={brand}
+                    onClick={onGuest}
+                  >
+                    游客身份，先聊聊看 →
+                  </Button>
+                )}
 
                 {/* 浮层模式（匿名讲解触发）：可暂不登录，返回继续浏览 */}
                 {onCancel && (

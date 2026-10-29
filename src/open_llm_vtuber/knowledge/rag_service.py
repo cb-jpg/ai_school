@@ -74,6 +74,11 @@ LOW_CONFIDENCE_THRESHOLD = 0.5  # 命中但最高分低于此值记为低置信�
 CHAT_TOP_K = 6
 DOC_CHAR_CAP = 480
 
+# 访客（未登录/游客模式）检索可见性（2026-10-29 游客模式）：
+# students 类目是名单类条目（班级名单、学习标兵问答体等，含具体学生个人信息），
+# 不对游客开放——游客检索前先按类目收缩候选集，登录用户不受影响。
+GUEST_EXCLUDED_CATEGORIES = frozenset({"students"})
+
 # 问题记录上限（防止文件无限增长）
 MAX_LOGGED_QUESTIONS = 500
 
@@ -220,6 +225,7 @@ class RagService:
         self._query_cache_lock = threading.Lock()
         self._searchable_cache: Tuple[float, Set[str]] = (0.0, set())
         self._searchable_total: int = -1
+        self._category_cache: Tuple[float, Optional[Dict[str, str]]] = (0.0, None)
 
     # 纯寒暄/客套短句（2026-09-26）：不检索、也不触发联网兜底，
     # 保住开口延迟（RAG 白跑 + rag_attempted 引发的联网搜索都省掉）
@@ -288,6 +294,22 @@ class RagService:
         self._searchable_total = len(entries)
         return ids
 
+    def _entry_category_map(self) -> Dict[str, str]:
+        """条目 id → 类目（entry.category.value）。访客可见性过滤用，
+        与 _searchable_entry_ids 同一 TTL 缓存策略（30s 内省去全表遍历）。"""
+        now = time.monotonic()
+        cached_at, cached = self._category_cache
+        if cached is not None and now - cached_at < _SEARCHABLE_TTL:
+            return cached
+        try:
+            entries = get_knowledge_crud().get_all(include_archived=False)
+        except Exception as e:
+            logger.error(f"获取条目类目映射失败：{e}")
+            return cached or {}
+        mapping = {e.id: e.category.value for e in entries}
+        self._category_cache = (now, mapping)
+        return mapping
+
     @staticmethod
     def _normalize_query(query: str) -> str:
         """查询归一化：压缩空白，让"同题不同空白"命中同一缓存"""
@@ -330,13 +352,19 @@ class RagService:
             if timings is not None:
                 timings["end"] = time.monotonic()
 
-    async def search(self, query: str, top_k: int = TOP_K) -> List[Dict[str, Any]]:
+    async def search(
+        self, query: str, top_k: int = TOP_K,
+        exclude_categories: Optional[Set[str]] = None,
+    ) -> List[Dict[str, Any]]:
         """检索已发布知识，返回 [{chunk_id, entry_id, title, category, content, score}]
 
         管理端搜索与对话 RAG 共用这一条检索路径。
         检索跑在专用小线程池上；相同查询在 TTL 内直接命中缓存（校园场景同题率极高）。
+        exclude_categories：访客可见性过滤（2026-10-29 游客模式）——给定类目的
+        条目在检索前就移出候选集（而非检索后剔除，避免 top_k 被空占）。
         """
-        cache_key = (self._normalize_query(query), top_k)
+        cache_key = (self._normalize_query(query), top_k,
+                     frozenset(exclude_categories or ()))
         version = get_knowledge_crud().data_version()  # 索引签名：建/删/改即变（含跨 worker）
         cached = self._cache_get(cache_key, version)
         if cached is not None:
@@ -346,6 +374,12 @@ class RagService:
             return cached
 
         searchable = self._searchable_entry_ids()
+        if exclude_categories:
+            category_map = self._entry_category_map()
+            searchable = {
+                entry_id for entry_id in searchable
+                if category_map.get(entry_id) not in exclude_categories
+            }
         if not searchable:
             return []
         span = current_span()
@@ -381,9 +415,12 @@ class RagService:
         return docs
 
     async def retrieve_and_enrich_input(
-        self, query: str, top_k: int = CHAT_TOP_K
+        self, query: str, top_k: int = CHAT_TOP_K,
+        exclude_categories: Optional[Set[str]] = None,
     ) -> Dict[str, Any]:
         """检索知识库并返回丰富后的输入信息
+
+        exclude_categories：访客可见性过滤（游客连接传 GUEST_EXCLUDED_CATEGORIES）。
 
         Returns:
             Dict 包含 original_query / enriched_query / retrieved_docs / has_context
@@ -399,7 +436,7 @@ class RagService:
             self.question_log.record_unanswered(query)
             return result
 
-        docs = await self.search(query, top_k=top_k)
+        docs = await self.search(query, top_k=top_k, exclude_categories=exclude_categories)
         if not docs:
             logger.info("未检索到相关学校知识")
             self.question_log.record_unanswered(query)
