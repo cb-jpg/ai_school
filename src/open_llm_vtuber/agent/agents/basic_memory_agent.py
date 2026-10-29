@@ -30,6 +30,10 @@ from ...mcpp.types import ToolCallObject
 from ...mcpp.tool_executor import ToolExecutor
 from ...utils.turn_latency import current_span
 
+# LLM 上下文内保留的最大对话条数（约 30 轮）。60 条远超真实会话长度，
+# 只用于防超长会话上下文无限膨胀拖高 prefill/首字延迟；持久化历史不受影响。
+_MEMORY_MAX_MESSAGES = 60
+
 
 class BasicMemoryAgent(AgentInterface):
     """Agent with basic chat memory and tool calling support."""
@@ -173,6 +177,11 @@ class BasicMemoryAgent(AgentInterface):
             return
 
         self._memory.append(message_data)
+        # 会话内存上限（2026-10-29 延迟优化）：历史全量随轮次线性膨胀会拖高
+        # 上游 prefill/首字延迟。60 条（约 30 轮）远超真实会话长度——正常使用
+        # 永远裁不到，仅防病态长会话；持久化历史不受影响，只裁 LLM 上下文。
+        if len(self._memory) > _MEMORY_MAX_MESSAGES:
+            del self._memory[: len(self._memory) - _MEMORY_MAX_MESSAGES]
 
     def set_memory_from_history(
         self, conf_uid: str, history_uid: str, username: str | None = None
@@ -193,6 +202,9 @@ class BasicMemoryAgent(AgentInterface):
                 )
             else:
                 logger.warning(f"Skipping invalid message from history: {msg}")
+        # 与 _add_message 同一上限（恢复超长历史时同样只保留最近 60 条）
+        if len(self._memory) > _MEMORY_MAX_MESSAGES:
+            del self._memory[: len(self._memory) - _MEMORY_MAX_MESSAGES]
         logger.info(f"Loaded {len(self._memory)} messages from history.")
 
     def handle_interrupt(self, heard_response: str) -> None:

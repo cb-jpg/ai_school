@@ -330,6 +330,14 @@ class WebSocketServer:
         from .model_config_api import mark_conf_seen
 
         mark_conf_seen()
+        # 后台预热 RAG 首查 / TTS 首合成冷路径（2026-10-29 延迟优化，
+        # 实测每 worker 首题多付 2.7~3.3s；纯预热不改变任何对外行为）。
+        # 独立守护线程承载：initialize 由 asyncio.run 驱动，任务挂在它的
+        # 循环上会随 asyncio.run 返回被取消；FastAPI 0.141 也已移除
+        # add_event_handler，挂不上 startup 事件。
+        from .utils.startup_warmup import start_background_warmup
+
+        start_background_warmup(self.default_context_cache)
 
     @staticmethod
     def clean_cache():
