@@ -1,6 +1,8 @@
 /**
  * 角色配置页面
- * 用于配置数字人角色名称、角色人设、用户名称和Live2D模型选择
+ * 用于配置数字人角色名称、角色人设和Live2D模型选择；
+ * 管理员可在此切换对话模型接口（LLM API）；
+ * 称呼与互动方式按登录账号角色自动生效（见右侧说明卡）。
  */
 
 import { FC, useEffect, useState } from 'react';
@@ -20,8 +22,10 @@ import {
   FiSettings,
   FiCheck,
   FiSave,
+  FiKey,
+  FiZap,
 } from 'react-icons/fi';
-import { useLocalStorage } from '@/hooks/utils/use-local-storage';
+import { useAuth } from '@/context/auth-context';
 import { useLive2DConfig } from '@/context/live2d-config-context';
 import { useLive2dModels } from '@/hooks/live2d/use-live2d-models';
 import { apiUrl } from '@/services/api-base';
@@ -31,6 +35,15 @@ import { toaster } from '@/components/ui/toaster';
 import {
   fetchBackendCharacterConfig,
   saveBackendCharacterConfig,
+  fetchModelConfig,
+  saveModelConfig,
+  testModelConfig,
+} from '@/services/character-config-api';
+import type {
+  ModelConfig,
+  ModelConfigPayload,
+  ModelProvider,
+  ModelTestResult,
 } from '@/services/character-config-api';
 
 // 角色配置接口
@@ -40,13 +53,6 @@ interface CharacterConfig {
   description: string;
   systemPrompt: string;
   createdAt: string;
-}
-
-// 用户配置接口
-interface UserConfig {
-  name: string;
-  title: string;
-  avatar: string;
 }
 
 // 学校颜色配置
@@ -85,11 +91,10 @@ const defaultCharacterConfig: CharacterConfig = {
   createdAt: new Date().toISOString(),
 };
 
-// 默认用户配置
-const defaultUserConfig: UserConfig = {
-  name: '管理员',
-  title: '系统管理员',
-  avatar: '',
+// 接口类型的显示名
+const PROVIDER_LABELS: Record<ModelProvider, string> = {
+  deepseek_llm: 'DeepSeek 官方',
+  openai_compatible_llm: 'OpenAI 兼容接口',
 };
 
 // 数字人角色列表改为运行时从后端 /api/live2d-models/info 获取（见 useLive2dModels）
@@ -97,6 +102,10 @@ const defaultUserConfig: UserConfig = {
 export const CharacterConfig: FC = () => {
   // Live2D配置hook
   const { setModelInfo } = useLive2DConfig();
+
+  // 登录用户（模型接口管理仅管理员可见）
+  const { user: authUser } = useAuth();
+  const isAdmin = authUser?.role === 'admin';
 
   // 角色配置状态：以【后端当前生效值】为初始值，编辑后需显式保存
   const [characterConfig, setCharacterConfig] = useState<CharacterConfig>(
@@ -111,11 +120,16 @@ export const CharacterConfig: FC = () => {
     characterConfig.name !== savedConfig.name ||
     characterConfig.systemPrompt !== savedConfig.systemPrompt;
 
-  // 用户配置状态（用户名称/身份仅用于界面显示，不参与 AI 行为）
-  const [userConfig, setUserConfig] = useLocalStorage<UserConfig>(
-    'userConfig',
-    defaultUserConfig
-  );
+  // 模型接口状态（管理员）：后端当前生效值 + 表单编辑值
+  const [currentModelCfg, setCurrentModelCfg] = useState<ModelConfig | null>(null);
+  const [modelLoading, setModelLoading] = useState(false);
+  const [modelSaving, setModelSaving] = useState(false);
+  const [modelTesting, setModelTesting] = useState(false);
+  const [modelProvider, setModelProvider] = useState<ModelProvider>('deepseek_llm');
+  const [modelBaseUrl, setModelBaseUrl] = useState('');
+  const [modelName, setModelName] = useState('');
+  const [modelApiKey, setModelApiKey] = useState(''); // 留空 = 保留已存密钥
+  const [testResult, setTestResult] = useState<ModelTestResult | null>(null);
 
   // 数字人选择状态
   const [selectedAvatar, setSelectedAvatar] = useState('');
@@ -260,10 +274,106 @@ export const CharacterConfig: FC = () => {
     }
   };
 
-  // 实时更新用户配置
-  const handleUserConfigChange = (field: keyof UserConfig, value: string) => {
-    const updatedConfig = { ...userConfig, [field]: value };
-    setUserConfig(updatedConfig);
+  // 挂载/成为管理员时读取模型接口当前生效值
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    setModelLoading(true);
+    fetchModelConfig()
+      .then((cfg) => {
+        if (cancelled) return;
+        setCurrentModelCfg(cfg);
+        setModelProvider(cfg.provider);
+        setModelBaseUrl(cfg.base_url || '');
+        setModelName(cfg.model || '');
+        setModelApiKey(''); // 密钥不回显，留空 = 保留
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        toaster.create({
+          title: '读取模型接口配置失败',
+          description: e instanceof Error ? e.message : String(e),
+          type: 'error',
+          duration: 4000,
+        });
+      })
+      .finally(() => {
+        if (!cancelled) setModelLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin]);
+
+  // 表单 → 请求体（温度固定 1.0 不暴露；密钥留空由后端保留旧值）
+  const buildModelPayload = (): ModelConfigPayload => ({
+    provider: modelProvider,
+    base_url: modelBaseUrl.trim(),
+    model: modelName.trim(),
+    llm_api_key: modelApiKey.trim(),
+    temperature: 1.0,
+  });
+
+  // 测试连接：用表单值（密钥留空回落已存密钥）发一次极小补全请求
+  const handleTestModel = async () => {
+    if (!modelName.trim()) {
+      toaster.create({ title: '请先填写模型名称', type: 'error', duration: 2000 });
+      return;
+    }
+    setModelTesting(true);
+    setTestResult(null);
+    try {
+      setTestResult(await testModelConfig(buildModelPayload()));
+    } catch (e) {
+      toaster.create({
+        title: '测试请求失败',
+        description: e instanceof Error ? e.message : String(e),
+        type: 'error',
+        duration: 4000,
+      });
+    } finally {
+      setModelTesting(false);
+    }
+  };
+
+  // 保存并生效：写入 conf.yaml + 热重建，新对话生效
+  const handleSaveModel = async () => {
+    if (!modelName.trim()) {
+      toaster.create({ title: '模型名称不能为空', type: 'error', duration: 2000 });
+      return;
+    }
+    if (modelProvider === 'openai_compatible_llm' && !modelBaseUrl.trim()) {
+      toaster.create({
+        title: 'OpenAI 兼容接口必须填写接口地址',
+        type: 'error',
+        duration: 2500,
+      });
+      return;
+    }
+    setModelSaving(true);
+    try {
+      const message = await saveModelConfig(buildModelPayload());
+      // 重新读取生效值（刷新掩码等展示）
+      const fresh = await fetchModelConfig();
+      setCurrentModelCfg(fresh);
+      setModelApiKey('');
+      setTestResult(null);
+      toaster.create({
+        title: message,
+        description: '新接口将应用于之后的新对话；进行中的对话保持原接口。',
+        type: 'success',
+        duration: 5000,
+      });
+    } catch (e) {
+      toaster.create({
+        title: '保存失败',
+        description: e instanceof Error ? e.message : String(e),
+        type: 'error',
+        duration: 4000,
+      });
+    } finally {
+      setModelSaving(false);
+    }
   };
 
   return (
@@ -515,113 +625,278 @@ export const CharacterConfig: FC = () => {
             >
               <Text fontSize="xs" color="blue.700">
                 💡 角色名称与人设保存后写入后端配置（conf.yaml），并即时对之后的新对话生效；
-                进行中的对话仍使用保存前的设定。角色描述与用户名称仅用于界面展示。
+                进行中的对话仍使用保存前的设定。角色描述仅用于界面展示。
               </Text>
             </Box>
           </VStack>
         </Box>
       </Box>
 
-      {/* 右侧：用户配置（手机端堆叠到角色配置下方，占满宽度） */}
+      {/* 右侧：模型接口（管理员）+ 称呼与互动方式说明（手机端堆叠到角色配置下方） */}
       <Box
         width={{ base: 'full', md: '300px' }}
-        bg="white"
-        rounded="xl"
-        border="1px solid"
-        borderColor={colors.gray200}
         display="flex"
         flexDirection="column"
+        gap={{ base: '4', md: '6' }}
         height={{ base: 'auto', md: 'full' }}
       >
-        {/* 标题栏 */}
-        <Box
-          p="4"
-          borderBottom="1px solid"
-          borderColor={colors.gray200}
-          bg={colors.gray50}
-        >
-          <HStack gap="3">
-            <FiUser style={{ width: '16px', height: '16px', color: colors.primary }} />
-            <Text fontSize="sm" fontWeight="semibold" color={colors.gray800}>
-              用户配置
-            </Text>
-          </HStack>
-        </Box>
-
-        {/* 用户配置内容 */}
-        <Box
-          flex="1"
-          overflowY="auto"
-          p="4"
-        >
-          <VStack gap="4" align="stretch">
-            {/* 用户名称 */}
-            <Box>
-              <Text fontSize="xs" color={colors.gray600} mb="2">
-                用户名称
-              </Text>
-              <Input
-                value={userConfig.name}
-                onChange={(e) => handleUserConfigChange('name', e.target.value)}
-                placeholder="请输入您的名称"
-                size="sm"
-              />
-            </Box>
-
-            {/* 用户身份 */}
-            <Box>
-              <Text fontSize="xs" color={colors.gray600} mb="2">
-                身份/职称
-              </Text>
-              <Input
-                value={userConfig.title}
-                onChange={(e) => handleUserConfigChange('title', e.target.value)}
-                placeholder="如：学生、教师、管理员"
-                size="sm"
-              />
-            </Box>
-
-            {/* 配置说明 */}
+        {isAdmin && (
+          <Box
+            bg="white"
+            rounded="xl"
+            border="1px solid"
+            borderColor={colors.gray200}
+            display="flex"
+            flexDirection="column"
+            flexShrink={0}
+          >
+            {/* 标题栏 */}
             <Box
-              p="3"
+              p="4"
+              borderBottom="1px solid"
+              borderColor={colors.gray200}
               bg={colors.gray50}
-              rounded="md"
             >
-              <Text fontSize="10px" color={colors.gray600} lineHeight="1.4">
-                用户配置会在对话中影响数字人对您的称呼和互动方式。
-              </Text>
+              <HStack gap="3">
+                <FiKey style={{ width: '16px', height: '16px', color: colors.primary }} />
+                <Text fontSize="sm" fontWeight="semibold" color={colors.gray800}>
+                  模型接口（API）
+                </Text>
+              </HStack>
             </Box>
 
-            {/* 当前配置预览 */}
-            <Box
-              p="3"
-              bg={colors.primary}
-              color="white"
-              rounded="md"
-              textAlign="center"
-            >
-              <Box
-                width="12"
-                height="12"
-                rounded="full"
-                bg="rgba(255,255,255,0.2)"
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-                margin="0 auto 2"
-                fontSize="lg"
-                fontWeight="semibold"
-              >
-                {userConfig.name.charAt(0) || '用'}
-              </Box>
-              <Text fontSize="sm" fontWeight="semibold">
-                {userConfig.name || '未设置'}
-              </Text>
-              <Text fontSize="10px" opacity="0.8">
-                {userConfig.title || '未设置身份'}
-              </Text>
+            {/* 模型接口内容 */}
+            <Box flex="1" overflowY="auto" p="4">
+              <VStack gap="3" align="stretch">
+                {/* 当前生效值 */}
+                <Box p="3" bg={colors.gray50} rounded="md">
+                  <Text fontSize="10px" color={colors.gray600} mb="1">
+                    当前生效
+                  </Text>
+                  {modelLoading ? (
+                    <Text fontSize="xs" color={colors.gray600}>
+                      正在读取…
+                    </Text>
+                  ) : currentModelCfg ? (
+                    <VStack align="start" gap="0">
+                      <Text fontSize="xs" color={colors.gray800} fontWeight="medium">
+                        {PROVIDER_LABELS[currentModelCfg.provider]} · {currentModelCfg.model || '未设置'}
+                      </Text>
+                      <Text fontSize="10px" color={colors.gray600}>
+                        密钥：{currentModelCfg.api_key_masked || '未设置'}
+                      </Text>
+                    </VStack>
+                  ) : (
+                    <Text fontSize="xs" color={colors.gray600}>
+                      未能读取（请检查登录状态）
+                    </Text>
+                  )}
+                </Box>
+
+                {/* 接口类型 */}
+                <Box>
+                  <Text fontSize="xs" color={colors.gray600} mb="1">
+                    接口类型
+                  </Text>
+                  <select
+                    aria-label="接口类型"
+                    value={modelProvider}
+                    onChange={(e) => {
+                      setModelProvider(e.target.value as ModelProvider);
+                      setTestResult(null);
+                    }}
+                    style={{
+                      width: '100%', fontSize: '13px', padding: '6px 8px',
+                      border: `1px solid ${colors.gray200}`, borderRadius: '6px',
+                      color: colors.gray800, background: 'white',
+                    }}
+                  >
+                    {(Object.keys(PROVIDER_LABELS) as ModelProvider[]).map((p) => (
+                      <option key={p} value={p}>{PROVIDER_LABELS[p]}</option>
+                    ))}
+                  </select>
+                </Box>
+
+                {/* 接口地址 */}
+                <Box>
+                  <Text fontSize="xs" color={colors.gray600} mb="1">
+                    接口地址
+                  </Text>
+                  <Input
+                    value={modelBaseUrl}
+                    onChange={(e) => setModelBaseUrl(e.target.value)}
+                    placeholder={
+                      modelProvider === 'deepseek_llm'
+                        ? '留空使用官方地址 https://api.deepseek.com/v1'
+                        : '必填，如 https://api.example.com/v1'
+                    }
+                    size="sm"
+                  />
+                </Box>
+
+                {/* 模型名称 */}
+                <Box>
+                  <Text fontSize="xs" color={colors.gray600} mb="1">
+                    模型名称
+                  </Text>
+                  <Input
+                    value={modelName}
+                    onChange={(e) => setModelName(e.target.value)}
+                    placeholder="如 deepseek-chat"
+                    size="sm"
+                  />
+                </Box>
+
+                {/* API 密钥 */}
+                <Box>
+                  <Text fontSize="xs" color={colors.gray600} mb="1">
+                    API 密钥
+                  </Text>
+                  <Input
+                    type="password"
+                    value={modelApiKey}
+                    onChange={(e) => setModelApiKey(e.target.value)}
+                    placeholder={
+                      currentModelCfg?.api_key_masked
+                        ? `已设置（${currentModelCfg.api_key_masked}），留空保持不变`
+                        : '请输入 API 密钥'
+                    }
+                    size="sm"
+                  />
+                </Box>
+
+                {/* 测试连接 */}
+                <HStack gap="2">
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    color={colors.primary}
+                    borderColor={colors.primary}
+                    disabled={modelLoading}
+                    loading={modelTesting}
+                    loadingText="测试中…"
+                    onClick={handleTestModel}
+                  >
+                    <FiZap />
+                    测试连接
+                  </Button>
+                  {testResult && (
+                    <Badge
+                      bg={testResult.ok ? 'green.100' : 'red.100'}
+                      color={testResult.ok ? 'green.700' : 'red.700'}
+                      fontSize="9px"
+                      px="2"
+                      py="0.5"
+                      rounded="md"
+                    >
+                      {testResult.ok
+                        ? `连通（${testResult.latency_ms}ms）`
+                        : '连接失败'}
+                    </Badge>
+                  )}
+                </HStack>
+                {testResult && (
+                  <Box
+                    p="2"
+                    rounded="md"
+                    bg={testResult.ok ? '#F0FFF4' : '#FFF5F5'}
+                    border="1px solid"
+                    borderColor={testResult.ok ? '#C6F6D5' : '#FED7D7'}
+                  >
+                    <Text
+                      fontSize="10px"
+                      color={testResult.ok ? '#276749' : '#C53030'}
+                      lineHeight="1.4"
+                      wordBreak="break-all"
+                    >
+                      {testResult.ok
+                        ? `模型 ${testResult.model} 连接成功${testResult.reply_sample ? `，回复：${testResult.reply_sample}` : ''}`
+                        : testResult.error || '连接失败'}
+                    </Text>
+                  </Box>
+                )}
+
+                {/* 保存 */}
+                <Button
+                  size="sm"
+                  bg={colors.primary}
+                  color="white"
+                  _hover={{ bg: colors.primaryLight }}
+                  disabled={modelLoading}
+                  loading={modelSaving}
+                  loadingText="保存中…"
+                  onClick={handleSaveModel}
+                >
+                  <FiSave />
+                  保存并生效
+                </Button>
+
+                {/* 说明 */}
+                <Box p="3" bg={colors.gray50} rounded="md">
+                  <Text fontSize="10px" color={colors.gray600} lineHeight="1.4">
+                    更换为学校自己的 API：填入接口地址、模型名称与密钥，先「测试连接」
+                    确认可用，再「保存并生效」。保存后写入服务器配置并对之后的新对话生效，
+                    进行中的对话保持原接口；密钥仅存服务器，不回显完整内容。
+                  </Text>
+                </Box>
+              </VStack>
             </Box>
-          </VStack>
+          </Box>
+        )}
+
+        {/* 称呼与互动方式（只读规则说明，原「用户配置」卡片） */}
+        <Box
+          bg="white"
+          rounded="xl"
+          border="1px solid"
+          borderColor={colors.gray200}
+          display="flex"
+          flexDirection="column"
+          flex="1"
+        >
+          {/* 标题栏 */}
+          <Box
+            p="4"
+            borderBottom="1px solid"
+            borderColor={colors.gray200}
+            bg={colors.gray50}
+          >
+            <HStack gap="3">
+              <FiUser style={{ width: '16px', height: '16px', color: colors.primary }} />
+              <Text fontSize="sm" fontWeight="semibold" color={colors.gray800}>
+                称呼与互动方式
+              </Text>
+            </HStack>
+          </Box>
+
+          <Box flex="1" overflowY="auto" p="4">
+            <VStack gap="3" align="stretch">
+              <Text fontSize="10px" color={colors.gray600} lineHeight="1.4">
+                系统按登录账号的角色自动选择数字人的称呼与互动风格，无需手动填写：
+              </Text>
+              {[
+                { role: '学生账号', rule: '称呼「同学」，互动亲切、有鼓励性，解释通俗' },
+                { role: '家长账号', rule: '称呼「家长」，围绕招生咨询与孩子在校学习生活' },
+                { role: '教职工账号（管理员/编辑）', rule: '称呼「老师」，互动专业、简洁、直给' },
+                { role: '一体机大屏 / 未登录访客', rule: '中性称呼「你」，不询问个人身份信息' },
+              ].map((item) => (
+                <Box key={item.role} p="2.5" bg={colors.gray50} rounded="md">
+                  <Text fontSize="11px" color={colors.gray800} fontWeight="medium">
+                    {item.role}
+                  </Text>
+                  <Text fontSize="10px" color={colors.gray600} mt="0.5" lineHeight="1.4">
+                    {item.rule}
+                  </Text>
+                </Box>
+              ))}
+              <Box p="3" bg="blue.50" border="1px solid" borderColor="blue.200" rounded="md">
+                <Text fontSize="10px" color="blue.700" lineHeight="1.4">
+                  💡 需要调整整体语气与性格时，请编辑左侧「角色人设」；称呼规则随账号
+                  角色自动叠加，与人设不冲突。
+                </Text>
+              </Box>
+            </VStack>
+          </Box>
         </Box>
       </Box>
     </Box>

@@ -36,6 +36,11 @@ from .conversations.static_narration import (
     normalize_narration_title,
     process_static_narration,
 )
+from .model_config_api import (
+    addressing_kind,
+    maybe_reload_default_context,
+    user_addressing_segment,
+)
 
 
 class MessageType(Enum):
@@ -210,22 +215,27 @@ class WebSocketHandler:
         # 在没有对话输入区的页面（首页/专题页）表现为"无人对话却在录音"。
         # 本部署中麦克风只由用户在前端显式开启（2026-09-09）。
 
-    def _create_session_agent(self):
+    def _create_session_agent(self, username: str | None, client_uid: str):
         """Create a dedicated agent instance for one session.
 
         agent_engine 持有会话状态（_memory 对话记忆、interrupt 标记等），
         全部连接共享 default_context_cache.agent_engine 会导致并发用户互串上下文、
         任意连接 fetch/create history 改写所有人的记忆，因此必须每会话新建。
         共享的重引擎（asr/tts/vad/live2d）仍按引用复用。
+        system_prompt 在全局人设尾部追加会话级称呼段：按登录账号角色决定数字人
+        如何称呼对方与互动（学生→同学/家长→家长/教职工→老师/一体机与游客→中性），
+        见 model_config_api.user_addressing_segment。
         """
         cached = self.default_context_cache
         agent_config = cached.character_config.agent_config
+        kind = addressing_kind(username)
+        logger.info(f"Session {client_uid} addressing segment: {kind}")
         try:
             return AgentFactory.create_agent(
                 conversation_agent_choice=agent_config.conversation_agent_choice,
                 agent_settings=agent_config.agent_settings.model_dump(),
                 llm_configs=agent_config.llm_configs.model_dump(),
-                system_prompt=cached.system_prompt,
+                system_prompt=cached.system_prompt + user_addressing_segment(username),
                 live2d_model=cached.live2d_model,
                 tts_preprocessor_config=cached.character_config.tts_preprocessor_config,
                 character_avatar=cached.character_config.avatar or "",
@@ -242,7 +252,10 @@ class WebSocketHandler:
         self, send_text: Callable, client_uid: str, username: str | None = None
     ) -> ServiceContext:
         """Initialize service context for a new session by cloning the default context"""
-        agent_engine = self._create_session_agent()
+        # 跨 worker 懒同步：conf.yaml 被其它 worker 的管理接口改过（模型接口/
+        # 人设），在克隆前对齐 default_context_cache，新会话即用新配置
+        await maybe_reload_default_context(self.default_context_cache)
+        agent_engine = self._create_session_agent(username, client_uid)
         if agent_engine is None:
             # 兜底：创建失败时退回共享实例（隔离退化但连接可用），日志告警
             logger.warning(

@@ -222,6 +222,14 @@ class WebSocketServer:
             init_character_config_routes(default_context_cache=self.default_context_cache)
         )
 
+        # Include model (LLM API) config routes（2026-10-29：校方后台自助切换模型
+        # 接口，含连通性测试；跨 worker 懒重载见 model_config_api）
+        from .model_config_api import init_model_config_routes
+
+        self.app.include_router(
+            init_model_config_routes(default_context_cache=self.default_context_cache)
+        )
+
         # Include system logs routes (audit trail / service log tail / stats)
         from .system_logs_api import init_agreements_routes, init_system_logs_routes
 
@@ -317,6 +325,11 @@ class WebSocketServer:
         """Asynchronously load the service context from config.
         Calling this function is needed if default_context_cache was not provided to the constructor."""
         await self.default_context_cache.load_from_config(self.config)
+        # 对齐 conf.yaml 初始签名：此后跨 worker 懒重载才以「外部变更」为准
+        # （见 model_config_api.maybe_reload_default_context）
+        from .model_config_api import mark_conf_seen
+
+        mark_conf_seen()
 
     @staticmethod
     def clean_cache():

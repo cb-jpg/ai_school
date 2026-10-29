@@ -20,7 +20,7 @@ from loguru import logger
 from pydantic import BaseModel, Field
 from ruamel.yaml import YAML
 
-from .knowledge.auth import require_user
+from .knowledge.auth import require_staff
 from .service_context import ServiceContext
 
 CONF_PATH = Path("conf.yaml")
@@ -60,7 +60,7 @@ def init_character_config_routes(
     router = APIRouter(prefix="/api/character", tags=["character"])
 
     @router.get("/config")
-    async def get_character_config(_user: dict = Depends(require_user)):
+    async def get_character_config(_user: dict = Depends(require_staff)):
         cc = default_context_cache.character_config
         if cc is None:
             raise HTTPException(status_code=503, detail="服务尚未完成初始化")
@@ -72,7 +72,7 @@ def init_character_config_routes(
 
     @router.put("/config")
     async def update_character_config(
-        payload: CharacterConfigPayload, _user: dict = Depends(require_user)
+        payload: CharacterConfigPayload, _user: dict = Depends(require_staff)
     ):
         cc = default_context_cache.character_config
         if cc is None:
