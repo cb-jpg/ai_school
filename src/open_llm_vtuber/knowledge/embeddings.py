@@ -326,6 +326,7 @@ class CachedEmbeddingModel:
 
 # Global embedding model instance
 _embedding_model: Optional[CachedEmbeddingModel] = None
+_embedding_model_lock = threading.Lock()
 
 
 def get_embedding_model(
@@ -345,15 +346,20 @@ def get_embedding_model(
     """
     global _embedding_model
     if _embedding_model is None:
-        # OLLV_EMBED_DEVICE 强制指定设备。默认 auto 会上 GPU，而本部署的
-        # GPU 与同事任务共用、长期贴满（2026-09-21 单日 324 次查询嵌入
-        # CUDA OOM，RAG 静默退化），模型很小，锁 CPU 反而稳定。
-        device = device or os.getenv("OLLV_EMBED_DEVICE") or None
-        _embedding_model = CachedEmbeddingModel(
-            model_name=model_name,
-            device=device,
-            cache_dir=cache_folder
-        )
+        # 双检锁：检索线程池（8 线程）并发首查会同时进这里，无锁时每个线程
+        # 各载一份 sentence-transformer（2026-11-02 压测实锤：单进程 8 份模型
+        # 并存，内存翻 8 倍且各自建索引互相踩）
+        with _embedding_model_lock:
+            if _embedding_model is None:
+                # OLLV_EMBED_DEVICE 强制指定设备。默认 auto 会上 GPU，而本部署的
+                # GPU 与同事任务共用、长期贴满（2026-09-21 单日 324 次查询嵌入
+                # CUDA OOM，RAG 静默退化），模型很小，锁 CPU 反而稳定。
+                device = device or os.getenv("OLLV_EMBED_DEVICE") or None
+                _embedding_model = CachedEmbeddingModel(
+                    model_name=model_name,
+                    device=device,
+                    cache_dir=cache_folder
+                )
     return _embedding_model
 
 

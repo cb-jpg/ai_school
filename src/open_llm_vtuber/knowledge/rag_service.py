@@ -29,8 +29,11 @@ from ..utils.turn_latency import current_span
 # 运行时数据固定在仓库根目录 data/runtime 下
 RUNTIME_DIR = Path(__file__).resolve().parents[3] / "data" / "runtime"
 
-# 检索专用线程池：小池子限制 GIL 密集任务的最大并发，其余请求排队等待
-_SEARCH_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="rag-search")
+# 检索专用线程池：查询内 embedding/矩阵余弦段释放 GIL、BM25/排序段纯 Python。
+# 旧值 2 线程在并发独立问题上排队严重（2026-11-02 压测：8 并发 ×128 独立问题
+# p95 15s、墙钟 20.4s，全耗在排队）；8 线程 ×3 worker 对 112 核机器开销可忽略，
+# 排队墙钟降至 ~5s 量级。池仍上限可控，防止极端并发把 CPU 全吃在检索上。
+_SEARCH_EXECUTOR = ThreadPoolExecutor(max_workers=8, thread_name_prefix="rag-search")
 
 # 查询结果缓存：TTL + 容量上限
 _QUERY_CACHE_TTL = 180.0
@@ -474,12 +477,18 @@ class RagService:
 
 # 全局单例
 _rag_service: Optional[RagService] = None
+_rag_service_lock = threading.Lock()
 
 
 def get_rag_service() -> RagService:
     global _rag_service
     if _rag_service is None:
-        _rag_service = RagService()
+        # 双检锁：与 get_vector_store/get_embedding_model 同因——多线程并发首查
+        # 会造出多份 RagService（各自的查询缓存/条目缓存互不相通，还各自再拉起
+        # 一套底层单例）
+        with _rag_service_lock:
+            if _rag_service is None:
+                _rag_service = RagService()
     return _rag_service
 
 

@@ -4,8 +4,9 @@ Supports both text-based and vector-based similarity search.
 """
 import json
 import threading
+from collections import OrderedDict
 from pathlib import Path
-from typing import List, Dict, Tuple, Optional, Any, Iterable
+from typing import List, Dict, Tuple, Optional, Any, Iterable, NamedTuple
 from loguru import logger
 import numpy as np
 
@@ -21,6 +22,30 @@ except ImportError:
     BM25_AVAILABLE = False
 
 RRF_K = 60  # Reciprocal Rank Fusion 常数（业界通用值）
+
+# 全库索引缓存槽位数：登录态与游客是两个条目集合变体（游客屏蔽 students 类目），
+# 各占一槽并存；多余变体按 LRU 淘汰。单槽时两变体交替访问每切换一次就全量重建
+# 一次（2026-11-02 并发压测：混流 p95 比单变体高 30%+，且重建会撕碎并发中的检索）
+_G_SLOTS_MAX = 4
+
+
+class _GlobalIndex(NamedTuple):
+    """全库索引的一代完整快照（不可变）。
+
+    字段只在 _g_lock 内整体替换、绝不原地修改，因此检索线程在锁内拿到这一代后
+    可以无锁使用——并发重建换代不会撕碎进行中的检索（2026-11-02 并发压测实锤：
+    无快照时向量路与 by_id 可跨代，by_id[chunk_id] KeyError → 整次检索失败返回空，
+    学生该轮提问拿不到任何知识库上下文）。
+    """
+
+    entry_key: frozenset
+    index_mtime: Optional[float]
+    all_chunks: List["Chunk"]
+    bm25: Optional["BM25Okapi"]
+    vec_chunks: List["Chunk"]
+    vec_matrix: Optional[np.ndarray]
+    title_by_entry: Dict[str, str]
+    title_chunk_ids: Dict[str, List[str]]
 
 
 class VectorStore:
@@ -55,13 +80,8 @@ class VectorStore:
         # 全库检索索引（对话 RAG 用）：embedding 矩阵 + 全语料 BM25 各构建一次。
         # 高并发下单次查询只做 1 次 query embedding + 1 次矩阵余弦 + 1 次 BM25 打分，
         # 替代旧版逐条目循环（每 query × 91 条目的 BM25/余弦），避免线程池被 GIL 密集任务灌满。
-        self._g_entry_key: Optional[frozenset] = None
-        self._g_index_mtime: Optional[float] = None
-        self._g_built: bool = False
-        self._g_all_chunks: List[Chunk] = []
-        self._g_bm25: Optional["BM25Okapi"] = None
-        self._g_vec_chunks: List[Chunk] = []
-        self._g_vec_matrix: Optional[np.ndarray] = None
+        # 多槽缓存：键=条目集合（登录态/游客两个变体并存），mtime 变化按槽失效重建
+        self._g_slots: "OrderedDict[frozenset, _GlobalIndex]" = OrderedDict()
         # 重建锁：无锁时并发首查会同时在半建状态上检索（2026-09-21 校验踩坑：
         # 4 线程并发首查期间部分查询退化成纯向量路径，BM25/标题加成全丢，
         # 同一查询时中时不中）
@@ -178,15 +198,7 @@ class VectorStore:
     def invalidate_global_index(self) -> None:
         """条目增删改索引后调用，使全库检索索引失效"""
         with self._g_lock:
-            self._g_entry_key = None
-            self._g_index_mtime = None
-            self._g_built = False
-            self._g_all_chunks = []
-            self._g_bm25 = None
-            self._g_vec_chunks = []
-            self._g_vec_matrix = None
-            self._g_title_by_entry = {}
-            self._g_title_chunk_ids = {}
+            self._g_slots.clear()
 
     def _load_entry_titles(self) -> Dict[str, str]:
         """读 index.json 里的 {条目id: 标题}，供标题子串精确匹配加成"""
@@ -196,37 +208,31 @@ class VectorStore:
         except Exception:
             return {}
 
-    def _ensure_global_index(self, entry_ids: Iterable[str]) -> None:
-        """确保全库索引就绪：条目集合或 index.json mtime 变化时重建"""
-        key = frozenset(entry_ids)
-        mtime = self._index_mtime()
-        if self._g_built and self._g_entry_key == key and self._g_index_mtime == mtime:
-            return
-
+    def _build_global_index(self, key: frozenset, mtime: Optional[float]) -> "_GlobalIndex":
+        """为给定条目集合构建一代全库索引（调用方持有 _g_lock）"""
         chunks: List[Chunk] = []
         for entry_id in key:
             chunks.extend(self.load_entry_chunks(entry_id))
 
-        self._g_title_by_entry = self._load_entry_titles()
-        self._g_title_chunk_ids: Dict[str, List[str]] = {}
+        title_by_entry = self._load_entry_titles()
+        title_chunk_ids: Dict[str, List[str]] = {}
         for c in chunks:
-            self._g_title_chunk_ids.setdefault(c.source_id, []).append(c.id)
+            title_chunk_ids.setdefault(c.source_id, []).append(c.id)
 
         if self.use_embeddings and self.embedding_model:
             self._ensure_embeddings(chunks)
 
-        self._g_all_chunks = chunks
-        self._g_vec_chunks = (
+        vec_chunks = (
             [c for c in chunks if c.id in self._embeddings_index]
             if self.use_embeddings and self.embedding_model
             else []
         )
-        self._g_vec_matrix = (
-            np.array([self._embeddings_index[c.id] for c in self._g_vec_chunks])
-            if self._g_vec_chunks
+        vec_matrix = (
+            np.array([self._embeddings_index[c.id] for c in vec_chunks])
+            if vec_chunks
             else None
         )
-        self._g_bm25 = None
+        bm25 = None
         if BM25_AVAILABLE and chunks:
             corpus = []
             for chunk in chunks:
@@ -235,15 +241,42 @@ class VectorStore:
                     tokens = [t for t in jieba.lcut(chunk.content) if t.strip()]
                     self._bm25_tokens[chunk.id] = tokens
                 corpus.append(tokens)
-            self._g_bm25 = BM25Okapi(corpus)
+            bm25 = BM25Okapi(corpus)
 
-        self._g_entry_key = key
-        self._g_index_mtime = mtime
-        self._g_built = True
-        logger.info(
-            f"Global search index built: {len(chunks)} chunks "
-            f"({len(self._g_vec_chunks)} vectorized, BM25={'on' if self._g_bm25 else 'off'})"
+        return _GlobalIndex(
+            entry_key=key,
+            index_mtime=mtime,
+            all_chunks=chunks,
+            bm25=bm25,
+            vec_chunks=vec_chunks,
+            vec_matrix=vec_matrix,
+            title_by_entry=title_by_entry,
+            title_chunk_ids=title_chunk_ids,
         )
+
+    def _ensure_global_index(self, entry_ids: Iterable[str]) -> "_GlobalIndex":
+        """确保全库索引就绪并返回当前代快照：条目集合或 index.json mtime 变化时重建。
+
+        快照（NamedTuple）交给检索全程使用，重建换代不影响进行中的检索（防撕裂）。
+        """
+        key = frozenset(entry_ids)
+        mtime = self._index_mtime()
+        state = self._g_slots.get(key)
+        if state is not None and state.index_mtime == mtime:
+            self._g_slots.move_to_end(key)
+            return state
+
+        state = self._build_global_index(key, mtime)
+        self._g_slots[key] = state
+        self._g_slots.move_to_end(key)
+        while len(self._g_slots) > _G_SLOTS_MAX:
+            self._g_slots.popitem(last=False)
+        logger.info(
+            f"Global search index built: {len(state.all_chunks)} chunks "
+            f"({len(state.vec_chunks)} vectorized, "
+            f"BM25={'on' if state.bm25 else 'off'}, slots={len(self._g_slots)})"
+        )
+        return state
 
     def search_all(
         self,
@@ -259,17 +292,18 @@ class VectorStore:
         """
         self._reconcile_with_index()
         with self._g_lock:
-            self._ensure_global_index(entry_ids)
+            state = self._ensure_global_index(entry_ids)
 
-        has_vectors = self._g_vec_matrix is not None and len(self._g_vec_chunks) > 0
-        if has_vectors and self._g_bm25 is not None:
-            return self._global_hybrid_search(query, top_k, min_score)
+        # 锁内取整代快照，检索全程只用快照字段——并发重建换代不撕裂（类注释）
+        has_vectors = state.vec_matrix is not None and len(state.vec_chunks) > 0
+        if has_vectors and state.bm25 is not None:
+            return self._global_hybrid_search(query, top_k, min_score, state)
         if has_vectors:
-            return self._global_vector_search(query, top_k, min_score)
-        return self._text_search(query, self._g_all_chunks, top_k, min_score)
+            return self._global_vector_search(query, top_k, min_score, state)
+        return self._text_search(query, state.all_chunks, top_k, min_score)
 
     def _global_vector_ranking(
-        self, query: str
+        self, query: str, state: "_GlobalIndex"
     ) -> Tuple[List[Chunk], Dict[str, float]]:
         """一次 query embedding + 一次全库矩阵余弦，返回全库排序"""
         try:
@@ -279,32 +313,32 @@ class VectorStore:
             return [], {}
 
         similarities = self.embedding_model.model.batch_similarity(
-            query_embedding, self._g_vec_matrix
+            query_embedding, state.vec_matrix
         )
         cosine_by_id = {
-            c.id: float(s) for c, s in zip(self._g_vec_chunks, similarities)
+            c.id: float(s) for c, s in zip(state.vec_chunks, similarities)
         }
         ranking = sorted(
-            self._g_vec_chunks, key=lambda c: cosine_by_id[c.id], reverse=True
+            state.vec_chunks, key=lambda c: cosine_by_id[c.id], reverse=True
         )
         return ranking, cosine_by_id
 
-    def _global_bm25_ranking(self, query: str) -> List[Chunk]:
+    def _global_bm25_ranking(self, query: str, state: "_GlobalIndex") -> List[Chunk]:
         """全库 BM25 一次打分，只返回得分 > 0 的 chunk"""
-        if self._g_bm25 is None or not self._g_all_chunks:
+        if state.bm25 is None or not state.all_chunks:
             return []
         query_tokens = [t for t in jieba.lcut(query) if t.strip()]
-        scores = self._g_bm25.get_scores(query_tokens)
+        scores = state.bm25.get_scores(query_tokens)
         ranked = sorted(
-            zip(self._g_all_chunks, scores), key=lambda x: x[1], reverse=True
+            zip(state.all_chunks, scores), key=lambda x: x[1], reverse=True
         )
         return [chunk for chunk, score in ranked if score > 0]
 
     def _global_vector_search(
-        self, query: str, top_k: int, min_score: float
+        self, query: str, top_k: int, min_score: float, state: "_GlobalIndex"
     ) -> List[Tuple[Chunk, float]]:
         """纯向量单路（BM25 依赖缺失时的退路），语义与 _vector_search 一致"""
-        ranking, cosine_by_id = self._global_vector_ranking(query)
+        ranking, cosine_by_id = self._global_vector_ranking(query, state)
         results = [
             (chunk, cosine_by_id[chunk.id])
             for chunk in ranking
@@ -313,15 +347,15 @@ class VectorStore:
         return results[:top_k]
 
     def _global_hybrid_search(
-        self, query: str, top_k: int, min_score: float
+        self, query: str, top_k: int, min_score: float, state: "_GlobalIndex"
     ) -> List[Tuple[Chunk, float]]:
         """全库 RRF 融合；融合逻辑与 _hybrid_search 一致。
 
         返回仍按余弦降序截断 top_k：旧版逐条目检索最终在 rag_service 按
         余弦合并排序，低置信阈值（docs[0].score）依赖这一语义，必须保持。
         """
-        vector_ranking, cosine_by_id = self._global_vector_ranking(query)
-        bm25_ranking = self._global_bm25_ranking(query)
+        vector_ranking, cosine_by_id = self._global_vector_ranking(query, state)
+        bm25_ranking = self._global_bm25_ranking(query, state)
         # BM25 名次表：查询嵌入失败时（GPU 被占 CUDA OOM 等）幸存块没有
         # 真实余弦、全部记 0.0，若无次级排序键，top_k 截断会退化为按块
         # 存储顺序随机挤掉 BM25 精确命中（2026-09-21 检索校验发现）
@@ -332,7 +366,7 @@ class VectorStore:
             for rank, chunk in enumerate(ranking, start=1):
                 rrf[chunk.id] = rrf.get(chunk.id, 0.0) + 1.0 / (RRF_K + rank)
 
-        by_id = {c.id: c for c in self._g_all_chunks}
+        by_id = {c.id: c for c in state.all_chunks}
 
         # 候选池 = RRF 融合前列 ∪ 全部 BM25 命中 ∪ 向量路前列，不随 top_k
         # 截断（旧版融合窗和 BM25 保留窗都取 top_k，同一查询不同 top_k 结果
@@ -352,7 +386,12 @@ class VectorStore:
             cosine = cosine_by_id.get(chunk_id, 0.0)
             # 保留：余弦过阈值，或 BM25 有任意命中
             if cosine >= min_score or chunk_id in bm25_rank_by_id:
-                survivors.append((by_id[chunk_id], cosine))
+                chunk = by_id.get(chunk_id)
+                if chunk is None:
+                    # 快照下不应发生（同代一致）；防御性兜底，绝不让单块缺失
+                    # 炸掉整次检索（历史教训：KeyError → 检索失败 → 返回空）
+                    continue
+                survivors.append((chunk, cosine))
 
         # 主序仍是余弦降序（rag_service 低置信阈值依赖此语义，见 docstring），
         # 在其上叠加 BM25 名次加成：只影响排序、不改上报分数。背景：同模板
@@ -370,9 +409,9 @@ class VectorStore:
         q = query.strip()
         tb_ids: set = set()
         if len(q) >= 2:
-            for eid, t in self._g_title_by_entry.items():
+            for eid, t in state.title_by_entry.items():
                 if t and (t in q or q in t):
-                    tb_ids.update(self._g_title_chunk_ids.get(eid, ()))
+                    tb_ids.update(state.title_chunk_ids.get(eid, ()))
 
         def _order_key(item: Tuple[Chunk, float]):
             chunk, cosine = item
@@ -757,6 +796,7 @@ class VectorStore:
 
 # Global vector store instance
 _vector_store: Optional[VectorStore] = None
+_vector_store_lock = threading.Lock()
 
 
 def get_vector_store(
@@ -776,11 +816,16 @@ def get_vector_store(
     """
     global _vector_store
     if _vector_store is None:
-        _vector_store = VectorStore(
-            knowledge_dir=knowledge_dir,
-            embedding_model=embedding_model,
-            use_embeddings=use_embeddings
-        )
+        # 双检锁：_search_sync 每次检索都经这里取单例，检索线程池并发首查时
+        # 无锁会造出多份 VectorStore（各载全库 chunks、各建全局索引，互相看不见
+        # 对方的 invalidate，内存与重建开销成倍放大——2026-11-02 压测实锤 8 份）
+        with _vector_store_lock:
+            if _vector_store is None:
+                _vector_store = VectorStore(
+                    knowledge_dir=knowledge_dir,
+                    embedding_model=embedding_model,
+                    use_embeddings=use_embeddings
+                )
     return _vector_store
 
 

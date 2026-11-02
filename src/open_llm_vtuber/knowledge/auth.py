@@ -18,6 +18,7 @@ import io
 import json
 import re
 import secrets
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
@@ -201,12 +202,16 @@ class UserStore:
 
 
 _user_store: UserStore | None = None
+_user_store_lock = threading.Lock()
 
 
 def get_user_store() -> UserStore:
     global _user_store
     if _user_store is None:
-        _user_store = UserStore()
+        # 双检锁：两个实例并存时各持一份 users 快照，双写会互相覆盖丢账号
+        with _user_store_lock:
+            if _user_store is None:
+                _user_store = UserStore()
     return _user_store
 
 
@@ -261,12 +266,17 @@ class TokenManager:
 
 
 _token_manager: TokenManager | None = None
+_token_manager_lock = threading.Lock()
 
 
 def get_token_manager() -> TokenManager:
     global _token_manager
     if _token_manager is None:
-        _token_manager = TokenManager()
+        # 双检锁：两个 TokenManager 并存时若 secret 文件尚未落盘会生成不同密钥，
+        # 令牌互相验不过（间歇性 401）
+        with _token_manager_lock:
+            if _token_manager is None:
+                _token_manager = TokenManager()
     return _token_manager
 
 
@@ -314,6 +324,60 @@ async def require_admin(user: dict = Depends(require_user)) -> dict:
     return user
 
 
+# ============== 登录失败锁定（2026-11-02 公网上线前加固） ==============
+#
+# /api/auth/login 是全系统唯一无凭据入口。scrypt 校验本身慢（这正是它的用途），
+# 但不限制失败次数就等于允许无限次在线爆破。按用户名计数：窗口期内失败达阈值
+# 则临时锁定，成功登录即清零。计数器在每 worker 进程内存里（3 worker ⇒ 实际
+# 阈值约为 3×LOGIN_MAX_FAILS 次），跨进程共享需引入外部存储，当前规模不值得。
+# 注意 kiosk 账号共用此逻辑：密码由 App 保存不会输错，被锁只可能是真实攻击，
+# 锁定期间已登录的 kiosk 会话（12h JWT）不受影响。
+
+LOGIN_MAX_FAILS = 5        # 窗口期内允许的失败次数
+LOGIN_FAIL_WINDOW = 15 * 60   # 失败计数窗口（秒）
+LOGIN_LOCK_SECONDS = 10 * 60  # 触发后的锁定时长（秒）
+
+_login_fails: dict[str, list[float]] = {}
+_login_locked_until: dict[str, float] = {}
+_login_guard = threading.Lock()
+
+
+def _login_remaining_lock(username: str) -> float:
+    """该用户名剩余锁定秒数（0=未锁）"""
+    now = time.time()
+    with _login_guard:
+        locked_until = _login_locked_until.get(username, 0.0)
+        return max(0.0, locked_until - now)
+
+
+def _login_record_failure(username: str) -> None:
+    now = time.time()
+    with _login_guard:
+        fails = [
+            t for t in _login_fails.get(username, []) if now - t < LOGIN_FAIL_WINDOW
+        ]
+        fails.append(now)
+        _login_fails[username] = fails
+        if len(fails) >= LOGIN_MAX_FAILS:
+            _login_locked_until[username] = now + LOGIN_LOCK_SECONDS
+            _login_fails.pop(username, None)
+            logger.warning(
+                f"账号 {username} 登录连续失败 {LOGIN_MAX_FAILS} 次，"
+                f"临时锁定 {LOGIN_LOCK_SECONDS}s"
+            )
+        # 防长期膨胀：过期锁与孤儿计数惰性清理
+        if len(_login_locked_until) > 4096:
+            expired = [u for u, t in _login_locked_until.items() if t <= now]
+            for u in expired:
+                _login_locked_until.pop(u, None)
+
+
+def _login_record_success(username: str) -> None:
+    with _login_guard:
+        _login_fails.pop(username, None)
+        _login_locked_until.pop(username, None)
+
+
 # ============== 认证路由 ==============
 
 class LoginRequest(BaseModel):
@@ -340,10 +404,26 @@ def init_auth_routes() -> APIRouter:
     router = APIRouter(prefix="/api/auth", tags=["auth"])
 
     @router.post("/login")
-    async def login(request: LoginRequest):
+    async def login(request: LoginRequest, req: Request):
+        remaining = _login_remaining_lock(request.username)
+        if remaining > 0:
+            logger.warning(
+                f"账号 {request.username} 登录被拒绝（锁定中，剩余 {int(remaining)}s，"
+                f"来源 {req.client.host if req.client else '未知'}）"
+            )
+            raise HTTPException(
+                status_code=429,
+                detail=f"登录失败次数过多，账号已临时锁定，请约 {int(remaining // 60) + 1} 分钟后再试",
+            )
         user = get_user_store().authenticate(request.username, request.password)
         if user is None:
+            _login_record_failure(request.username)
+            logger.warning(
+                f"登录失败：{request.username}"
+                f"（来源 {req.client.host if req.client else '未知'}）"
+            )
             raise HTTPException(status_code=401, detail="用户名或密码错误")
+        _login_record_success(request.username)
         token = get_token_manager().issue(user["username"], user["role"])
         logger.info(f"用户登录成功：{user['username']}（{user['role']}）")
         return {"token": token, "user": user}
