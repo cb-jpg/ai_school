@@ -43,8 +43,10 @@ SSH_TARGET = "liucb@183.36.243.124"
 
 def _parse_args():
     """--levels 64,96 --timeout 150 [--no-rag] [--diversify] [--history]
-    可覆盖默认梯度/单轮超时/关闭 RAG 问题/各问各的出题/建立真实历史"""
-    global LEVELS, TURN_TIMEOUT, Q_SCHOOL, DIVERSIFY, USE_HISTORY
+    [--swap-limit 100]
+    可覆盖默认梯度/单轮超时/关闭 RAG 问题/各问各的出题/建立真实历史/
+    放宽 swap 保险丝（残留页高水位时用，其余三保险丝不动）"""
+    global LEVELS, TURN_TIMEOUT, Q_SCHOOL, DIVERSIFY, USE_HISTORY, GUARD_SWAP_PCT
     argv = sys.argv[1:]
     for i, a in enumerate(argv):
         if a == "--levels" and i + 1 < len(argv):
@@ -57,6 +59,12 @@ def _parse_args():
             DIVERSIFY = True
         elif a == "--history":
             USE_HISTORY = True
+        elif a == "--swap-limit" and i + 1 < len(argv):
+            # 显式放宽 swap 保险丝（其余三指标保险丝不动）。用途：共用服务器的
+            # swap 残留页是历史内存挤压的高水位标记，Linux 不主动换回——35G+
+            # MemAvailable 的当下 swap 60% 只说明"过去紧张过"，不代表当前压力。
+            # 放宽时 MemAvailable<8G / load1 / IO PSI 保险丝照常生效兜底。
+            GUARD_SWAP_PCT = float(argv[i + 1])
 
 
 LEVELS = [1, 2, 4, 8, 12, 16, 24, 32, 48]
@@ -97,7 +105,8 @@ CASUAL_POOL = [
 DIVERSIFY = False
 USE_HISTORY = False
 
-_parse_args()  # 须在 Q_SCHOOL 定义之后调用，--no-rag 才能生效
+# _parse_args() 延迟到保险丝常量定义之后调用（--swap-limit 覆盖才不会被
+# 下面的常量赋值盖掉；--no-rag 依赖 Q_SCHOOL，同样满足）
 
 
 def questions_for(idx: int) -> tuple[str, str]:
@@ -113,8 +122,10 @@ def questions_for(idx: int) -> tuple[str, str]:
 # ---- 保险丝阈值（四指标，超标即中止）----
 GUARD_AVAIL_MB = 8192.0
 GUARD_LOAD1 = 50.0
-GUARD_SWAP_PCT = 50.0
+GUARD_SWAP_PCT = 50.0   # 可被 --swap-limit 覆盖（见 _parse_args 注释）
 GUARD_PSI_FULL10 = 50.0
+
+_parse_args()  # 须在 Q_SCHOOL 与保险丝常量定义之后调用
 
 SSH_METRICS_CMD = (
     "awk '/MemAvailable/{print \"AVAIL_MB \" $2}' /proc/meminfo; "
