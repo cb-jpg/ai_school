@@ -206,14 +206,8 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
         // 学校知识库检索状态（2026-10-14 用户要求关掉"已检索到 N 条相关资料"弹条，仅留状态不打扰）
         break;
       case 'web-status':
-        // 联网检索（2026-09-20 需求 #4）：本次回答结合了网上最新信息
-        if (message.used) {
-          toaster.create({
-            title: '已结合网上最新信息作答',
-            type: 'info',
-            duration: 2500,
-          });
-        }
+        // 联网检索状态（2026-09-20 需求 #4）。2026-11-03 用户要求去掉
+        // 「已结合网上最新信息作答」弹窗，同 rag-status 处理：仅留状态不打扰。
         break;
       case 'config-files':
         if (message.configs) {
