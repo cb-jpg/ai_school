@@ -27,9 +27,10 @@ import threading
 import time
 import urllib.request
 from datetime import datetime
+from html import unescape as _unescape
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Set
 from urllib.parse import urlencode
 
 from loguru import logger
@@ -193,7 +194,7 @@ def sync_wechat_to_portal() -> dict:
                 hidden += 1
     result = {"ok": True, "total": len(articles), "created": created,
               "updated": updated, "hidden": hidden, "skipped": len(articles) - len(fetched_urls)}
-    result["kb"] = _ingest_articles_to_kb()
+    result["kb"] = ingest_articles_to_kb()
     result["kb_anchor"] = _refresh_latest_anchor()
     logger.info(f"公众号同步完成：{result}")
     return result
@@ -374,6 +375,56 @@ def _extract_article_meta(html: str) -> tuple:
     return title, date
 
 
+def _extract_account(page: str) -> str:
+    """公众号账号名：页面 JS 变量 nickname（htmlDecode 包裹或裸值）或 #js_name 文本。"""
+    for pat in (r'var nickname = htmlDecode\("([^"]+)"\)',
+                r"var nickname = htmlDecode\('([^']+)'\)",
+                r'var nickname = "([^"]+)"',
+                r'id="js_name"[^>]*>([^<]+?)<'):
+        m = re.search(pat, page)
+        if m:
+            name = _unescape(m.group(1)).strip()
+            if name:
+                return name
+    return ""
+
+
+def fetch_wechat_article(url: str) -> dict:
+    """拉取单篇公众号文章的标题/日期/账号名/正文，供发布表单自动回填。
+
+    仅支持 mp.weixin.qq.com 链接（顺带把 SSRF 面收到公众号一个域）；
+    正文过短（< _KB_MIN_CHARS 字）标 image_only（多为纯图片推文）。
+    失败抛 WechatSyncError（错误信息用户可读）。"""
+    if not _is_wx_url(url):
+        raise WechatSyncError("自动拉取目前仅支持微信公众号文章链接（mp.weixin.qq.com），"
+                              "其他链接请手动填写标题、日期与来源")
+    try:
+        page = _http_get_text(url)
+    except WechatSyncError:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise WechatSyncError(f"抓取文章页面失败：{e}") from e
+    if "环境异常" in page[:3000]:
+        raise WechatSyncError(
+            "微信返回了环境验证页，暂时拉取不了；请稍后重试，"
+            "或先手动填写标题/日期，保存后系统会在下次同步时自动重试灌库")
+    text = _extract_js_content(page)
+    title, date = _extract_article_meta(page)
+    from .models import KnowledgeCategory
+    return {
+        "url": url,
+        "title": title,
+        "date": date,
+        "source": _extract_account(page),
+        "content": text,
+        "content_chars": len(text),
+        "image_only": len(text) < _KB_MIN_CHARS,
+        "category_hint": ("荣誉喜报"
+                          if _pick_kb_category(title) is KnowledgeCategory.HONORS
+                          else None),
+    }
+
+
 def _pick_kb_category(title: str):
     from .models import KnowledgeCategory
     if re.search(r"荣誉|喜报|获奖|夺冠|佳绩|祝贺|一等奖|二等奖|特等奖|金牌|百强", title):
@@ -394,8 +445,11 @@ def _kb_state_put(state: dict) -> None:
                               encoding="utf-8")
 
 
-def _ingest_articles_to_kb() -> dict:
-    """官网内容库里尚未灌库的公众号文章 → 抓正文 → 知识库。"""
+def ingest_articles_to_kb(only_urls: Optional[Set[str]] = None) -> dict:
+    """官网内容库里尚未灌库的公众号文章 → 抓正文 → 知识库。
+
+    only_urls 给定时只处理这几个链接（后台保存单条后立即灌库用），
+    不给则全量扫描（定时同步 / 手动同步路径）。"""
     if os.environ.get(_KB_INGEST_ENV, "").strip() == "0":
         return {"ingested": 0, "skipped": 0, "failed": 0, "disabled": True}
     with _KB_LOCK:  # 进程内串行；跨进程竞态由 source_url 查重兜底
@@ -415,11 +469,12 @@ def _ingest_articles_to_kb() -> dict:
             it for it in store.list_all()
             if it.published and _is_wx_url(it.url)
             and it.url not in state
+            and (only_urls is None or it.url in only_urls)
         ]
         candidates.sort(key=lambda x: x.date or "", reverse=True)
         candidates = candidates[:_KB_MAX_PER_RUN]
 
-        ingested = skipped = failed = 0
+        ingested = skipped = failed = chunks_total = 0
         for it in candidates:
             try:
                 html = _http_get_text(it.url)
@@ -440,7 +495,8 @@ def _ingest_articles_to_kb() -> dict:
             page_title, page_date = _extract_article_meta(html)
             title = (page_title or it.title).strip()
             date = it.date or page_date
-            content = f"{title}\n{date} 发布于学校微信公众号。\n\n{text}"
+            src_name = it.source or SYNC_SOURCE
+            content = f"{title}\n{date} 发布于微信公众号「{src_name}」。\n\n{text}"
             if any(e.title == title for e in crud.get_all()):
                 title = f"{title}（{date}）"
             try:
@@ -458,11 +514,13 @@ def _ingest_articles_to_kb() -> dict:
             state[it.url] = {"entry_id": entry.id, "ts": time.time(),
                              "date": date, "digest": text[:100]}
             ingested += 1
+            chunks_total += len(chunks)
             logger.info(f"公众号文章已灌知识库：{title}（{len(chunks)} 块）")
             time.sleep(1.0)  # 对公众号页面温和抓取
         if candidates:
             _kb_state_put(state)
-        return {"ingested": ingested, "skipped": skipped, "failed": failed}
+        return {"ingested": ingested, "skipped": skipped, "failed": failed,
+                "chunks": chunks_total}
 
 
 # ---- 「最新动态」问答锚点条目：桥接笼统题 → 公众号新文章 ----
@@ -497,8 +555,9 @@ def _refresh_latest_anchor() -> bool:
         dm = re.search(r"(\d{4}-\d{2}-\d{2})", summary)
         date = info.get("date") or (dm.group(1) if dm else "")
         digest = (info.get("digest") or summary).replace("\n", " ").strip()
-        # 老状态没有 digest 时回退 summary，剥掉内容头（标题+发布行）
-        digest = re.sub(r".*?发布于学校微信公众号。", "", digest, count=1,
+        # 老状态没有 digest 时回退 summary，剥掉内容头（标题+发布行）；
+        # 兼容两种历史格式：「发布于学校微信公众号。」与「发布于微信公众号「XX」。」
+        digest = re.sub(r".*?发布于微信公众号[^。]*。", "", digest, count=1,
                         flags=re.S).strip()
         items.append({"date": date, "title": entry.title, "digest": digest[:70]})
     if not items:

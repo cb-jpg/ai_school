@@ -5,7 +5,7 @@
  * 发布后官网刷新即见，无需重新发版。
  * API：GET/POST/PUT/DELETE /api/portal/items（require_staff，写审计）。
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Box, VStack, HStack, Text, Button, Input, Badge, Textarea,
 } from '@chakra-ui/react';
@@ -37,6 +37,28 @@ type Tab = 'all' | Kind;
 
 const NEWS_CATEGORIES = ['校园新闻', '荣誉喜报', '媒体聚焦'];
 const AUDIENCES = ['全体', '家长', '学生'];
+
+/** POST /api/portal/fetch-url 的返回：公众号文章解析结果 */
+interface FetchUrlResult {
+  url: string;
+  title: string;
+  date: string;
+  source: string;
+  content: string;
+  content_chars: number;
+  image_only: boolean;
+  category_hint?: string | null;
+}
+
+/** 保存响应里的知识库灌入结果（kb=null 表示非公众号链接，未触发灌库） */
+interface KbIngestResult {
+  ingested: number;
+  skipped: number;
+  failed: number;
+  chunks?: number;
+  pending?: boolean;
+  error?: string;
+}
 
 // 表单态（编辑时整体回填）
 interface FormState {
@@ -120,6 +142,13 @@ export function PortalContentAdmin() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
 
+  // 公众号链接拉取回填（发布新内容填入 mp.weixin.qq.com 链接后自动触发）
+  const [fetching, setFetching] = useState(false);
+  const [fetchNote, setFetchNote] = useState<{ ok: boolean; msg: string } | null>(null);
+  const lastFetchedUrl = useRef('');
+  // 保存后知识库灌入结果提示
+  const [kbMsg, setKbMsg] = useState<{ ok: boolean; msg: string } | null>(null);
+
   const loadItems = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -146,12 +175,71 @@ export function PortalContentAdmin() {
     setEditingId(null);
     setForm(EMPTY_FORM);
     setError('');
+    setFetchNote(null);
+    setKbMsg(null);
+    lastFetchedUrl.current = '';
   };
 
   const startEdit = (it: PortalItem) => {
     setEditingId(it.id);
     setForm(itemToForm(it));
     setError('');
+    setFetchNote(null);
+    setKbMsg(null);
+    lastFetchedUrl.current = it.url || '';
+  };
+
+  /** 拉取公众号文章回填表单（标题/日期/来源自动填，正文供知识库与预览）。
+   * blur 自动触发一次；按钮可强制重拉。 */
+  const doFetchUrl = async (urlInput: string, force = false) => {
+    const url = urlInput.trim();
+    if (!url || fetching) return;
+    if (!/^https?:\/\//i.test(url)) return;
+    if (!force && url === lastFetchedUrl.current) return;
+    if (!url.includes('mp.weixin.qq.com')) {
+      setFetchNote({ ok: false, msg: '自动拉取目前仅支持微信公众号文章链接（mp.weixin.qq.com）；其他链接请手动填写标题、日期与来源。' });
+      return;
+    }
+    setFetching(true);
+    setFetchNote(null);
+    setError('');
+    try {
+      const response = await authFetch('/api/portal/fetch-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.detail || `拉取失败（${response.status}）`);
+      }
+      const art = data as FetchUrlResult;
+      lastFetchedUrl.current = url;
+      setForm((f) => ({
+        ...f,
+        title: art.title || f.title,
+        date: art.date || f.date,
+        source: art.source || f.source,
+        category:
+          f.kind === 'news' && art.category_hint && f.category === '校园新闻'
+            ? art.category_hint
+            : f.category,
+      }));
+      const digest = art.content.replace(/\s+/g, ' ').trim().slice(0, 80);
+      setFetchNote({
+        ok: !art.image_only,
+        msg: art.image_only
+          ? `已拉取《${art.title}》（${art.date || '日期未识别'}）。正文仅 ${art.content_chars} 字——可能为纯图片推文，官网链接不受影响，但知识库不会收录正文。`
+          : `已拉取《${art.title}》（${art.date || '日期未识别'}）：标题/日期/来源已自动填入（可修改），正文 ${art.content_chars} 字将在保存时自动灌入知识库。开头：${digest}…`,
+      });
+    } catch (e) {
+      setFetchNote({
+        ok: false,
+        msg: e instanceof Error ? e.message : '拉取失败',
+      });
+    } finally {
+      setFetching(false);
+    }
   };
 
   const handleSave = async () => {
@@ -187,6 +275,19 @@ export function PortalContentAdmin() {
       if (!response.ok) {
         const detail = await response.json().then((d) => d?.detail).catch(() => null);
         throw new Error(detail || `保存失败（${response.status}）`);
+      }
+      const saved = await response.json().catch(() => ({}));
+      const kb = saved?.kb as KbIngestResult | null | undefined;
+      if (kb) {
+        if (kb.ingested > 0) {
+          setKbMsg({ ok: true, msg: `已发布「${saved.title}」。正文已同步灌入知识库（${kb.chunks ?? '?'} 个检索块），数字人现在就能回答这篇推文的内容。` });
+        } else if (kb.skipped > 0) {
+          setKbMsg({ ok: true, msg: `已发布「${saved.title}」。该推文正文过短（可能为纯图片推文），知识库未收录，官网链接正常展示。` });
+        } else if (kb.pending) {
+          setKbMsg({ ok: true, msg: `已发布「${saved.title}」。知识库灌入仍在后台进行，稍后自动完成（下次同步也会重试）。` });
+        } else {
+          setKbMsg({ ok: false, msg: `已发布「${saved.title}」。知识库灌入未成功${kb.error ? `（${kb.error}）` : ''}，系统会在下次公众号同步时自动重试。` });
+        }
       }
       startCreate();
       await loadItems();
@@ -251,7 +352,8 @@ export function PortalContentAdmin() {
         <Text fontSize="lg" fontWeight="bold" color={gray800}>官网新闻公告</Text>
         <Text fontSize="xs" color={gray600}>
           发布官网首页「学校新闻/公告与通知」两栏与新闻中心页的内容：贴外链（公众号文章、政府
-          通知等，新窗口打开）或直接撰写文字文章（官网站内阅读页）。保存后官网刷新即见，无需重新发版。
+          通知等，新窗口打开，公众号链接可自动拉取标题/日期/来源）或直接撰写文字文章（官网站内阅读页）。
+          公众号文章正文在保存时自动灌入数字人知识库。保存后官网刷新即见，无需重新发版。
         </Text>
       </VStack>
 
@@ -264,6 +366,16 @@ export function PortalContentAdmin() {
       {syncMsg && (
         <Box mb="4" p="3" bg="#E8F5E9" borderRadius="md" borderWidth="1px" borderColor="#2DAFAD">
           <Text fontSize="xs" color="#1b7a70">{syncMsg}</Text>
+        </Box>
+      )}
+
+      {kbMsg && (
+        <Box
+          mb="4" p="3" borderRadius="md" borderWidth="1px"
+          bg={kbMsg.ok ? '#E8F5E9' : '#FFF7E0'}
+          borderColor={kbMsg.ok ? '#2DAFAD' : '#b7791f'}
+        >
+          <Text fontSize="xs" color={kbMsg.ok ? '#1b7a70' : '#8a5a12'}>{kbMsg.msg}</Text>
         </Box>
       )}
 
@@ -323,13 +435,37 @@ export function PortalContentAdmin() {
 
           <Box>
             <Text fontSize="xs" color={gray600} mb="1">
-              外链（选填，以 http:// 或 https:// 开头；填写后条目在官网新窗口打开该链接）
+              外链（选填，以 http:// 或 https:// 开头；填写后条目在官网新窗口打开该链接）。
+              公众号文章链接会自动拉取标题、日期、来源并回填下方（正文在保存时灌入知识库，官网保持跳原推文）。
             </Text>
-            <Input
-              placeholder="https://mp.weixin.qq.com/s/..." size="sm"
-              value={form.url}
-              onChange={(e) => set('url', e.target.value)}
-            />
+            <HStack gap="2">
+              <Input
+                placeholder="https://mp.weixin.qq.com/s/..." size="sm"
+                value={form.url}
+                onChange={(e) => set('url', e.target.value)}
+                onBlur={(e) => doFetchUrl(e.target.value)}
+              />
+              <Button
+                size="sm" variant="outline" borderColor={schoolBlue} color={schoolBlue}
+                flexShrink={0}
+                onClick={() => doFetchUrl(form.url, true)}
+                loading={fetching}
+                loadingText="拉取中..."
+              >
+                拉取内容
+              </Button>
+            </HStack>
+            {fetchNote && (
+              <Box
+                mt="2" p="2" borderRadius="md" borderWidth="1px"
+                bg={fetchNote.ok ? '#E8F5E9' : '#FFF7E0'}
+                borderColor={fetchNote.ok ? '#2DAFAD' : '#b7791f'}
+              >
+                <Text fontSize="xs" color={fetchNote.ok ? '#1b7a70' : '#8a5a12'}>
+                  {fetchNote.msg}
+                </Text>
+              </Box>
+            )}
           </Box>
 
           <Box>

@@ -13,6 +13,7 @@
 处理请求的 worker，**必须**以文件签名（mtime_ns+size）为跨进程信号做读时
 对账（同 knowledge/crud.py 的 09-29 修复，勿删）。
 """
+import asyncio
 import json
 import threading
 import uuid
@@ -62,6 +63,11 @@ class PortalItemIn(BaseModel):
     content: Optional[str] = None
     pinned: bool = False
     published: bool = True
+
+
+class FetchUrlIn(BaseModel):
+    """发布表单「拉取链接内容」入参"""
+    url: str
 
 
 # 首次启动引导数据=前端 portal-content.ts 占位条的等值迁移（校方在后台改删，
@@ -287,6 +293,21 @@ def init_portal_public_routes() -> APIRouter:
     return router
 
 
+async def _ingest_kb_for_url(url: str) -> dict:
+    """保存公众号链接条目后立即灌知识库（限单个 url）。25s 封顶不阻塞发布：
+    超时/失败都不影响条目本身，定时同步（每 6h）会对未灌成的自动重试。"""
+    from .wechat_sync import ingest_articles_to_kb
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(ingest_articles_to_kb, {url}), timeout=25)
+    except asyncio.TimeoutError:
+        logger.warning(f"知识库灌文超时（同步稍后重试）：{url[:80]}")
+        return {"ingested": 0, "skipped": 0, "failed": 0, "pending": True}
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"知识库灌文异常（同步稍后重试）：{url[:80]} {e}")
+        return {"ingested": 0, "skipped": 0, "failed": 0, "error": str(e)[:120]}
+
+
 def init_portal_admin_routes() -> APIRouter:
     """后台管理路由：require_staff（admin/editor 均可发，与知识库一致）"""
     router = APIRouter(
@@ -299,6 +320,24 @@ def init_portal_admin_routes() -> APIRouter:
         items = get_portal_store().list_all()
         return {"items": [it.model_dump() for it in items], "total": len(items)}
 
+    @router.post("/fetch-url")
+    async def fetch_url(data: FetchUrlIn, user: dict = Depends(require_staff)):
+        """拉取公众号文章的标题/日期/来源（账号名）/正文，回填发布表单。
+        正文不落官网条目（官网保持外链跳原推文，保图片排版），保存时自动灌知识库。"""
+        from .wechat_sync import WechatSyncError, fetch_wechat_article
+        url = (data.url or "").strip()
+        if not url.lower().startswith(("http://", "https://")):
+            raise HTTPException(status_code=422, detail="链接需以 http:// 或 https:// 开头")
+        try:
+            result = await asyncio.to_thread(fetch_wechat_article, url)
+        except WechatSyncError as e:
+            raise HTTPException(status_code=502, detail=str(e))
+        except Exception as e:  # noqa: BLE001
+            logger.exception("拉取公众号文章异常")
+            raise HTTPException(status_code=502, detail=f"拉取失败：{e}")
+        audit_record(user["username"], "portal.fetch_url", "fetch", url[:120])
+        return result
+
     @router.post("/items")
     async def create_item(data: PortalItemIn, user: dict = Depends(require_staff)):
         fields = _validate_item_in(data)
@@ -306,7 +345,10 @@ def init_portal_admin_routes() -> APIRouter:
         get_portal_store().create(item)
         audit_record(user["username"], "portal.create", item.id, item.title)
         logger.info(f"官网内容已发布：{item.kind}/{item.id} {item.title}")
-        return {"id": item.id, "title": item.title}
+        kb = None
+        if item.url and "mp.weixin.qq.com" in item.url:
+            kb = await _ingest_kb_for_url(item.url)
+        return {"id": item.id, "title": item.title, "kb": kb}
 
     @router.put("/items/{item_id}")
     async def update_item(item_id: str, data: PortalItemIn,
@@ -316,7 +358,10 @@ def init_portal_admin_routes() -> APIRouter:
         if not updated:
             raise HTTPException(status_code=404, detail="条目不存在")
         audit_record(user["username"], "portal.update", item_id, updated.title)
-        return {"id": updated.id, "title": updated.title}
+        kb = None
+        if updated.url and "mp.weixin.qq.com" in updated.url:
+            kb = await _ingest_kb_for_url(updated.url)
+        return {"id": updated.id, "title": updated.title, "kb": kb}
 
     @router.delete("/items/{item_id}")
     async def delete_item(item_id: str, user: dict = Depends(require_staff)):
