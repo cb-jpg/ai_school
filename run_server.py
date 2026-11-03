@@ -205,6 +205,12 @@ def run(console_log_level: str, workers: int = 1):
             # 放宽到 60s/60s（死连接清理变慢对本场景无影响）
             ws_ping_interval=60.0,
             ws_ping_timeout=60.0,
+            # 默认 5s：worker 进程 spawn 后须在 5s 内应答健康检查 ping，否则被当作
+            # 「hung」杀掉重拉。本应用 worker 启动要 import torch/加载 RAG/预热索引
+            # （30-60s，且预热期 GIL 高占用会饿死应答线程），共用服务器一忙就超过
+            # 5s → 杀掉重拉 → 新 worker 依旧超时 → 无限死亡循环（2026-10-29 与
+            # 11-03 两次「无 traceback 静默死亡循环」的根因）。放宽到 60s。
+            timeout_worker_healthcheck=60.0,
         )
         return
 

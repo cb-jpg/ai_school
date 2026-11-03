@@ -155,34 +155,51 @@ class DocumentProcessor:
             if parsed.scheme not in ("http", "https") or not parsed.netloc:
                 raise ValueError("仅支持 http/https 网页链接")
 
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
-                    if response.status != 200:
-                        raise ValueError(f"Failed to fetch URL: {response.status}")
-                    # 非 HTML 页面给出明确提示（PDF 等文件应走文件上传）
-                    content_type = response.headers.get("Content-Type", "").split(";")[0].strip().lower()
-                    if content_type and content_type not in ("text/html", "text/plain", "application/xhtml+xml"):
-                        raise ValueError(
-                            f"链接内容类型为 {content_type}，仅支持网页链接；文件请用上传功能"
-                        )
-                    # 防止超大响应拖垮内存
-                    if response.content_length and response.content_length > 5 * 1024 * 1024:
-                        raise ValueError("网页内容超过 5MB 限制")
-                    html = await response.text()
+            if "mp.weixin.qq.com" in url:
+                # 公众号文章专用链路（iPhone UA + js_content 解析 + 验证页拒绝）：
+                # 通用抓取曾把微信「环境异常」验证页当正文灌库，产出 title=URL、
+                # 内容是验证提示词的垃圾条目（2026-11-03 data 账号实锤）。
+                from .wechat_sync import WechatSyncError, fetch_wechat_article
+                try:
+                    art = await asyncio.to_thread(fetch_wechat_article, url)
+                except WechatSyncError as e:
+                    raise ValueError(str(e)) from e
+                text_content = art["content"]
+                if not title:
+                    title = art["title"] or url
+                if len(text_content.strip()) < 100:
+                    raise ValueError(
+                        "公众号正文过短（可能为纯图片推文），无法入库；"
+                        "建议在官网后台以「外链」方式发布该文章")
+            else:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                        if response.status != 200:
+                            raise ValueError(f"Failed to fetch URL: {response.status}")
+                        # 非 HTML 页面给出明确提示（PDF 等文件应走文件上传）
+                        content_type = response.headers.get("Content-Type", "").split(";")[0].strip().lower()
+                        if content_type and content_type not in ("text/html", "text/plain", "application/xhtml+xml"):
+                            raise ValueError(
+                                f"链接内容类型为 {content_type}，仅支持网页链接；文件请用上传功能"
+                            )
+                        # 防止超大响应拖垮内存
+                        if response.content_length and response.content_length > 5 * 1024 * 1024:
+                            raise ValueError("网页内容超过 5MB 限制")
+                        html = await response.text()
 
-            # Parse HTML（放线程池，大页面解析避免阻塞事件循环）
-            soup = await asyncio.to_thread(BeautifulSoup, html, 'html.parser')
+                # Parse HTML（放线程池，大页面解析避免阻塞事件循环）
+                soup = await asyncio.to_thread(BeautifulSoup, html, 'html.parser')
 
-            # Extract title if not provided
-            if not title:
-                title_tag = soup.find('title')
-                title = title_tag.text.strip() if title_tag else url
+                # Extract title if not provided
+                if not title:
+                    title_tag = soup.find('title')
+                    title = title_tag.text.strip() if title_tag else url
 
-            # Extract main content
-            text_content = await asyncio.to_thread(self._extract_main_content, soup)
+                # Extract main content
+                text_content = await asyncio.to_thread(self._extract_main_content, soup)
 
-            if not text_content or len(text_content.strip()) < 10:
-                raise ValueError("Extracted web content is too short or empty")
+                if not text_content or len(text_content.strip()) < 10:
+                    raise ValueError("Extracted web content is too short or empty")
 
             # Create chunks
             chunks = self._chunk_text(text_content, title=title)
