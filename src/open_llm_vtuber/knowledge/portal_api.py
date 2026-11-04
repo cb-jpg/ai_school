@@ -15,6 +15,7 @@
 """
 import asyncio
 import json
+import re
 import threading
 import uuid
 from datetime import datetime
@@ -341,8 +342,25 @@ def init_portal_admin_routes() -> APIRouter:
     @router.post("/items")
     async def create_item(data: PortalItemIn, user: dict = Depends(require_staff)):
         fields = _validate_item_in(data)
+        store = get_portal_store()
+        # 发布查重（2026-11-04 连点双贴事故）：同一链接或同一标题（忽略空白）
+        # 已存在即 409 拒绝，提示去编辑原条目而非重复新建。同步通道与官网已有
+        # 条目的 (mid, idx) 规范键去重在 wechat_sync.sync_wechat_to_portal 兜底
+        # （手贴短链与官方长链 URL 形态不同，创建期无法零成本比对）。
+        norm_title = re.sub(r"\s+", "", fields.get("title") or "")
+        for it in store.list_all():
+            if fields.get("url") and it.url and it.url == fields["url"]:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"该链接已发布过：《{it.title}》（{it.date or '日期不详'}），"
+                           "请勿重复发布；如需修改请编辑原条目")
+            if norm_title and re.sub(r"\s+", "", it.title) == norm_title:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"已存在同名文章：《{it.title}》（{it.date or '日期不详'}），"
+                           "请勿重复发布；如需修改请编辑原条目")
         item = PortalItem(**fields, created_by=user["username"])
-        get_portal_store().create(item)
+        store.create(item)
         audit_record(user["username"], "portal.create", item.id, item.title)
         logger.info(f"官网内容已发布：{item.kind}/{item.id} {item.title}")
         kb = None

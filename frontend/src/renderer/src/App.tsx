@@ -43,6 +43,7 @@ import { useState, useEffect, useRef } from "react";
 import "@/styles/admin-fonts.css";
 import { IS_KIOSK, KIOSK_LAYOUT_WIDTH } from "@/utils/device-profile";
 import { setGuestMode, useGuestMode } from "./utils/guest-mode";
+import { preloadLive2dAssets } from "./utils/live2d-preload";
 // import Canvas from './components/canvas/canvas'; // Likely unused now
 import Footer from "./components/footer/footer";
 import { AiStateProvider } from "./context/ai-state-context";
@@ -273,6 +274,11 @@ function AppContent(): JSX.Element {
     const onChange = () => setIsNarrowVp(mq.matches);
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
+  }, []);
+  // 模型资源预取（2026-11-04 加载提速）：登录页/首页期间后台把默认模型大文件
+  // 拉进 HTTP 缓存，进对话页时人物秒开（utils/live2d-preload.ts）
+  useEffect(() => {
+    preloadLive2dAssets();
   }, []);
   useOtaUpdate(); // App 在线更新检查（手机弹窗 / kiosk 静默换包；浏览器端内部短路）
   const live2dContainerRef = useRef<HTMLDivElement>(null);
@@ -505,6 +511,13 @@ function AppContent(): JSX.Element {
 
   // 专题页匿名点「讲解」：登录浮层盖在当前页面上，可取消继续浏览；
   // 已登录但待强制改密的账号同样保留浮层（登录页就地显示改密步骤）
+  // 游客入口（2026-11-04 统一）：所有登录浮层都提供「游客身份先聊聊」，
+  // 选游客 = 开游客模式并跳到对话页（v2.47 时只有对话页门禁有此入口）。
+  const enterGuestFromLogin = () => {
+    setAuthPrompt(false);
+    setGuestMode(true);
+    window.location.hash = "#/hero";
+  };
   const authPromptOverlay = authPrompt && (!authUser || authUser.must_change_password) && (
     <Box
       position="fixed"
@@ -514,7 +527,7 @@ function AppContent(): JSX.Element {
       height="100vh"
       zIndex={100}
     >
-      <AppLoginPage onCancel={() => setAuthPrompt(false)} />
+      <AppLoginPage onCancel={() => setAuthPrompt(false)} onGuest={enterGuestFromLogin} />
     </Box>
   );
 
@@ -711,7 +724,16 @@ function AppContent(): JSX.Element {
     // 学生（user）/ 家长（parent）无权限。
     // 待强制改密的登录态视同未登录（2026-10-14），先在登录页改完密码再进后台。
     if (!authUser || authUser.must_change_password) {
-      return <AppLoginPage />;
+      // 页头「登录」进的是这里（#/main）：与对话页门禁统一提供游客入口，
+      // 选游客不开后台、直接以匿名身份去对话页（2026-11-04 用户反馈）。
+      return (
+        <AppLoginPage
+          onGuest={() => {
+            setGuestMode(true);
+            window.location.hash = "#/hero";
+          }}
+        />
+      );
     }
     if (authUser.role !== "admin" && authUser.role !== "editor") {
       // 学生/家长账号登录成功但无后台权限：直接送回正常页面（2026-09-30 校方要求

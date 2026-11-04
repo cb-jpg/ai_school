@@ -380,7 +380,10 @@ export const useLive2DModel = ({
               error,
             );
           }
-        }, 500);
+        }, document.getElementById("canvas") ? 0 : 500);
+        // 画布就绪即初始化（2026-11-04 加载提速）：原固定 500ms 是「等画布渲染」
+        // 的保守延迟——effect 本就跑在 DOM 提交后，画布通常已存在，此时 500ms
+        // 纯属白等；未就绪仍退回 500ms 再查（内层 canvas 检查兜底不变）。
       }
     } catch (error) {
       console.error("[useLive2DModel] Error processing model URL:", error);

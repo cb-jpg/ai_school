@@ -130,11 +130,24 @@ class RevalidateStaticFiles(CORSStaticFiles):
     长期复用旧文件——模型参数/OTA 清单更新后设备可能几天拿不到新版
     （2026-10-25 v2.44：手机端 joy.exp3.json 更新送达即受此威胁）。
     no-cache=强制 revalidate，etag 未变仍回 304，代价可忽略。
+
+    2026-11-04 加载提速分级：贴图类大文件（占模型体积大头，~20 张）在
+    live2d-models 挂载下改 max-age=86400——它们从未在部署中被单独就地替换
+    （历史替换都伴随 moc3/model3.json 更新，二者仍 no-cache 兜底），24h 内
+    重复加载零请求；app-releases 挂载不享受（manifest/zip 保持 no-cache）。
+    若未来确需就地替换贴图：部署后 24h 内贴图可能陈旧，届时改部署文件名
+    或等缓存过期。
     """
+
+    # 各挂载实例可覆盖：传空元组即全部 no-cache（app-releases 用）
+    long_cache_exts: tuple = (".png", ".jpg", ".jpeg", ".webp")
 
     async def get_response(self, path: str, scope):
         response = await super().get_response(path, scope)
-        response.headers["Cache-Control"] = "no-cache"
+        if path.lower().endswith(self.long_cache_exts):
+            response.headers["Cache-Control"] = "public, max-age=86400"
+        else:
+            response.headers["Cache-Control"] = "no-cache"
         return response
 
 
@@ -287,9 +300,13 @@ class WebSocketServer:
         # App 启动时比对 manifest.version_code 与本机构建号，弹窗/静默换包。
         if not os.path.exists(os.path.join("data", "app-releases")):
             os.makedirs(os.path.join("data", "app-releases"), exist_ok=True)
+        _app_releases_files = RevalidateStaticFiles(
+            directory=os.path.join("data", "app-releases")
+        )
+        _app_releases_files.long_cache_exts = ()  # manifest/zip 永远 no-cache
         self.app.mount(
             "/app-releases",
-            RevalidateStaticFiles(directory=os.path.join("data", "app-releases")),
+            _app_releases_files,
             name="app-releases",
         )
 

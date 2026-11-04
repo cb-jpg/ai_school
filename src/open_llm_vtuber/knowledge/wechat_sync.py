@@ -166,17 +166,35 @@ def fetch_published_articles() -> List[dict]:
 
 
 def sync_wechat_to_portal() -> dict:
-    """按 url 幂等 upsert 进 PortalStore；返回计数摘要（给后台提示用）。"""
+    """按 url + (mid, idx) 规范键幂等 upsert 进 PortalStore；返回计数摘要
+    （给后台提示用）。规范键兜底：后台手贴的是短链，官方发布列表返回长链，
+    裸 URL 查重认不出同一篇文章（2026-11-04 扬长教育04-16 手贴当晚即被回建
+    成重复）。短链解析一次进持久缓存（复用草稿通道状态文件），之后零抓取。"""
     articles = fetch_published_articles()
     store = get_portal_store()
     created = updated = skipped = hidden = 0
     fetched_urls: set = set()
+    state = _draft_state()
+    cache = state.setdefault("resolved", {})
+    key_map: dict = {}
+    for it in store.list_all():
+        if not _is_wx_url(it.url):
+            continue
+        k = _resolve_key(it.url, cache)
+        if k:
+            key_map.setdefault(k, it)
+    state["resolved"] = cache
+    _draft_state_put(state)
     for art in articles:
         url = art["url"]
         fetched_urls.add(url)
         date = (datetime.fromtimestamp(art["update_time"]).strftime("%Y-%m-%d")
                 if art["update_time"] else "")
         existing = store.find_by_url(url)
+        if not existing:
+            key = _parse_mid_idx(url)
+            if key:
+                existing = key_map.get(key)
         if existing:
             if existing.title != art["title"] or existing.date != date:
                 store.update(existing.id, title=art["title"], date=date,
