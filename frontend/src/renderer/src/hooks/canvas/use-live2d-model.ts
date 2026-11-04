@@ -279,6 +279,8 @@ export const useLive2DModel = ({
   const prevModelIdentityRef = useRef<string | null>(null);
   // GL 重建的 500ms 延迟定时器（identity 连续翻转时只让最后一个落地，见下）
   const initTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // 位图自愈看门狗的定时器（模型重建/卸载时随 effect 清理一并取消）
+  const resizeWatchdogRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   // 站位适配的存活标记（2026-09-30 曾挂 420ms frameTick 滑入插值；
   // 2026-10-19 用户反馈"人物从别处移过来怪怪的"→ 改瞬时置位，动画已移除。
   // cancelFitAnimation 及其引用保留为无害空操作，拖动/捏合让位调用点不动）
@@ -371,6 +373,31 @@ export const useLive2DModel = ({
           console.log("[useLive2DModel] Reinitializing Live2D");
           try {
             initializeLive2D();
+            // 位图自愈看门狗（2026-11-05 v2.55）：App 冷启动布局未完成时
+            // clientWidth 可能还是 0，initializeLive2D 内的 _resizeCanvas 会把
+            // 位图铺成 0×0，渲染循环空转、人物一直不显示，直到某次窗口 resize
+            // 才恢复（2026-11-04 把 500ms 改 0ms 后真机复现：首页人物不出、切
+            // 模型无反应——切模型走同一条 init 链，位图仍是 0）。在初始化后的
+            // 几个时间点检查「位图 ≠ clientWidth×dpr」就补一次 onResize（与窗口
+            // resize 同一条安全路径，只重铺位图+重建投影，无 GL 重建）。
+            for (const delay of [400, 1200, 3000]) {
+              const t = setTimeout(() => {
+                const el = document.getElementById(
+                  "canvas",
+                ) as HTMLCanvasElement | null;
+                const expected = el
+                  ? Math.round(el.clientWidth * (window.devicePixelRatio || 1))
+                  : 0;
+                if (el && el.clientWidth > 0 && el.width !== expected) {
+                  console.log(
+                    "[useLive2DModel] Bitmap size mismatch, nudging onResize",
+                    { bitmap: el.width, expected },
+                  );
+                  LAppDelegate.getInstance()?.onResize?.();
+                }
+              }, delay);
+              resizeWatchdogRef.current.push(t);
+            }
             // SPA 路由往返时组件重挂载，本 effect 重建 GL 链并重新绑定 canvas；
             // 通知 hero 适配逻辑重新执行初始站位
             window.dispatchEvent(new Event("live2d-rebound"));
@@ -380,10 +407,10 @@ export const useLive2DModel = ({
               error,
             );
           }
-        }, document.getElementById("canvas") ? 0 : 500);
-        // 画布就绪即初始化（2026-11-04 加载提速）：原固定 500ms 是「等画布渲染」
-        // 的保守延迟——effect 本就跑在 DOM 提交后，画布通常已存在，此时 500ms
-        // 纯属白等；未就绪仍退回 500ms 再查（内层 canvas 检查兜底不变）。
+        }, 500);
+        // 保留 500ms「等画布渲染」保守延迟（2026-11-05 回退 v2.54 的 0ms 快速
+        // 路径：真机冷启动布局未完成，_resizeCanvas 按当时 clientWidth 铺位图
+        // 会把画布铺成 0×0——上面已加自愈看门狗兜底，初始化本身不再抢跑）。
       }
     } catch (error) {
       console.error("[useLive2DModel] Error processing model URL:", error);
@@ -393,6 +420,10 @@ export const useLive2DModel = ({
         clearTimeout(initTimerRef.current);
         initTimerRef.current = undefined;
       }
+      for (const t of resizeWatchdogRef.current) {
+        clearTimeout(t);
+      }
+      resizeWatchdogRef.current = [];
     };
   }, [modelInfo?.url, modelInfo?.kScale]);
 
