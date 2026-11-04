@@ -16,7 +16,12 @@ from .asr.audio_preprocessor import (
 )
 from verification.asr_config import build_asr_config, public_browser_config
 from .knowledge.routes import init_knowledge_routes
-from .knowledge.auth import USERNAME_PATTERN, get_token_manager
+from .knowledge.auth import (
+    USERNAME_PATTERN,
+    get_token_manager,
+    get_user_store,
+    kiosk_exempt_usernames,
+)
 
 
 def _load_model_dict(path: str = "model_dict.json") -> dict:
@@ -80,6 +85,18 @@ def init_client_ws_route(default_context_cache: ServiceContext) -> APIRouter:
             candidate = str(payload.get("username") or "") if payload else ""
             if not payload or not USERNAME_PATTERN.match(candidate):
                 logger.warning("Rejected /client-ws: invalid or expired user_token")
+                await websocket.close(code=1008)
+                return
+            # 停用账号 / 首登未改密账号：令牌虽有效仍拒连（与 REST 层 403 同步，
+            # 2026-11-04 对齐交接文档 §3/§8.5；kiosk 豁免首改拦截）
+            record = get_user_store().users.get(candidate) or {}
+            if not record.get("active", True):
+                logger.warning(f"Rejected /client-ws for {candidate}: account disabled")
+                await websocket.close(code=1008)
+                return
+            if (record.get("must_change_password")
+                    and candidate not in kiosk_exempt_usernames()):
+                logger.warning(f"Rejected /client-ws for {candidate}: must change password first")
                 await websocket.close(code=1008)
                 return
             username = candidate

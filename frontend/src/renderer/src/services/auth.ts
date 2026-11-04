@@ -17,7 +17,9 @@ export interface AuthUser {
   must_change_password?: boolean;
 }
 
-/** 自助修改密码（登录态）：首次登录强制改密与设置面板共用 */
+/** 自助修改密码（登录态）：首次登录强制改密与设置面板共用。
+ *  后端改密后换发新 token（旧 token 因 pv 自增立即失效），响应带 {message, token, user}；
+ *  这里必须换存新 token，否则下一个请求就 401 被踢回登录页。 */
 export async function changePassword(newPassword: string): Promise<void> {
   const response = await authFetch('/api/auth/change-password', {
     method: 'POST',
@@ -31,9 +33,18 @@ export async function changePassword(newPassword: string): Promise<void> {
       .catch(() => null);
     throw new Error(detail || `修改失败（${response.status}）`);
   }
-  // 本地 user 同步清除标记（下次登录后端也不会再返回 true）
+  const data = await response.json().catch(() => null as null | {
+    token?: string;
+    user?: AuthUser;
+  });
   const stored = getStoredUser();
-  if (stored) {
+  const user = (data?.user as AuthUser | undefined) ||
+    (stored ? { ...stored, must_change_password: false } : null);
+  if (data?.token && user) {
+    // 换发：存新 token + 服务端回传的最新 user（must_change_password 已置 false）
+    setAuth(data.token, user);
+  } else if (stored) {
+    // 兼容旧后端（不换发）：仅本地清标记
     setAuth(getStoredToken() || '', { ...stored, must_change_password: false });
   }
 }

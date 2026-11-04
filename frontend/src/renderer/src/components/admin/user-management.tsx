@@ -8,6 +8,10 @@
  * 导入后可下载含初始密码的一次性回执——服务端 scrypt 哈希不可逆，导出清单
  * 因此不含密码）；「分组」为纯标注字段（班级/部门），不参与权限。
  *
+ * 2026-11-04 停用/启用（对齐石实 SHINE 交接文档 §8.5）：行内「停用/启用」+
+ * 「已停用」徽标；停用立即拒绝登录（403）、保留全部数据可恢复；删除确认提示
+ * 一般建议用停用。后端改密换发新 token（services/auth.ts 同步）。
+ *
  * 2026-10-13 下载修复：Android WebView（App/一体机）没有下载处理器，
  * blob + <a download> 点击是纯静默 no-op（Capacitor 未接 DownloadListener），
  * 校方在 App 后台点「下载模板/导出/回执」毫无反应。原生环境改弹
@@ -34,6 +38,9 @@ interface UserRow {
   role: 'admin' | 'editor' | 'user' | 'parent';
   group?: string;
   must_change_password?: boolean;
+  /** 2026-11-04 停用/启用：false=已停用（登录 403、保留全部历史可恢复）。
+   *  存量账号后端不回传此字段 → undefined 按启用处理。 */
+  active?: boolean;
   created_at: number;
 }
 
@@ -319,7 +326,7 @@ export default function UserManagement() {
   };
 
   const handleDelete = async (username: string) => {
-    if (!window.confirm(`确定删除用户 ${username}？`)) {
+    if (!window.confirm(`确定删除用户 ${username}？\n（一般建议用「停用」代替删除：停用保留聊天历史等全部数据，随时可恢复）`)) {
       return;
     }
     setError('');
@@ -337,6 +344,33 @@ export default function UserManagement() {
     }
   };
 
+  /** 停用/启用（2026-11-04 对齐交接文档 §8.5）：停用立即生效（登录 403、
+   *  既有令牌 API/WS 层拒绝），数据全保留可随时启用恢复。 */
+  const handleSetActive = async (u: UserRow, active: boolean) => {
+    const verb = active ? '启用' : '停用';
+    if (!window.confirm(`确定${verb}用户 ${u.username}？${active ? '' : '\n停用后该账号立即无法登录，聊天历史等数据全部保留，可随时启用恢复。'}`)) {
+      return;
+    }
+    setError('');
+    try {
+      const response = await authFetch(
+        `/api/auth/users/${encodeURIComponent(u.username)}/active`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ active }),
+        },
+      );
+      if (!response.ok) {
+        const detail = await response.json().then((d) => d?.detail).catch(() => null);
+        throw new Error(detail || `${verb}失败（${response.status}）`);
+      }
+      await loadUsers();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : `${verb}失败`);
+    }
+  };
+
   return (
     <Box maxWidth="860px">
       <VStack gap="1" alignItems="start" mb="6">
@@ -345,6 +379,7 @@ export default function UserManagement() {
           管理员拥有全部权限；编辑者仅可管理知识库；普通用户用于 App 登录（每人独立聊天记录）。
           「分组」用于标注班级/部门，方便筛选，不影响权限。忘记密码不用删号重建，
           直接「重置密码」即可（重置后该账号旧登录失效、下次登录须先改新密码）。
+          离校/毕业等账号建议「停用」而非删除：停用立即无法登录，聊天历史等数据保留，可随时恢复。
           当前登录：{user?.username}
         </Text>
       </VStack>
@@ -530,6 +565,11 @@ export default function UserManagement() {
                     初始密码未改
                   </Badge>
                 )}
+                {u.active === false && (
+                  <Badge bg="#f1f5f9" color={gray600} fontSize="9px" px="2" rounded="full">
+                    已停用
+                  </Badge>
+                )}
                 {u.username === user?.username && (
                   <Text fontSize="10px" color={gray600}>（当前登录）</Text>
                 )}
@@ -542,11 +582,33 @@ export default function UserManagement() {
                 >
                   重置密码
                 </Button>
+                {u.active === false ? (
+                  <Button
+                    size="xs" variant="ghost" color="#2e8b57"
+                    onClick={() => handleSetActive(u, true)}
+                    title="恢复该账号登录（历史数据全部保留）"
+                  >
+                    启用
+                  </Button>
+                ) : (
+                  <Button
+                    size="xs" variant="ghost" color="#b7791f"
+                    onClick={() => handleSetActive(u, false)}
+                    disabled={u.username === user?.username}
+                    title={u.username === user?.username
+                      ? '不能停用当前登录用户'
+                      : '停用后该账号立即无法登录，数据保留可随时恢复'}
+                  >
+                    停用
+                  </Button>
+                )}
                 <Button
                   size="xs" variant="ghost" color={schoolRed}
                   onClick={() => handleDelete(u.username)}
                   disabled={u.username === user?.username}
-                  title={u.username === user?.username ? '不能删除当前登录用户' : undefined}
+                  title={u.username === user?.username
+                    ? '不能删除当前登录用户'
+                    : '物理删除（不可恢复）——一般建议用「停用」'}
                 >
                   删除
                 </Button>

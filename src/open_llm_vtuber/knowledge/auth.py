@@ -16,6 +16,7 @@ import hashlib
 import hmac
 import io
 import json
+import os
 import re
 import secrets
 import threading
@@ -40,8 +41,21 @@ TOKEN_TTL_SECONDS = 12 * 3600
 VALID_ROLES = {"admin", "editor", "user", "parent"}
 
 # 用户名同时用作聊天历史目录名（chat_history/<conf>/users/<username>/），
-# 必须限制为文件系统安全字符，防路径穿越
-USERNAME_PATTERN = re.compile(r"^[a-zA-Z0-9_-]{2,32}$")
+# 必须限制为文件系统安全字符，防路径穿越。2026-11-04 对齐石实 SHINE 交接
+# 文档 §6：教师工号 3~64 位含 @ . _ -（与 SHINE 侧账号互通预留），放宽到
+# 2~64；`.` `..` 纯点号仍拒绝（目录穿越面）。
+USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_.@-]{2,64}$")
+
+
+def valid_username(username: str) -> bool:
+    return bool(USERNAME_PATTERN.match(username)) and username not in (".", "..")
+
+
+def kiosk_exempt_usernames() -> set:
+    """免「首登强制改密」拦截的账号（一体机自动登录，密码不可交互修改）。
+    与 model_config_api 同源：OLLV_KIOSK_USERNAMES（逗号分隔，默认 kiosk）。"""
+    raw = os.environ.get("OLLV_KIOSK_USERNAMES", "kiosk")
+    return {u.strip() for u in raw.split(",") if u.strip()}
 
 
 # ============== 密码哈希（scrypt，标准库） ==============
@@ -136,20 +150,25 @@ class UserStore:
         record = self.users.get(username)
         if record and verify_password(password, record["password"]):
             # must_change_password：首次登录/被重置后强制改密（存量账号无此字段=False，
-            # 2026-10-14 起新建与重置都会打上标记）
+            # 2026-10-14 起新建与重置都会打上标记）；active：停用账号登录被 403
+            # （2026-11-04 对齐交接文档 §4.4，存量账号无此字段=启用）
             return {
                 "username": username,
                 "role": record["role"],
                 "must_change_password": bool(record.get("must_change_password", False)),
+                "active": bool(record.get("active", True)),
             }
         return None
 
     def create_user(self, username: str, password: str, role: str, group: str = "") -> dict:
         self._refresh_if_changed()
         if username in self.users:
-            raise ValueError(f"用户已存在：{username}")
-        if not USERNAME_PATTERN.match(username):
-            raise ValueError("用户名需为 2-32 位字母、数字、下划线或短横线")
+            record = self.users[username]
+            if not record.get("active", True):
+                raise ValueError(f"用户名已存在：{username}（已停用账号，请在列表启用而非新建）")
+            raise ValueError(f"用户名已存在：{username}")
+        if not valid_username(username):
+            raise ValueError("用户名需为 2-64 位字母、数字或 _.@-（不可用纯点号）")
         if role not in VALID_ROLES:
             raise ValueError(f"无效角色：{role}（可选 {sorted(VALID_ROLES)}）")
         self.users[username] = {
@@ -164,16 +183,18 @@ class UserStore:
         logger.info(f"创建用户 {username}（{role}，分组：{(group or '').strip()[:32] or '无'}）")
         return {"username": username, "role": role}
 
-    def delete_user(self, username: str) -> None:
+    def set_user_active(self, username: str, active: bool) -> None:
+        """停用/启用账号（2026-11-04 对齐交接文档 §8.5：停用保留全部历史可恢复，
+        删除才物理移除）。停用立即生效：登录 403、既有令牌在 API/WS 层被 403/拒连。"""
         self._refresh_if_changed()
         if username not in self.users:
             raise ValueError(f"用户不存在：{username}")
-        admins = [u for u, r in self.users.items() if r["role"] == "admin"]
-        if self.users[username]["role"] == "admin" and len(admins) <= 1:
-            raise ValueError("不能删除最后一个管理员")
-        del self.users[username]
+        record = self.users[username]
+        if record.get("active", True) == active:
+            return
+        record["active"] = active
         self._save()
-        logger.info(f"删除用户 {username}")
+        logger.info(f"用户 {username} 已{'启用' if active else '停用'}")
 
     def change_password(self, username: str, new_password: str,
                         must_change: bool = False) -> None:
@@ -196,9 +217,21 @@ class UserStore:
         return [
             {"username": u, "role": r["role"], "group": r.get("group", ""),
              "must_change_password": bool(r.get("must_change_password", False)),
+             "active": bool(r.get("active", True)),
              "created_at": r["created_at"]}
             for u, r in self.users.items()
         ]
+
+    def delete_user(self, username: str) -> None:
+        self._refresh_if_changed()
+        if username not in self.users:
+            raise ValueError(f"用户不存在：{username}")
+        admins = [u for u, r in self.users.items() if r["role"] == "admin"]
+        if self.users[username]["role"] == "admin" and len(admins) <= 1:
+            raise ValueError("不能删除最后一个管理员")
+        del self.users[username]
+        self._save()
+        logger.info(f"删除用户 {username}")
 
 
 _user_store: UserStore | None = None
@@ -282,6 +315,11 @@ def get_token_manager() -> TokenManager:
 
 # ============== FastAPI 依赖 ==============
 
+# 首登强制改密的豁免路径（2026-11-04 对齐交接文档 §3：除改密/查身份/重新登录
+# 外全部拦截；login 本就不经过 Bearer 校验）
+_MUST_CHANGE_EXEMPT_PATHS = {"/api/auth/change-password", "/api/auth/me"}
+
+
 def _extract_user(request: Request) -> dict:
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
@@ -289,7 +327,20 @@ def _extract_user(request: Request) -> dict:
     payload = get_token_manager().verify(auth_header[7:])
     if payload is None:
         raise HTTPException(status_code=401, detail="登录已过期或令牌无效")
-    return {"username": payload["username"], "role": payload["role"]}
+    username = payload["username"]
+    store = get_user_store()
+    store._refresh_if_changed()
+    record = store.users.get(username) or {}
+    # 停用账号：即使令牌仍在有效期内，一律拒绝（停用即时生效）
+    if not record.get("active", True):
+        raise HTTPException(status_code=403, detail="账号已停用")
+    # 首登/被重置后强制改密：服务端硬拦截（此前仅前端门禁）。一体机 kiosk
+    # 账号豁免（自动登录，无法交互改密）。
+    if (record.get("must_change_password")
+            and request.url.path not in _MUST_CHANGE_EXEMPT_PATHS
+            and username not in kiosk_exempt_usernames()):
+        raise HTTPException(status_code=403, detail="首次登录请先修改密码")
+    return {"username": username, "role": payload["role"]}
 
 
 async def require_user(request: Request) -> dict:
@@ -328,8 +379,12 @@ async def require_admin(user: dict = Depends(require_user)) -> dict:
 #
 # /api/auth/login 是全系统唯一无凭据入口。scrypt 校验本身慢（这正是它的用途），
 # 但不限制失败次数就等于允许无限次在线爆破。按用户名计数：窗口期内失败达阈值
-# 则临时锁定，成功登录即清零。计数器在每 worker 进程内存里（3 worker ⇒ 实际
-# 阈值约为 3×LOGIN_MAX_FAILS 次），跨进程共享需引入外部存储，当前规模不值得。
+# 则临时锁定，成功登录即清零。
+# 2026-11-04 对齐交接文档 §8.3（失败 5 次锁 10 分钟须真实生效）：计数改为
+# data/auth/login_failures.json 跨 worker 共享（文件签名重读，模式同 UserStore）
+# ——此前每 worker 各记一份，3 worker 实际阈值≈15 次。读写都持进程内锁 +
+# 每次改前重读盘上最新态再回写，跨进程并发下计数可能轻微合并丢失，但
+# 「5 次锁 10 分钟」语义整体成立。文件损坏/不可写时退化为进程内计数。
 # 注意 kiosk 账号共用此逻辑：密码由 App 保存不会输错，被锁只可能是真实攻击，
 # 锁定期间已登录的 kiosk 会话（12h JWT）不受影响。
 
@@ -337,45 +392,90 @@ LOGIN_MAX_FAILS = 5        # 窗口期内允许的失败次数
 LOGIN_FAIL_WINDOW = 15 * 60   # 失败计数窗口（秒）
 LOGIN_LOCK_SECONDS = 10 * 60  # 触发后的锁定时长（秒）
 
-_login_fails: dict[str, list[float]] = {}
-_login_locked_until: dict[str, float] = {}
+_LOGIN_STATE_FILE = AUTH_DIR / "login_failures.json"
+_login_state: dict = {}
+_login_state_sig: tuple | None = None
+_login_state_ok = True   # 盘上状态可用；损坏/不可写时退化为纯内存
 _login_guard = threading.Lock()
+
+
+def _load_login_state() -> dict:
+    global _login_state, _login_state_sig, _login_state_ok
+    try:
+        st = _LOGIN_STATE_FILE.stat()
+        sig = (st.st_mtime_ns, st.st_size)
+        if _login_state_ok and sig == _login_state_sig:
+            return _login_state
+        data = json.loads(_LOGIN_STATE_FILE.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            _login_state = data
+            _login_state_sig = sig
+            return data
+    except FileNotFoundError:
+        _login_state_sig = None
+        return _login_state
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"登录失败计数文件不可用，退化为进程内计数：{e}")
+        _login_state_ok = False
+    return _login_state
+
+
+def _save_login_state(state: dict) -> None:
+    global _login_state, _login_state_sig
+    _login_state = state
+    try:
+        _LOGIN_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _LOGIN_STATE_FILE.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+        st = _LOGIN_STATE_FILE.stat()
+        _login_state_sig = (st.st_mtime_ns, st.st_size)
+        _login_state_ok = True
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"登录失败计数写盘失败，退化为进程内计数：{e}")
+        _login_state_ok = False
 
 
 def _login_remaining_lock(username: str) -> float:
     """该用户名剩余锁定秒数（0=未锁）"""
     now = time.time()
     with _login_guard:
-        locked_until = _login_locked_until.get(username, 0.0)
-        return max(0.0, locked_until - now)
+        entry = _load_login_state().get(username) or {}
+        return max(0.0, float(entry.get("locked_until", 0)) - now)
 
 
 def _login_record_failure(username: str) -> None:
     now = time.time()
     with _login_guard:
+        state = _load_login_state()
+        entry = state.get(username) or {}
         fails = [
-            t for t in _login_fails.get(username, []) if now - t < LOGIN_FAIL_WINDOW
+            t for t in entry.get("fails", []) if now - t < LOGIN_FAIL_WINDOW
         ]
         fails.append(now)
-        _login_fails[username] = fails
         if len(fails) >= LOGIN_MAX_FAILS:
-            _login_locked_until[username] = now + LOGIN_LOCK_SECONDS
-            _login_fails.pop(username, None)
+            state[username] = {"fails": [], "locked_until": now + LOGIN_LOCK_SECONDS}
             logger.warning(
                 f"账号 {username} 登录连续失败 {LOGIN_MAX_FAILS} 次，"
                 f"临时锁定 {LOGIN_LOCK_SECONDS}s"
             )
-        # 防长期膨胀：过期锁与孤儿计数惰性清理
-        if len(_login_locked_until) > 4096:
-            expired = [u for u, t in _login_locked_until.items() if t <= now]
-            for u in expired:
-                _login_locked_until.pop(u, None)
+        else:
+            state[username] = {"fails": fails,
+                               "locked_until": entry.get("locked_until", 0)}
+        # 防长期膨胀：过期锁与过期计数惰性清理
+        if len(state) > 4096:
+            for u, e in list(state.items()):
+                if (e.get("locked_until", 0) <= now
+                        and not [t for t in e.get("fails", [])
+                                 if now - t < LOGIN_FAIL_WINDOW]):
+                    state.pop(u, None)
+        _save_login_state(state)
 
 
 def _login_record_success(username: str) -> None:
     with _login_guard:
-        _login_fails.pop(username, None)
-        _login_locked_until.pop(username, None)
+        state = _load_login_state()
+        if username in state:
+            state.pop(username, None)
+            _save_login_state(state)
 
 
 # ============== 认证路由 ==============
@@ -423,6 +523,14 @@ def init_auth_routes() -> APIRouter:
                 f"（来源 {req.client.host if req.client else '未知'}）"
             )
             raise HTTPException(status_code=401, detail="用户名或密码错误")
+        if not user.get("active", True):
+            # 密码正确但账号停用（2026-11-04 对齐交接文档 §4.4；401 文案不区分
+            # 用户名/密码错的防枚举原则不受影响——此处已确认凭据正确）
+            logger.warning(
+                f"停用账号登录被拒：{request.username}"
+                f"（来源 {req.client.host if req.client else '未知'}）"
+            )
+            raise HTTPException(status_code=403, detail="账号已停用，请联系管理员启用")
         _login_record_success(request.username)
         token = get_token_manager().issue(user["username"], user["role"])
         logger.info(f"用户登录成功：{user['username']}（{user['role']}）")
@@ -494,6 +602,12 @@ def init_auth_routes() -> APIRouter:
                 continue
             if not password:
                 password = secrets.token_urlsafe(9)
+            elif len(password) < 8:
+                # 密码长度三处统一 ≥8（2026-11-04 对齐交接文档 §3；pydantic
+                # 只拦 API 入参，CSV 导入旁路必须在这里补齐）
+                errors.append({"line": idx, "username": username,
+                               "error": "密码长度不足（至少 8 位），该行未导入"})
+                continue
             try:
                 store.create_user(username, password, role, group)
             except ValueError as e:
@@ -534,6 +648,23 @@ def init_auth_routes() -> APIRouter:
             raise HTTPException(status_code=400, detail=str(e))
         return {"message": f"用户 {username} 已删除"}
 
+    # ---- 停用/启用（2026-11-04 对齐交接文档 §8.5）：停用保留全部历史可随时
+    # 恢复，删除才物理移除。停用即时生效（登录 403 + 既有令牌 API/WS 层拒绝）。----
+    class SetActiveRequest(BaseModel):
+        active: bool
+
+    @router.post("/users/{username}/active")
+    async def set_user_active(username: str, req: SetActiveRequest,
+                              _admin: dict = Depends(require_admin)):  # noqa: B008
+        # 防呆：停用自己会把自己下次请求就 403 踢出后台（无他人可救），直接拒绝
+        if not req.active and username == _admin.get("username"):
+            raise HTTPException(status_code=400, detail="不能停用当前登录的管理员账号")
+        try:
+            get_user_store().set_user_active(username, req.active)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        return {"message": f"用户 {username} 已{'启用' if req.active else '停用'}"}
+
     # ---- 管理员重置任意账号密码（2026-10-14）：替代"删号重建"的改密方式 ----
     # 重置后该账号旧令牌立即失效（pv），且下次登录强制改密（must_change_password）。
     # 允许 admin 给自己重置（即管理员修改自己的密码）。
@@ -548,8 +679,13 @@ def init_auth_routes() -> APIRouter:
 
     @router.post("/change-password")
     async def change_password(req: ChangePasswordRequest, user: dict = Depends(require_user)):
-        # 自助改密：清除强制改密标记（首次登录/被重置后走这里完成改密）
+        # 自助改密：清除强制改密标记（首次登录/被重置后走这里完成改密）。
+        # 改密即换发新 token（2026-11-04 对齐交接文档 §5）——pv 自增已使旧令牌
+        # 失效，调用方拿新 token 无缝续用，不再被迫重登。
         get_user_store().change_password(user["username"], req.new_password, must_change=False)
-        return {"message": "密码已修改"}
+        token = get_token_manager().issue(user["username"], user["role"])
+        return {"message": "密码已修改", "token": token,
+                "user": {"username": user["username"], "role": user["role"],
+                         "must_change_password": False}}
 
     return router

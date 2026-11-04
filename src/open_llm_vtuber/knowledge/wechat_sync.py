@@ -14,6 +14,8 @@ cgi-bin/freepublish/batchget 拉已发布文章（article_url 为永久链接）
 按 url 幂等 upsert 进 PortalStore（kind=news, category=媒体聚焦,
 source=学校微信公众号，created_by=wechat-sync）。已从公众号撤回/删除的文章
 同步在官网下架（仅当本次确实拉到了文章时才做清扫，防 API 异常清空）。
+2026-11-04 增补草稿箱通道：校方只群发不发布时，freepublish 看不到新文章，
+改从 draft/batchget 识别「已群发（带 url）」的草稿自动建条目（见下方分节注释）。
 后台「从公众号同步」按钮可手动触发；另有常驻定时同步（默认每 6 小时，
 环境变量 OLLV_WECHAT_SYNC_INTERVAL_HOURS 调整周期，设 0 关闭），
 多 worker 部署靠状态文件 + 独占锁保证同一周期只有一个进程真正执行。
@@ -40,8 +42,11 @@ from .portal_api import PortalItem, get_portal_store
 WECHAT_API = "https://api.weixin.qq.com/cgi-bin"
 SYNC_SOURCE = "学校微信公众号"
 SYNC_BY = "wechat-sync"
-PAGE_SIZE = 20  # freepublish/batchget 单页上限
+PAGE_SIZE = 20  # freepublish/batchget 与 draft/batchget 单页上限
 MAX_PAGES = 3   # 最多拉 3 页（60 篇），官网新闻栏只展示最新若干条，足够
+
+# 荣誉类标题启发式（portal 栏目与 KB 分类共用一条规则）
+_HONORS_TITLE_RE = re.compile(r"荣誉|喜报|获奖|夺冠|佳绩|祝贺|一等奖|二等奖|特等奖|金牌|百强")
 
 _TOKEN_CACHE: dict = {}
 _TOKEN_LOCK = threading.Lock()
@@ -194,6 +199,14 @@ def sync_wechat_to_portal() -> dict:
                 hidden += 1
     result = {"ok": True, "total": len(articles), "created": created,
               "updated": updated, "hidden": hidden, "skipped": len(articles) - len(fetched_urls)}
+    # 草稿箱通道（2026-11-04）：校方只「群发」不「发布」时，freepublish 看不到
+    # 新文章，但已群发的草稿带 url。独立 try/except：草稿通道任何失败不拖垮
+    # 主同步，下个周期重试。
+    try:
+        result["drafts"] = _sync_drafts_to_portal()
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"草稿箱通道同步失败（主同步不受影响，下个周期重试）：{e}")
+        result["drafts"] = {"scanned": 0, "created": 0, "error": str(e)[:120]}
     result["kb"] = ingest_articles_to_kb()
     result["kb_anchor"] = _refresh_latest_anchor()
     logger.info(f"公众号同步完成：{result}")
@@ -203,6 +216,150 @@ def sync_wechat_to_portal() -> dict:
 async def sync_wechat_to_portal_async() -> dict:
     """async 包装：urllib 是阻塞调用，丢线程池避免卡事件循环。"""
     return await asyncio.to_thread(sync_wechat_to_portal)
+
+
+# ---- 草稿箱通道（2026-11-04）：校方只「群发」不「发布」时的自动同步 ----
+#
+# freepublish/batchget 只列「发布/发表」过的文章；校方 2026-10-16 后只群发，
+# 接口列表停在秋假那篇。破局点：已群发的文章在 draft/batchget 草稿箱里的
+# 草稿会带 url（未群发草稿没有），以此识别「已发出去」的文章自动建条目，
+# 之后复用同一套 KB 灌库/「最新动态」锚点链路。
+# 与已有条目（含后台手贴的短链）以 (mid, idx) 规范键去重：长链直接解析；
+# 短链抓文章页解析（页面 JS 变量两种形态），结果缓存进状态文件。
+# 群发后把草稿删掉的文章覆盖不到（微信无任何群发历史列表接口），交接时
+# 需叮嘱「群发后请保留草稿」。OLLV_WECHAT_DRAFT_SYNC=0 可关本通道。
+
+SYNC_BY_DRAFT = "wechat-sync-draft"   # 独立属主：freepublish 下架清扫只扫
+# created_by==SYNC_BY，草稿条目绝不能挂 SYNC_BY 名下，否则下个周期被误下架
+_DRAFT_STATE_FILE = Path("data/portal/wechat_draft_state.json")
+_DRAFT_SYNC_ENV = "OLLV_WECHAT_DRAFT_SYNC"
+_DRAFT_MAX_PAGES = 5        # 100 条草稿，覆盖数月
+_DRAFT_FIRST_RUN_DAYS = 14  # 首跑只建近 14 天的草稿，更早的历史一律只记 seen
+_DRAFT_SEEN_CAP = 4000      # seen 键封顶，防状态文件无限膨胀
+
+
+def _draft_state() -> dict:
+    try:
+        data = json.loads(_DRAFT_STATE_FILE.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            return data
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _draft_state_put(state: dict) -> None:
+    _DRAFT_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _DRAFT_STATE_FILE.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+
+
+def _parse_mid_idx(url: str) -> str:
+    """长链 → 'mid:idx' 规范键；解析不出返回空串。多图文推送里 mid 同、
+    idx 不同，正好一一对应单篇文章。"""
+    m = re.search(r"[?&]mid=(\d+)", url)
+    i = re.search(r"[?&]idx=(\d+)", url)
+    return f"{m.group(1)}:{i.group(1)}" if m and i else ""
+
+
+def _resolve_key(url: str, cache: dict) -> str:
+    """任意公众号链接 → 'mid:idx'。长链直接解析；短链抓页面解析
+    （`var mid = "..."` 与 `mid: "..."` 两种形态实测都有）。失败返回空串，
+    不缓存失败结果（下个周期重试）。"""
+    if not _is_wx_url(url):
+        return ""
+    key = _parse_mid_idx(url)
+    if key:
+        return key
+    if url in cache:
+        return cache[url]
+    try:
+        page = _http_get_text(url)
+    except Exception:  # noqa: BLE001
+        return ""
+    mm = re.search(r'var\s+mid\s*=\s*["\'](\d+)["\']|\bmid\s*:\s*["\'](\d+)["\']', page)
+    ii = re.search(r'var\s+idx\s*=\s*["\'](\d+)["\']|\bidx\s*:\s*["\'](\d+)["\']', page)
+    key = f"{(mm.group(1) or mm.group(2))}:{(ii.group(1) or ii.group(2))}" if mm and ii else ""
+    if key:
+        cache[url] = key
+    return key
+
+
+def fetch_sent_drafts(max_pages: int = _DRAFT_MAX_PAGES) -> List[dict]:
+    """拉草稿箱里已群发（带 url）的文章，[ {title, url, update_time} ]。
+    url 为空的草稿=还没发出去，天然过滤（发出去后 url 出现，下轮即收）。"""
+    token = get_access_token()
+    out: List[dict] = []
+    for page in range(max_pages):
+        url = f"{WECHAT_API}/draft/batchget?access_token={token}"
+        data = _http_json(url, payload={"offset": page * PAGE_SIZE,
+                                        "count": PAGE_SIZE, "no_content": 1})
+        if data.get("errcode"):
+            raise WechatSyncError(_friendly_err(data["errcode"], data.get("errmsg", "")))
+        for it in data.get("item") or []:
+            update_time = int(it.get("update_time") or 0)
+            for news in (it.get("content") or {}).get("news_item") or []:
+                art_url = (news.get("url") or "").strip()
+                title = (news.get("title") or "").strip()
+                if not art_url or not title:
+                    continue
+                out.append({"title": title, "url": art_url, "update_time": update_time})
+        if (data.get("item_count") or 0) < PAGE_SIZE:
+            break
+    return out
+
+
+def _sync_drafts_to_portal() -> dict:
+    """草稿箱通道主体：扫描已群发草稿，官网没有的（按 mid:idx 与标题双保险
+    去重）新建条目，属主 SYNC_BY_DRAFT。首跑只建近 _DRAFT_FIRST_RUN_DAYS 天的。"""
+    if os.environ.get(_DRAFT_SYNC_ENV, "").strip() == "0":
+        return {"scanned": 0, "created": 0, "disabled": True}
+    drafts = fetch_sent_drafts()
+    store = get_portal_store()
+    state = _draft_state()
+    cache = state.setdefault("resolved", {})
+    seen: set = set(state.get("seen", []))
+    first_run = not state.get("initialized")
+
+    portal_keys: set = set()
+    portal_titles: set = set()
+    for it in store.list_all():
+        if not _is_wx_url(it.url):
+            continue
+        k = _resolve_key(it.url, cache)
+        if k:
+            portal_keys.add(k)
+        portal_titles.add(re.sub(r"\s+", "", it.title))
+
+    now = time.time()
+    created = 0
+    for art in drafts:
+        key = _parse_mid_idx(art["url"]) or _resolve_key(art["url"], cache)
+        if not key:
+            continue
+        seen.add(key)
+        if key in portal_keys:
+            continue
+        if re.sub(r"\s+", "", art["title"]) in portal_titles:
+            continue  # 标题兜底：短链解析失败的旧条目不至于重复建
+        if first_run and (not art["update_time"]
+                          or now - art["update_time"] > _DRAFT_FIRST_RUN_DAYS * 86400):
+            continue
+        date = (datetime.fromtimestamp(art["update_time"]).strftime("%Y-%m-%d")
+                if art["update_time"] else "")
+        title = art["title"]
+        category = "荣誉喜报" if _HONORS_TITLE_RE.search(title) else "校园新闻"
+        store.create(PortalItem(
+            id="wxd" + hashlib.md5(art["url"].encode("utf-8")).hexdigest()[:8],
+            kind="news", title=title, date=date, category=category,
+            source=SYNC_SOURCE, url=art["url"], published=True, pinned=False,
+            created_by=SYNC_BY_DRAFT))
+        portal_titles.add(re.sub(r"\s+", "", title))
+        created += 1
+        logger.info(f"公众号草稿箱通道新建条目：{title[:30]}（{date or '日期不详'} → {category}）")
+
+    state["seen"] = sorted(seen)[-_DRAFT_SEEN_CAP:]
+    state["initialized"] = True
+    _draft_state_put(state)
+    return {"scanned": len(drafts), "created": created}
 
 
 # ---- 定时自动同步（2026-10-05）：无需人工点按钮 ----
@@ -427,7 +584,7 @@ def fetch_wechat_article(url: str) -> dict:
 
 def _pick_kb_category(title: str):
     from .models import KnowledgeCategory
-    if re.search(r"荣誉|喜报|获奖|夺冠|佳绩|祝贺|一等奖|二等奖|特等奖|金牌|百强", title):
+    if _HONORS_TITLE_RE.search(title):
         return KnowledgeCategory.HONORS
     return KnowledgeCategory.ACTIVITIES
 
