@@ -228,6 +228,11 @@ async def sync_wechat_to_portal_async() -> dict:
 # 短链抓文章页解析（页面 JS 变量两种形态），结果缓存进状态文件。
 # 群发后把草稿删掉的文章覆盖不到（微信无任何群发历史列表接口），交接时
 # 需叮嘱「群发后请保留草稿」。OLLV_WECHAT_DRAFT_SYNC=0 可关本通道。
+# 页面核验（2026-11-04 用户反馈：草稿箱里大多是没编辑完的稿子）：带 url 只
+# 说明群发过，不说明内容合适——撤回/删除的文章草稿仍带 url；群发后又改草稿
+# （标题还是没改好的占位）也可能被扫到。所以候选条目建进官网前一律抓文章页
+# 核验：标题以真正发出去的版本（og:title）为准、日期取实际发表时间；已撤回/
+# 删除/违规、标题疑似占位或测试稿的一律跳过；抓页失败不记 seen 下轮重试。
 
 SYNC_BY_DRAFT = "wechat-sync-draft"   # 独立属主：freepublish 下架清扫只扫
 # created_by==SYNC_BY，草稿条目绝不能挂 SYNC_BY 名下，否则下个周期被误下架
@@ -236,6 +241,23 @@ _DRAFT_SYNC_ENV = "OLLV_WECHAT_DRAFT_SYNC"
 _DRAFT_MAX_PAGES = 5        # 100 条草稿，覆盖数月
 _DRAFT_FIRST_RUN_DAYS = 14  # 首跑只建近 14 天的草稿，更早的历史一律只记 seen
 _DRAFT_SEEN_CAP = 4000      # seen 键封顶，防状态文件无限膨胀
+
+# 文章被撤回/删除/违规下架后页面顶部会出现这些提示（撤回后草稿仍带 url，
+# 不核验就会把不可见的文章搬进官网）
+_DRAFT_RECALL_RE = re.compile(
+    r"已被发布者撤回|已被发布者删除|因违规无法查看")
+_DRAFT_TITLE_PLACEHOLDERS = ("标题", "未命名", "新建图文", "图文消息", "草稿")
+
+
+def _draft_title_suspicious(title: str) -> bool:
+    """标题疑似没编辑完：占位词/过短/纯测试稿。宁可漏收（下轮不重试也不该
+    把半成品推上官网），不误收。"""
+    t = (title or "").strip()
+    if len(t) < 4:
+        return True
+    if t in _DRAFT_TITLE_PLACEHOLDERS or t.startswith("未命名"):
+        return True
+    return bool(re.fullmatch(r"(?i)test\d*", t))
 
 
 def _draft_state() -> dict:
@@ -283,9 +305,33 @@ def _resolve_key(url: str, cache: dict) -> str:
     return key
 
 
+def _verify_sent_draft(url: str) -> tuple:
+    """抓文章页核验「已群发」草稿是否适合进官网。
+
+    返回 (核验标题, 日期, 放行, 原因)：
+    - 抓页失败/验证页/取不到标题 → ("", "", False, "retry")：不标 seen，下轮重试
+    - 已撤回/删除/违规 → ("", "", False, "gone")：标 seen 永久跳过并记日志
+    - 正常 → (页面 og:title, 发表日期, True, "")：以真正发出去的版本为准
+    """
+    try:
+        page = _http_get_text(url)
+    except Exception:  # noqa: BLE001
+        return "", "", False, "retry"
+    if "环境异常" in page[:3000]:
+        return "", "", False, "retry"
+    if _DRAFT_RECALL_RE.search(page[:6000]):
+        return "", "", False, "gone"
+    title, date = _extract_article_meta(page)
+    if not title:
+        return "", "", False, "retry"
+    return title, date, True, ""
+
+
 def fetch_sent_drafts(max_pages: int = _DRAFT_MAX_PAGES) -> List[dict]:
     """拉草稿箱里已群发（带 url）的文章，[ {title, url, update_time} ]。
-    url 为空的草稿=还没发出去，天然过滤（发出去后 url 出现，下轮即收）。"""
+    url 为空的草稿=还没发出去，天然过滤（发出去后 url 出现，下轮即收）。
+    注意：草稿箱里的 title 是草稿当前标题，未必是发出去的版本——建官网条目
+    前还有 _verify_sent_draft 页面核验。"""
     token = get_access_token()
     out: List[dict] = []
     for page in range(max_pages):
@@ -309,7 +355,8 @@ def fetch_sent_drafts(max_pages: int = _DRAFT_MAX_PAGES) -> List[dict]:
 
 def _sync_drafts_to_portal() -> dict:
     """草稿箱通道主体：扫描已群发草稿，官网没有的（按 mid:idx 与标题双保险
-    去重）新建条目，属主 SYNC_BY_DRAFT。首跑只建近 _DRAFT_FIRST_RUN_DAYS 天的。"""
+    去重）经页面核验后新建条目，属主 SYNC_BY_DRAFT。首跑只建近
+    _DRAFT_FIRST_RUN_DAYS 天的。核验细节见 _verify_sent_draft。"""
     if os.environ.get(_DRAFT_SYNC_ENV, "").strip() == "0":
         return {"scanned": 0, "created": 0, "disabled": True}
     drafts = fetch_sent_drafts()
@@ -335,23 +382,42 @@ def _sync_drafts_to_portal() -> dict:
         key = _parse_mid_idx(art["url"]) or _resolve_key(art["url"], cache)
         if not key:
             continue
-        seen.add(key)
+        # seen 是「已定案」集合（建过/明确跳过），必须先查后写——否则首跑窗口
+        # 外只记 seen 的历史草稿会在之后每一轮（first_run 失效后）被回建
+        # （2026-11-04 事故：12:37 循环回建 98 条旧文章，见交接记录）
+        if key in seen:
+            continue
         if key in portal_keys:
+            seen.add(key)
             continue
         if re.sub(r"\s+", "", art["title"]) in portal_titles:
+            seen.add(key)
             continue  # 标题兜底：短链解析失败的旧条目不至于重复建
         if first_run and (not art["update_time"]
                           or now - art["update_time"] > _DRAFT_FIRST_RUN_DAYS * 86400):
+            seen.add(key)
             continue
-        date = (datetime.fromtimestamp(art["update_time"]).strftime("%Y-%m-%d")
-                if art["update_time"] else "")
-        title = art["title"]
+        # 页面核验：标题认真正发出去的版本，撤回/占位/测试稿不放行
+        v_title, v_date, ok, reason = _verify_sent_draft(art["url"])
+        if not ok:
+            if reason == "gone":
+                seen.add(key)
+                logger.info(f"公众号草稿跳过（文章已撤回/删除/违规）：{art['title'][:30]}")
+            continue  # retry：不标 seen，下个周期重试
+        if _draft_title_suspicious(v_title):
+            seen.add(key)
+            logger.info(f"公众号草稿跳过（标题疑似未编辑完）：「{v_title[:20]}」")
+            continue
+        title = v_title
+        date = v_date or (datetime.fromtimestamp(art["update_time"]).strftime("%Y-%m-%d")
+                          if art["update_time"] else "")
         category = "荣誉喜报" if _HONORS_TITLE_RE.search(title) else "校园新闻"
         store.create(PortalItem(
             id="wxd" + hashlib.md5(art["url"].encode("utf-8")).hexdigest()[:8],
             kind="news", title=title, date=date, category=category,
             source=SYNC_SOURCE, url=art["url"], published=True, pinned=False,
             created_by=SYNC_BY_DRAFT))
+        seen.add(key)
         portal_titles.add(re.sub(r"\s+", "", title))
         created += 1
         logger.info(f"公众号草稿箱通道新建条目：{title[:30]}（{date or '日期不详'} → {category}）")
