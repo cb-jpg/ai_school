@@ -28,7 +28,7 @@ import {
 import { useAuth } from '@/context/auth-context';
 import { useLive2DConfig } from '@/context/live2d-config-context';
 import { useLive2dModels } from '@/hooks/live2d/use-live2d-models';
-import { apiUrl } from '@/services/api-base';
+import { useRemoteImage } from '@/hooks/utils/use-remote-image';
 import type { Live2dCharacter } from '@/services/live2d-models-api';
 import { toaster } from '@/components/ui/toaster';
 
@@ -67,6 +67,27 @@ const colors = {
   gray600: '#475569',
   gray800: '#1e293b',
 };
+
+/** 模型头像：远程 http 图经 useRemoteImage 兼容加载——部分 ROM 的 WebView 静默
+ * 拦截 <img> 直连 http 远程图（一体机实报「小石/小萌头像显示不出来」），失败
+ * 回退 emoji 占位。 */
+function ModelAvatar({ src, fallback }: { src: string; fallback: string }) {
+  const resolved = useRemoteImage(src);
+  if (!resolved) return <Text fontSize="2xl">{fallback}</Text>;
+  return (
+    <Image
+      src={resolved}
+      alt={fallback}
+      boxSize="10"
+      rounded="full"
+      objectFit="cover"
+      border="1px solid"
+      borderColor={colors.gray200}
+      bg="white"
+      flexShrink={0}
+    />
+  );
+}
 
 // 默认角色配置
 const defaultCharacterConfig: CharacterConfig = {
@@ -493,17 +514,7 @@ export const CharacterConfig: FC = () => {
                   >
                     <HStack gap="3">
                       {character.avatarUrl ? (
-                        <Image
-                          src={apiUrl(character.avatarUrl)}
-                          alt={character.name}
-                          boxSize="10"
-                          rounded="full"
-                          objectFit="cover"
-                          border="1px solid"
-                          borderColor={colors.gray200}
-                          bg="white"
-                          flexShrink={0}
-                        />
+                        <ModelAvatar src={character.avatarUrl} fallback={character.preview} />
                       ) : (
                         <Text fontSize="2xl">{character.preview}</Text>
                       )}

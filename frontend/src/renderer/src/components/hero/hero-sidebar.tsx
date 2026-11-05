@@ -5,6 +5,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
+import { useRemoteImage } from '@/hooks/utils/use-remote-image';
 import { apiUrl } from '@/services/api-base';
 import {
   Box,
@@ -63,6 +64,27 @@ const schoolColors = {
 };
 
 // 数字人角色列表改为运行时从后端 /api/live2d-models/info 获取（见 useLive2dModels）
+
+/** 模型头像：远程 http 图经 useRemoteImage 兼容加载——部分 ROM 的 WebView 静默
+ * 拦截 <img> 直连 http 远程图（一体机实报「小石/小萌头像显示不出来」），失败
+ * 回退 emoji 占位。 */
+function ModelAvatar({ src, fallback }: { src: string; fallback: string }) {
+  const resolved = useRemoteImage(src);
+  if (!resolved) return <Text fontSize="2xl">{fallback}</Text>;
+  return (
+    <Image
+      src={resolved}
+      alt={fallback}
+      boxSize="10"
+      rounded="full"
+      objectFit="cover"
+      border="1px solid"
+      borderColor={schoolColors.border}
+      bg={schoolColors.white}
+      flexShrink={0}
+    />
+  );
+}
 
 // 背景图片列表：校园实景为前端打包资源（APK 离线可用）；
 // 矢量插画背景由后端 /bg 静态目录提供
@@ -494,17 +516,7 @@ export default function HeroSidebar({ isOpen, onClose }: HeroSidebarProps) {
                     {/* 角色头像：模型目录提供 <目录名>.png 时用真图（后端 /live2d-models/info 的 avatar 字段），
                         否则回退到按名匹配的 emoji 占位 */}
                     {character.avatarUrl ? (
-                      <Image
-                        src={apiUrl(character.avatarUrl)}
-                        alt={character.name}
-                        boxSize="10"
-                        rounded="full"
-                        objectFit="cover"
-                        border="1px solid"
-                        borderColor={schoolColors.border}
-                        bg={schoolColors.white}
-                        flexShrink={0}
-                      />
+                      <ModelAvatar src={character.avatarUrl} fallback={character.preview} />
                     ) : (
                       <Text fontSize="2xl">{character.preview}</Text>
                     )}
