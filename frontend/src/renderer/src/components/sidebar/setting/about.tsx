@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { FaGithub, FaBook } from 'react-icons/fa';
 import { settingStyles } from './setting-styles';
 import { Button } from '@/components/ui/button';
+import { APP_VERSION } from '@/utils/app-version';
 
 function About(): JSX.Element {
   const { t } = useTranslation();
@@ -19,7 +20,8 @@ function About(): JSX.Element {
     window.open(url, '_blank');
   };
   
-  const appVersion = '1.2.1';
+  // 应用真实版本（构建期从 android versionName 注入；此前硬编码 npm 包版本 1.2.1 与发版无关）
+  const appVersion = `v${APP_VERSION}`;
   // const appAuthor = 'Open LLM VTuber Team';
 
   return (

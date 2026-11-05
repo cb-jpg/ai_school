@@ -15,6 +15,7 @@ import { changePassword } from '@/services/auth';
 import { withToken } from '@/services/api-base';
 import { AGREEMENTS, type AgreementDoc } from '@/data/agreements';
 import { siteTheme, swissFont } from '@/components/hero/site-theme';
+import VersionBadge from '@/components/ui/version-badge';
 
 // 全站官网主题（site-theme.ts）：绛红主色，渐变到按压深一档
 const brand = siteTheme.red;
@@ -386,6 +387,13 @@ export default function AppLoginPage({ onCancel, onGuest }: AppLoginPageProps) {
           隐私政策
         </Text>
       </Text>
+
+      {/* 版本徽标（2026-11-05）：当前版本 + App 端有热更包时提示可更新 */}
+      <VersionBadge
+        data-login-version
+        mt={2}
+        color="rgba(255,255,255,0.55)"
+      />
 
       {/* 协议全文弹层：内嵌全文，各端（App/手机/桌面）都可在线阅读 */}
       {agreement && (

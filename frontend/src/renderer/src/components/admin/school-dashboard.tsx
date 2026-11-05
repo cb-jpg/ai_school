@@ -10,6 +10,7 @@ import {
   FiMessageSquare,
   FiSettings,
 } from 'react-icons/fi';
+import { APP_BUILD, APP_VERSION } from '@/utils/app-version';
 
 // 学校颜色配置
 const colors = {
@@ -120,7 +121,7 @@ export const SchoolDashboard: FC = () => {
               系统版本：
             </Text>
             <Text fontSize="sm" color={colors.gray800} fontWeight="medium">
-              v1.2.1
+              {`v${APP_VERSION}（构建 ${APP_BUILD}）`}
             </Text>
           </HStack>
           <HStack gap="2">
