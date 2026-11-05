@@ -611,7 +611,17 @@ export default function HomePage(_props: HomePageProps) {
             fontSize={isPortraitBoard ? '15px' : { base: '9.5px', md: '11px' }}
             lineHeight="1.6"
           >
-            {SCHOOL_CONTACT.address} · 联系电话 {SCHOOL_CONTACT.phone} · © 2026 佛山市南海区石实实验学校 · 小石同学 v{APP_VERSION}
+            {SCHOOL_CONTACT.address} · 联系电话 {SCHOOL_CONTACT.phone}
+            {/* 版权行另起一行（2026-11-05 测试反馈图3：一行太长挤在屏幕外，读不到版本号） */}
+            <Text
+              as="span"
+              display="block"
+              color={siteTheme.textSecondary}
+              fontSize="inherit"
+              lineHeight="1.6"
+            >
+              © 2026 佛山市南海区石实实验学校 · 小石同学 v{APP_VERSION}
+            </Text>
           </Text>
         </Box>
       </Flex>

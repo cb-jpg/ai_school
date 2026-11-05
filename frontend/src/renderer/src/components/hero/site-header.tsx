@@ -11,7 +11,7 @@
 import { useState } from 'react';
 import { Box, Button, Flex, HStack, Image, Text } from '@chakra-ui/react';
 import { FiChevronDown, FiHome, FiMessageCircle, FiSettings } from 'react-icons/fi';
-import TopicTabRow from './topic-tab-row';
+import TopicTabRow, { navSizing } from './topic-tab-row';
 import { SCHOOL_CONFIG } from './school-config';
 import { kaiFont, swissFont, siteTheme } from './site-theme';
 import { useInterrupt } from '@/hooks/utils/use-interrupt';
@@ -70,6 +70,8 @@ function NavDropdown({
     && typeof window !== 'undefined'
     && window.matchMedia('(min-width: 768px)').matches;
   const navigateFirst = () => items[0]?.onClick();
+  // 手机/一体机压缩尺寸（11.5 测试反馈视频2：菜单栏缩小字体弄成一页版）
+  const s = navSizing(isPortraitBoard);
 
   return (
     <Box
@@ -88,14 +90,14 @@ function NavDropdown({
           if (isDesktopViewport && !isPortraitBoard) setOpen((value) => !value);
           else navigateFirst();
         }}
-        height={isPortraitBoard ? '54px' : '40px'}
-        px={isPortraitBoard ? '20px' : { base: '12px', lg: '16px' }}
+        height={s.height}
+        px={s.px}
         borderRadius="md"
         background={active ? siteTheme.red : 'transparent'}
         color={active ? 'white' : siteTheme.navy}
         fontFamily={swissFont}
         fontWeight="500"
-        fontSize={isPortraitBoard ? '19px' : 'sm'}
+        fontSize={s.fontSize}
         flexShrink={0}
         _hover={{
           background: active ? siteTheme.red : siteTheme.redWash,
@@ -103,7 +105,7 @@ function NavDropdown({
         }}
         transition="all 200ms ease"
       >
-        <HStack gap={isPortraitBoard ? '8px' : '5px'}>
+        <HStack gap={s.innerGap}>
           <Text>{label}</Text>
           {/* ▾ 箭头只在 md+ 桌面语义成立（base 一律直跳栏目页，无下拉可展开） */}
           <Box
@@ -177,6 +179,8 @@ export default function SiteHeader({
   const isPortraitBoard = usePortraitBoard();
   const { user, logout } = useAuth();
   const isStaff = user?.role === 'admin' || user?.role === 'editor';
+  // 手机/一体机导航压缩尺寸（11.5 测试反馈视频2：菜单栏缩小字体弄成一页版）
+  const s = navSizing(isPortraitBoard);
 
   const goHash = (hash: string) => {
     interrupt();
@@ -306,14 +310,14 @@ export default function SiteHeader({
             aria-label="回到学校首页"
             aria-current={activeNav === 'home' ? 'page' : undefined}
             onClick={() => goHash('#/home')}
-            height={isPortraitBoard ? '54px' : '40px'}
-            px={isPortraitBoard ? '20px' : { base: '12px', lg: '16px' }}
+            height={s.height}
+            px={s.px}
             borderRadius="md"
             background={activeNav === 'home' ? siteTheme.red : 'transparent'}
             color={activeNav === 'home' ? 'white' : '#586174'}
             fontFamily={swissFont}
             fontWeight="500"
-            fontSize={isPortraitBoard ? '19px' : 'sm'}
+            fontSize={s.fontSize}
             flexShrink={0}
             _hover={{
               background: activeNav === 'home' ? siteTheme.red : siteTheme.redWash,
@@ -321,8 +325,8 @@ export default function SiteHeader({
             }}
             transition="all 200ms ease"
           >
-            <HStack gap={isPortraitBoard ? '10px' : '8px'}>
-              <FiHome size={isPortraitBoard ? 22 : 16} />
+            <HStack gap={s.innerGap}>
+              <FiHome size={s.icon} />
               <Text>首页</Text>
             </HStack>
           </Button>
@@ -363,8 +367,8 @@ export default function SiteHeader({
               interrupt();
               onGoChat();
             }}
-            height={isPortraitBoard ? '54px' : '40px'}
-            px={isPortraitBoard ? '20px' : '16px'}
+            height={s.height}
+            px={s.px}
             borderRadius="md"
             variant="ghost"
             flexShrink={0}
@@ -372,13 +376,13 @@ export default function SiteHeader({
             color={activeNav === 'dialog' ? 'white' : '#586174'}
             fontFamily={swissFont}
             fontWeight="500"
-            fontSize={isPortraitBoard ? '19px' : 'sm'}
+            fontSize={s.fontSize}
             _hover={{
               background: activeNav === 'dialog' ? siteTheme.red : siteTheme.redWash,
               color: activeNav === 'dialog' ? 'white' : siteTheme.red,
             }}
           >
-            <FiMessageCircle size={isPortraitBoard ? 22 : 16} style={{ marginRight: '8px' }} />
+            <FiMessageCircle size={s.icon} style={{ marginRight: s.innerGap }} />
             对话
           </Button>
         }

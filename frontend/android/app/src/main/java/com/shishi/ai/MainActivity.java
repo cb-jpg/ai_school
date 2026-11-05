@@ -42,6 +42,11 @@ public class MainActivity extends BridgeActivity {
      * 另：一体机/定制 ROM 常改系统字体大小，WebView 会按 fontScale 放大
      * textZoom（文字变大、容器不变）→ 文字重叠溢出、界面错乱（2026-09-14
      * 一体机适配）。UI 按 px 定版，这里把 textZoom 钉死 100% 保证各端一致。
+     * 再：关掉 WebView 全部缩放（2026-11-05 一体机测试反馈视频1「固定缩放，
+     * 不要每点一次就自动放大，影响阅读」）：页面 meta 的 user-scalable=no 是
+     * JS 运行时改写，部分 ROM/老内核不接受；触控一体机又极易把单击判成双击，
+     * 双击缩放逐次放大整页。原生层 setSupportZoom/setBuiltInZoomControls
+     * 全关 = 物理固定缩放，App 与一体机（同装本 APK）一并生效。
      */
     private void forceWebViewNetworkSettings() {
         WebView webView = getBridge() != null ? getBridge().getWebView() : null;
@@ -50,15 +55,20 @@ public class MainActivity extends BridgeActivity {
             android.util.Log.d("AISchool", "before: mixed=" + settings.getMixedContentMode()
                     + " blockImg=" + settings.getBlockNetworkImage()
                     + " blockLoads=" + settings.getBlockNetworkLoads()
-                    + " textZoom=" + settings.getTextZoom());
+                    + " textZoom=" + settings.getTextZoom()
+                    + " supportZoom=" + settings.supportZoom());
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
             settings.setBlockNetworkImage(false);
             settings.setBlockNetworkLoads(false);
             settings.setTextZoom(100);
+            settings.setSupportZoom(false);
+            settings.setBuiltInZoomControls(false);
+            settings.setDisplayZoomControls(false);
             android.util.Log.d("AISchool", "after: mixed=" + settings.getMixedContentMode()
                     + " blockImg=" + settings.getBlockNetworkImage()
                     + " blockLoads=" + settings.getBlockNetworkLoads()
-                    + " textZoom=" + settings.getTextZoom());
+                    + " textZoom=" + settings.getTextZoom()
+                    + " supportZoom=" + settings.supportZoom());
         }
     }
 

@@ -9,6 +9,7 @@ import {
   Box,
   VStack,
   HStack,
+  Button,
   Text,
   Textarea,
   IconButton,
@@ -256,19 +257,46 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
             >
               <FiHome />
             </IconButton>
-            <IconButton
-              aria-label="新对话"
-              size="sm"
-              variant="ghost"
-              color={schoolColors.textSecondary}
-              onClick={() => {
-                // 创建新对话：打断播报 + 通知后端开新会话
-                createNewHistory();
-                setShowHistory(false);
-              }}
-            >
-              <FiPlus />
-            </IconButton>
+            {/* 清空对话（2026-11-05 测试反馈「加一个清缓存的按钮，对话不要永远显示在对话栏里」）：
+                语义即「新对话」——通知后端开新会话并清空对话栏；一体机用文字按钮亮出来，
+                路人/测试老师一眼可见；手机/网页端维持原「新对话」图标键不变 */}
+            {IS_KIOSK ? (
+              <Button
+                aria-label="清空对话"
+                title="清空对话（开始新会话）"
+                data-testid="clear-chat-button"
+                size="sm"
+                variant="ghost"
+                height="28px"
+                px={2}
+                gap="4px"
+                flexShrink={0}
+                color={schoolColors.textSecondary}
+                onClick={() => {
+                  // 创建新对话：打断播报 + 通知后端开新会话
+                  createNewHistory();
+                  setShowHistory(false);
+                }}
+              >
+                <FiPlus />
+                清空对话
+              </Button>
+            ) : (
+              <IconButton
+                aria-label="新对话"
+                title="新对话"
+                size="sm"
+                variant="ghost"
+                color={schoolColors.textSecondary}
+                onClick={() => {
+                  // 创建新对话：打断播报 + 通知后端开新会话
+                  createNewHistory();
+                  setShowHistory(false);
+                }}
+              >
+                <FiPlus />
+              </IconButton>
+            )}
             <IconButton
               aria-label="对话历史"
               size="sm"
