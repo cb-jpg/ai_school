@@ -10,6 +10,7 @@ import { useSendAudio } from '@/hooks/utils/use-send-audio';
 import { SubtitleContext } from './subtitle-context';
 import { AiStateContext, type AiState } from './ai-state-context';
 import { useLocalStorage } from '@/hooks/utils/use-local-storage';
+import { IS_KIOSK } from '@/utils/device-profile';
 import { toaster } from '@/components/ui/toaster';
 
 /**
@@ -113,9 +114,11 @@ export function VADProvider({ children }: { children: React.ReactNode }) {
   // Persistent state management (改为不持久化，每次重新启动时默认关闭)
   const [micOn, setMicOn] = useState(DEFAULT_VAD_STATE.micOn);
   const autoStopMicRef = useRef(true);
+  // 一体机默认开：立式机是路人即问即走场景，说完话必须自动收音（11.5 测试反馈「不会自动停止接收声音」），
+  // 且 UI 上一体机不渲染该开关——这里只定默认值， speech-end 处另有 IS_KIOSK 强制兜底
   const [autoStopMic, setAutoStopMicState] = useLocalStorage(
     'autoStopMic',
-    DEFAULT_VAD_STATE.autoStopMic,
+    IS_KIOSK ? true : DEFAULT_VAD_STATE.autoStopMic,
   );
   const [settings, setSettings] = useLocalStorage<VADSettings>(
     'vadSettings',
@@ -229,7 +232,8 @@ export function VADProvider({ children }: { children: React.ReactNode }) {
     console.log('Speech ended');
     audioTaskQueue.clearQueue();
 
-    if (autoStopMicRef.current) {
+    if (autoStopMicRef.current || IS_KIOSK) {
+      // 一体机无条件自动收音：即使本地存储残留过 OFF 也强制生效（11.5 测试反馈）
       stopMic();
     } else {
       console.log('Auto stop mic is OFF, keeping mic active');

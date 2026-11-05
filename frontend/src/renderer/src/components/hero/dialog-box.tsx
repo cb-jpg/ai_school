@@ -32,6 +32,7 @@ import { useLive2DConfig } from '@/context/live2d-config-context';
 import { useSidebar } from '@/hooks/sidebar/use-sidebar';
 import { resolveApiBaseUrl } from '@/services/api-base';
 import { wsService } from '@/services/websocket-service';
+import { IS_KIOSK } from '@/utils/device-profile';
 import { siteTheme } from './site-theme';
 
 // 全站官网主题（site-theme.ts 石实IP官方色）语义别名：
@@ -188,12 +189,14 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
       )}
 
       <VStack gap={{ base: 3, md: 6 }} align="stretch" flex={1} overflow="hidden">
-        {/* Status Indicator（手机端排在标题下方，order 见各块；胶囊底衬提升在人物/渐变上的可读性） */}
+        {/* Status Indicator（手机端排在标题下方，order 见各块；胶囊底衬提升在人物/渐变上的可读性）
+            一体机：状态条固定第 0 位，输入条(1)紧随其后移到顶部——立式机身底部输入要弯腰，
+            测试反馈(11.5)要求只有一体机把输入区上移，手机/网页布局不变 */}
         <HStack
           gap={2}
           mb={{ base: 2, md: 4 }}
           justify="space-between"
-          order={{ base: 1, md: 0 }}
+          order={IS_KIOSK ? 0 : { base: 1, md: 0 }}
         >
           <HStack
             gap={2}
@@ -278,8 +281,12 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
           </HStack>
         </HStack>
 
-        {/* 副标题：桌面端/竖屏大屏显示一句说明（手机端隐藏，由状态行承担头部） */}
-        <Box order={{ base: 0, md: 1 }} px={{ base: 0, md: 0 }} display={isPortraitBoard ? 'block' : { base: 'none', sm: 'block' }}>
+        {/* 副标题：桌面端/竖屏大屏显示一句说明（手机端隐藏，由状态行承担头部）；一体机隐藏——顶部让位给输入条 */}
+        <Box
+          order={{ base: 0, md: 1 }}
+          px={{ base: 0, md: 0 }}
+          display={IS_KIOSK ? 'none' : (isPortraitBoard ? 'block' : { base: 'none', sm: 'block' })}
+        >
           <Text
             fontSize={isPortraitBoard ? '20px' : { sm: 'base', md: 'lg' }}
             color={schoolColors.textSecondary}
@@ -414,9 +421,10 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
         </Box>
 
         {/* Input Area —— zIndex 20：浮于 Live2D 层(15)之上，人物再怎么下移也不挡输入。
-            输入框与对话卡同宽；右侧悬浮麦克风，开始输入时原地切换为发送键 */}
+            输入框与对话卡同宽；右侧悬浮麦克风，开始输入时原地切换为发送键。
+            一体机 order=1：紧贴状态条置于顶部（立式机身免弯腰，11.5 测试反馈） */}
         <Box
-          order={3}
+          order={IS_KIOSK ? 1 : 3}
           position="relative"
           zIndex={20}
         >
@@ -509,21 +517,24 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
           )}
         </Box>
 
-        {/* 麦克风自动停止设置 —— 同输入区，保持可点 */}
-        <HStack
-          gap={3}
-          fontSize={isPortraitBoard ? '15px' : 'xs'}
-          color={schoolColors.textSecondary}
-          order={4}
-          position="relative"
-          zIndex={20}
-        >
-          <Switch
-            checked={autoStopMic}
-            onCheckedChange={(e) => setAutoStopMic(e.checked)}
-          />
-          <Text>对话结束后自动停止麦克风</Text>
-        </HStack>
+        {/* 麦克风自动停止设置 —— 同输入区，保持可点。
+            一体机不渲染：自动停止由 VAD 层强制生效（vad-context），路人模式说完即收音 */}
+        {!IS_KIOSK && (
+          <HStack
+            gap={3}
+            fontSize={isPortraitBoard ? '15px' : 'xs'}
+            color={schoolColors.textSecondary}
+            order={4}
+            position="relative"
+            zIndex={20}
+          >
+            <Switch
+              checked={autoStopMic}
+              onCheckedChange={(e) => setAutoStopMic(e.checked)}
+            />
+            <Text>对话结束后自动停止麦克风</Text>
+          </HStack>
+        )}
       </VStack>
     </Flex>
   );
