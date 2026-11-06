@@ -151,6 +151,9 @@ function MottoStrip({ isPortraitBoard }: { isPortraitBoard: boolean }) {
             fontWeight="600"
             fontSize={isPortraitBoard ? '22px' : { base: '11px', md: '12.5px' }}
             lineHeight="1.45"
+            /* keep-all：格窄时只在词间空格处换行（「勤教勤学 开拓进取」断成
+               两截整词），禁止 CJK 任意断字出现「开/拓进取」式半词换行 */
+            wordBreak="keep-all"
           >
             {text}
           </Text>
@@ -185,13 +188,21 @@ export default function HomePage(_props: HomePageProps) {
   };
 
   /* hero banner 高度：页头实际高（base≈94px / md≈112px）+ banner 区高。
-     banner 背景层从页头顶端铺起（页头自身不透明，盖住 banner 顶部即可对齐）。 */
+     banner 背景层从页头顶端铺起（页头自身不透明，盖住 banner 顶部即可对齐）。
+     高度走 var(--app-vh)（2026-11-06 首页乱修复②）：kiosk ROM 的 100vh 缩水
+     曾致 banner/背景高度错位；--app-vh 仅一体机写入，手机/桌面回退 100vh 不变。 */
   const bannerBgHeight = isPortraitBoard
     ? undefined
-    : { base: 'calc(96px + 38vh)', md: 'calc(114px + 40vh)' };
+    : {
+        base: 'calc(96px + 0.38 * var(--app-vh, 100vh))',
+        md: 'calc(114px + 0.40 * var(--app-vh, 100vh))',
+      };
   const heroSectionHeight = isPortraitBoard
     ? undefined
-    : { base: '38vh', md: '40vh' };
+    : {
+        base: 'calc(0.38 * var(--app-vh, 100vh))',
+        md: 'calc(0.40 * var(--app-vh, 100vh))',
+      };
 
   return (
     <Box
@@ -355,8 +366,11 @@ export default function HomePage(_props: HomePageProps) {
           <Flex
             data-testid="home-hero-banner"
             position="relative"
-            height={heroSectionHeight}
-            minHeight="240px"
+            /* minHeight 而非 height（2026-11-06 首页乱修复①）：v2.60 往面板里加
+               了「13位保送」「一等奖」两行后桌面面板高≈335px，超出固定 40vh
+               （800 高窗口=320px）→ 面板溢出盖住下方一风三训条。minHeight 让
+               区块随内容长高，任何字号/行数组合都不可能再压到下面的格子。 */
+            minHeight={heroSectionHeight}
             align="center"
             px={{ base: 3, md: 8, lg: 12 }}
           >

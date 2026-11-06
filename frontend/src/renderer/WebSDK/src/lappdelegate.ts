@@ -190,7 +190,7 @@ export class LAppDelegate {
 
       // 画面の初期化
       // 屏幕初始化
-      gl!.clearColor(0.0, 0.0, 0.0, 1.0);
+      gl!.clearColor(0.0, 0.0, 0.0, 0.0);
 
       // 深度テストを有効化
       // 启用深度测试
@@ -202,8 +202,15 @@ export class LAppDelegate {
 
       // カラーバッファや深度バッファをクリアする
       // 清除颜色缓冲区和深度缓冲区
-      // gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-      gl!.clear(gl!.DEPTH_BUFFER_BIT);
+      // 每帧显式清颜色+深度（2026-11-06「一堆人物模型」根治）：本应用注释掉了
+      // 背景精灵（lappview.initializeSprite 的 _back 不存在），render() 不做全屏
+      // 重画，此前又不 GL 清颜色——一直靠 preserveDrawingBuffer=false 的「合成后
+      // 自动失效」清屏。真机 WebView（尤其 kiosk ROM Chrome 95 + CSS transform
+      // 硬件层）上该失效偶发不生效：每次 GL 重建/站位变化都会把上一帧人物像素
+      // 留在缓冲上叠加成「一堆人物模型」。显式 clear( COLOR|DEPTH ) 后每帧从
+      // 透明黑开始，合成结果与自动失效路径逐像素一致（premultiplied 合成下
+      // alpha=0 与历史视觉零差异），结构性消灭残留/重影族故障。
+      gl!.clear(gl!.COLOR_BUFFER_BIT | gl!.DEPTH_BUFFER_BIT);
 
       gl!.clearDepth(1.0);
 
