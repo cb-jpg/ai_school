@@ -13,6 +13,45 @@ import { LAppGlManager } from "./lappglmanager";
 import { LAppLive2DManager } from "./lapplive2dmanager";
 
 /**
+ * WebGL 上下文丢失监听只装一次（2026-11-06 App「人物模型不见」热修）：
+ * 旧 WebView 显卡驱动偶发 GPU 重置→CONTEXT_LOST→画布永久空白（模型消失、
+ * UI 正常）。preventDefault 允许恢复；restored 后整链重建（release→initialize）
+ * 与手动刷新同路径。日志落 console 便于以后定位。
+ */
+let contextWatchInstalled = false;
+let contextRestoring = false;
+
+function installContextWatch(canvasElement: HTMLCanvasElement): void {
+  if (contextWatchInstalled) {
+    return;
+  }
+  contextWatchInstalled = true;
+  canvasElement.addEventListener(
+    "webglcontextlost",
+    (e: Event) => {
+      e.preventDefault(); // 必须阻止默认行为才允许后续 restore
+      console.error("[Live2D] WebGL context LOST — waiting for restore");
+    },
+    false
+  );
+  canvasElement.addEventListener(
+    "webglcontextrestored",
+    () => {
+      if (contextRestoring) {
+        return;
+      }
+      contextRestoring = true;
+      console.error("[Live2D] WebGL context RESTORED — rebuilding Live2D");
+      setTimeout(() => {
+        contextRestoring = false;
+        initializeLive2D();
+      }, 300);
+    },
+    false
+  );
+}
+
+/**
  * Initialize the Live2D application
  */
 export function initializeLive2D(): void {
@@ -28,6 +67,8 @@ export function initializeLive2D(): void {
     console.error('[Live2D] Canvas element not found in DOM. Make sure the component is mounted.');
     return;
   }
+
+  installContextWatch(canvasElement as HTMLCanvasElement);
 
   // Clean up any existing instances first
   const hasExistingDelegate = !!LAppDelegate.getInstance();
