@@ -22,7 +22,13 @@ import { CampusTopicId } from '@/data/campus-knowledge';
 import { SiteColumnId, siteColumns } from '@/data/site-columns';
 import { IS_KIOSK } from '@/utils/device-profile';
 
-export type SiteNavActive = 'home' | 'dialog' | 'news' | SiteColumnId | CampusTopicId;
+export type SiteNavActive =
+  | 'home'
+  | 'dialog'
+  | 'news'
+  | 'notices'
+  | SiteColumnId
+  | CampusTopicId;
 
 interface SiteHeaderProps {
   /** 当前激活栏目（红底白字） */
@@ -31,6 +37,8 @@ interface SiteHeaderProps {
   onNavigateColumn: (columnId: SiteColumnId, articleId?: string) => void;
   /** 进入新闻中心 */
   onNavigateNews: () => void;
+  /** 进入通知公告独立页（2026-11-06 主任反馈；缺省回落新闻中心） */
+  onNavigateNotices?: () => void;
   /** 进入对话界面（先打断播报再切路由由内部处理） */
   onGoChat: () => void;
   /** 设置齿轮回调（打开 HeroSidebar） */
@@ -171,6 +179,7 @@ export default function SiteHeader({
   activeNav,
   onNavigateColumn,
   onNavigateNews,
+  onNavigateNotices,
   onGoChat,
   onOpenSettings,
   showAdmin = true,
@@ -201,6 +210,13 @@ export default function SiteHeader({
   const goNews = () => {
     interrupt();
     onNavigateNews();
+  };
+
+  // 通知公告独立页（2026-11-06 主任反馈：与学校新闻分开落地）
+  const goNotices = () => {
+    interrupt();
+    if (onNavigateNotices) onNavigateNotices();
+    else onNavigateNews();
   };
 
   return (
@@ -350,11 +366,11 @@ export default function SiteHeader({
             <NavDropdown
               testId="campus-nav-news"
               label="新闻中心"
-              active={activeNav === 'news'}
+              active={activeNav === 'news' || activeNav === 'notices'}
               isPortraitBoard={isPortraitBoard}
               items={[
-                { label: '学校新闻', onClick: goNews },
-                { label: '通知公告', onClick: goNews },
+                { label: '学校新闻', active: activeNav === 'news', onClick: goNews },
+                { label: '通知公告', active: activeNav === 'notices', onClick: goNotices },
               ]}
             />
           </>

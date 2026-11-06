@@ -123,13 +123,15 @@ const getCurrentRoute = (): AppRoute => {
 
   // Hero landing page route - include campus routes as hero mode
   // #/portal 是 09-20 版独立门户页的旧链接，官网化改版（2026-09-21）后门户
-  // 即新首页本身，旧链接兼容落到首页；#/news 为新闻中心（官网 v2）
+  // 即新首页本身，旧链接兼容落到首页；#/news 为新闻中心（官网 v2）；
+  // #/notices 为通知公告独立页（2026-11-06 主任反馈：公告不再混入新闻页）
   if (
     hash === "#/home" ||
     hash === "#/hero" ||
     hash === "#/landing" ||
     hash === "#/portal" ||
     hash === "#/news" ||
+    hash === "#/notices" ||
     hash === "" ||
     hash === "#/" ||
     hash.startsWith("#/campus/") ||
@@ -195,6 +197,10 @@ const readColumnArticleFromLocation = (): ActiveColumnView | null => {
 const readIsNewsFromLocation = (): boolean =>
   typeof window !== "undefined" && window.location.hash === "#/news";
 
+// 通知公告独立页（2026-11-06 主任反馈）
+const readIsNoticesFromLocation = (): boolean =>
+  typeof window !== "undefined" && window.location.hash === "#/notices";
+
 // 官网新闻/公告后台管理化（2026-09-29）：自撰文章阅读页 #/article/<id>
 const readArticleIdFromLocation = (): string | null => {
   if (typeof window === "undefined") return null;
@@ -238,6 +244,10 @@ function AppContent(): JSX.Element {
   );
   const [isNewsActive, setIsNewsActive] = useState<boolean>(
     readIsNewsFromLocation,
+  );
+  // 通知公告独立页（#/notices，2026-11-06 主任反馈）
+  const [isNoticesActive, setIsNoticesActive] = useState<boolean>(
+    readIsNoticesFromLocation,
   );
   // 官网文章阅读页（#/article/<id>，后台发布的自撰文章）
   const [activeArticleId, setActiveArticleId] = useState<string | null>(
@@ -306,6 +316,7 @@ function AppContent(): JSX.Element {
       setActiveCampusTopic(readCampusTopicFromLocation());
       setActiveColumn(readColumnArticleFromLocation());
       setIsNewsActive(readIsNewsFromLocation());
+      setIsNoticesActive(readIsNoticesFromLocation());
       setActiveArticleId(readArticleIdFromLocation());
       setHeroView(readHeroView());
     };
@@ -356,6 +367,9 @@ function AppContent(): JSX.Element {
   };
   const goNewsPage = () => {
     window.location.hash = "#/news";
+  };
+  const goNoticesPage = () => {
+    window.location.hash = "#/notices";
   };
   const goDialogPage = () => {
     window.location.hash = "#/hero";
@@ -439,7 +453,11 @@ function AppContent(): JSX.Element {
   // 不再强制登录，进入「对话界面」才要求登录——家长/学生各用各的账号，会话按账号隔离。
   // 官网 v2：栏目/新闻也算浏览态（isOverlayView），画布为它们让出右侧位。
   const isOverlayView =
-    !!activeCampusTopic || !!activeColumn || isNewsActive || !!activeArticleId;
+    !!activeCampusTopic ||
+    !!activeColumn ||
+    isNewsActive ||
+    isNoticesActive ||
+    !!activeArticleId;
   // 手机窄屏浏览栏目/新闻：正文满宽没有人物留白区，画布隐藏防遮挡
   // （首页 banner 人物区、对话页卡片人物位不受影响）
   const hideHeroOnPhone = isNarrowVp && isOverlayView;
@@ -571,7 +589,7 @@ function AppContent(): JSX.Element {
             heroAlign={
               isHomeView
                 ? "center"
-                : activeColumn || isNewsActive || activeArticleId
+                : activeColumn || isNewsActive || isNoticesActive || activeArticleId
                   ? "column"
                   : "right"
             }
@@ -631,12 +649,13 @@ function AppContent(): JSX.Element {
         {/* 栏目页/新闻中心/文章阅读页的共享页头（App 级渲染；z40 须压过页面根 z30——
             两者同为 z30 时页面在 DOM 靠后会把下拉面板盖住，用户反馈过）；
             首页与对话页的页头由各自组件内部渲染 */}
-        {(activeColumn || isNewsActive || activeArticleId) && (
+        {(activeColumn || isNewsActive || isNoticesActive || activeArticleId) && (
           <Box position="absolute" top={0} left={0} width="100%" zIndex={40}>
             <SiteHeader
-              activeNav={activeColumn ? activeColumn.column : "news"}
+              activeNav={activeColumn ? activeColumn.column : isNoticesActive ? "notices" : "news"}
               onNavigateColumn={goColumnArticle}
               onNavigateNews={goNewsPage}
+              onNavigateNotices={goNoticesPage}
               onGoChat={goDialogPage}
               onOpenSettings={() => setHeroSidebarOpen(!heroSidebarOpen)}
             />
@@ -698,8 +717,11 @@ function AppContent(): JSX.Element {
             onNavigateHome={goHomePage}
             onRequireAuth={() => setAuthPrompt(true)}
           />
-        ) : isNewsActive ? (
-          <NewsPage onNavigateHome={goHomePage} />
+        ) : isNewsActive || isNoticesActive ? (
+          <NewsPage
+            view={isNoticesActive ? "notices" : "all"}
+            onNavigateHome={goHomePage}
+          />
         ) : activeArticleId ? (
           <ArticlePage
             articleId={activeArticleId}

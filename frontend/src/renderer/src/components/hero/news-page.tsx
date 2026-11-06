@@ -33,6 +33,8 @@ const accentWash = siteTheme.redWash;
 
 interface NewsPageProps {
   onNavigateHome: () => void;
+  /** 2026-11-06 主任反馈：通知公告独立页——"notices" 只渲染公告列表（标题/文案随之切换） */
+  view?: "all" | "notices";
 }
 
 function NewsRow({
@@ -129,7 +131,8 @@ function NewsRow({
   );
 }
 
-export default function NewsPage({ onNavigateHome }: NewsPageProps) {
+export default function NewsPage({ onNavigateHome, view = "all" }: NewsPageProps) {
+  const isNoticesOnly = view === "notices";
   const isPortraitBoard = usePortraitBoard();
   // 后台管理数据（失败/空回退静态占位）；刷新即见后台改动
   const { news, announcements } = usePortalContent();
@@ -202,7 +205,7 @@ export default function NewsPage({ onNavigateHome }: NewsPageProps) {
                 letterSpacing="-0.01em"
                 mb="3"
               >
-                新闻中心
+                {isNoticesOnly ? "通知公告" : "新闻中心"}
               </Text>
               <Box mb="4" width="56px" height="3px" bg={accent} />
               <Text
@@ -211,35 +214,40 @@ export default function NewsPage({ onNavigateHome }: NewsPageProps) {
                 lineHeight="1.7"
                 mb="7"
               >
-                学校新闻与通知公告。带 ↗
-                的条目可点击查看（政府/媒体公开报道或站内发布文章）；更多图文请关注学校微信公众号"石实"。
+                {isNoticesOnly
+                  ? "学校通知公告。带 ↗ 的条目可点击查看（政府/媒体公开报道或站内发布文章）；更多图文请关注学校微信公众号\"石实\"。"
+                  : "学校新闻与通知公告。带 ↗ 的条目可点击查看（政府/媒体公开报道或站内发布文章）；更多图文请关注学校微信公众号\"石实\"。"}
               </Text>
 
-              {/* 学校新闻 */}
-              <Text
-                data-testid="news-list-news"
-                color={accent}
-                fontSize="15px"
-                fontWeight="700"
-                mb="2"
-                pb="3"
-                borderBottom="2px solid"
-                borderColor={accent}
-              >
-                学校新闻
-              </Text>
-              {news.map((item) => (
-                <NewsRow
-                  key={item.id}
-                  testId={`news-row-${item.id}`}
-                  title={item.title}
-                  date={item.date}
-                  tag={item.category || "新闻"}
-                  href={portalItemHref(item)}
-                  external={Boolean(item.url)}
-                  source={item.source}
-                />
-              ))}
+              {/* 学校新闻（通知公告独立页不渲染） */}
+              {!isNoticesOnly && (
+                <>
+                  <Text
+                    data-testid="news-list-news"
+                    color={accent}
+                    fontSize="15px"
+                    fontWeight="700"
+                    mb="2"
+                    pb="3"
+                    borderBottom="2px solid"
+                    borderColor={accent}
+                  >
+                    学校新闻
+                  </Text>
+                  {news.map((item) => (
+                    <NewsRow
+                      key={item.id}
+                      testId={`news-row-${item.id}`}
+                      title={item.title}
+                      date={item.date}
+                      tag={item.category || "新闻"}
+                      href={portalItemHref(item)}
+                      external={Boolean(item.url)}
+                      source={item.source}
+                    />
+                  ))}
+                </>
+              )}
 
               {/* 通知公告 */}
               <Text
@@ -247,7 +255,7 @@ export default function NewsPage({ onNavigateHome }: NewsPageProps) {
                 color={accent}
                 fontSize="15px"
                 fontWeight="700"
-                mt="8"
+                mt={isNoticesOnly ? undefined : "8"}
                 mb="2"
                 pb="3"
                 borderBottom="2px solid"

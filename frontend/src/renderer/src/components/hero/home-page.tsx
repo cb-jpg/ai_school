@@ -15,7 +15,7 @@
  */
 
 import { useState } from 'react';
-import { Box, Flex, HStack, Image, Link, Text } from '@chakra-ui/react';
+import { Box, Flex, HStack, Image, Link, SimpleGrid, Text } from '@chakra-ui/react';
 import { FiArrowUpRight, FiChevronRight, FiMessageCircle } from 'react-icons/fi';
 import HeroSidebar from './hero-sidebar';
 import SiteHeader from './site-header';
@@ -30,10 +30,21 @@ import {
 } from '@/services/portal-content-api';
 import campusGate from '@/assets/school/campus-gate.jpg';
 
-// 亮点数据（2026-10-08 校方口径）：建校以来 43 位学子录取清北，其中 13 位
-// 凭信息学特长保送清北（南方+曾报道《佛山唯一！保送北大！》），校领导最认可的硬成果
+// 亮点数据（2026-10-08 校方口径；2026-11-06 主任 docx 更新选修课数与一等奖行）：
+// 建校以来 43 位学子录取清北，其中 13 位凭信息学特长保送清北（南方+曾报道
+// 《佛山唯一！保送北大！》），每学期 130+ 门扬长选修课，连续 3 年区高质量发展一等奖
 const ADMITTED_COUNT = '43';
 const HIGHLIGHT_COUNT = '13';
+const COURSE_COUNT = '130+';
+const TOP_AWARD_LINE = '连续3年蝉联南海区初中教育高质量发展先进学校一等奖';
+
+// 一风三训（2026-11-06 主任 docx：放在首页"一"内容下面）
+const MOTTO_LINES: Array<[string, string]> = [
+  ['校训', '任重道远 毋忘奋斗'],
+  ['校风', '从严要求 全面发展 · 勤教勤学 开拓进取'],
+  ['教风', '科学 协作 拼搏'],
+  ['学风', '尊师 爱校 勤学 俭朴'],
+];
 
 // 新闻/公告栏目：后台管理数据（2026-09-29 起），首页展示前 3 条
 const NEWS_COUNT = 3;
@@ -98,6 +109,57 @@ function SectionTitle({
   );
 }
 
+/** 一风三训条（校训/校风/教风/学风）：手机 2×2、桌面一行四格；竖屏大屏走 2×2 大字版 */
+function MottoStrip({ isPortraitBoard }: { isPortraitBoard: boolean }) {
+  return (
+    <SimpleGrid
+      data-testid="home-mottos"
+      columns={isPortraitBoard ? 2 : { base: 2, md: 4 }}
+      gap={isPortraitBoard ? '14px' : { base: '6px', md: '10px' }}
+      mt={isPortraitBoard ? 5 : { base: 2, md: 3 }}
+    >
+      {MOTTO_LINES.map(([label, text]) => (
+        <Flex
+          key={label}
+          align={isPortraitBoard ? 'flex-start' : 'center'}
+          gap="8px"
+          px={isPortraitBoard ? '14px' : '8px'}
+          py={isPortraitBoard ? '10px' : '5px'}
+          borderRadius="md"
+          background="rgba(255, 255, 255, 0.62)"
+          border="1px solid"
+          borderColor={siteTheme.hairline}
+        >
+          <Box
+            as="span"
+            flexShrink={0}
+            px="7px"
+            py="1px"
+            borderRadius="sm"
+            background={siteTheme.redWash}
+            color={siteTheme.red}
+            fontFamily={kaiFont}
+            fontWeight="700"
+            fontSize={isPortraitBoard ? '18px' : { base: '10.5px', md: '12px' }}
+            mt={isPortraitBoard ? '2px' : 0}
+          >
+            {label}
+          </Box>
+          <Text
+            fontFamily={kaiFont}
+            color={siteTheme.navy}
+            fontWeight="600"
+            fontSize={isPortraitBoard ? '22px' : { base: '11px', md: '12.5px' }}
+            lineHeight="1.45"
+          >
+            {text}
+          </Text>
+        </Flex>
+      ))}
+    </SimpleGrid>
+  );
+}
+
 export default function HomePage(_props: HomePageProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { interrupt } = useInterrupt();
@@ -114,6 +176,12 @@ export default function HomePage(_props: HomePageProps) {
   const goNews = () => {
     interrupt();
     window.location.hash = '#/news';
+  };
+
+  // 通知公告独立页（2026-11-06 主任反馈：公告点击不再混入新闻页）
+  const goNotices = () => {
+    interrupt();
+    window.location.hash = '#/notices';
   };
 
   /* hero banner 高度：页头实际高（base≈94px / md≈112px）+ banner 区高。
@@ -188,6 +256,7 @@ export default function HomePage(_props: HomePageProps) {
             window.location.hash = `#/campus/${columnId}${articleId ? `/${articleId}` : ''}`;
           }}
           onNavigateNews={goNews}
+          onNavigateNotices={goNotices}
           onGoChat={goChat}
           onOpenSettings={() => setSidebarOpen(!sidebarOpen)}
         />
@@ -264,6 +333,21 @@ export default function HomePage(_props: HomePageProps) {
                 </Box>
               </Flex>
               <Box mt={6} width="96px" height="3px" bg="rgba(144, 27, 53, 0.35)" />
+              {/* 2026-11-06 主任 docx：亮点数据补全（43录取/130+选修/一等奖） */}
+              <Text
+                mt={4}
+                color={siteTheme.navy}
+                fontSize="18px"
+                fontWeight="600"
+                lineHeight="1.6"
+              >
+                43位学子录取清北 · {COURSE_COUNT}门扬长选修课
+                <Box as="span" display="block" mt="2px">
+                  {TOP_AWARD_LINE}
+                </Box>
+              </Text>
+              {/* 一风三训（2026-11-06 主任 docx：放在"一"内容下面） */}
+              <MottoStrip isPortraitBoard />
             </Box>
           </Box>
         ) : (
@@ -338,16 +422,16 @@ export default function HomePage(_props: HomePageProps) {
                   <Box as="span" fontWeight="bold" fontSize={{ base: '15px', md: '19px' }}>
                     {HIGHLIGHT_COUNT}
                   </Box>
-                  {' '}位学子保送清北
+                  {' '}位学子通过信息学保送清北
                 </Text>
                 <Text fontSize={{ base: '11px', md: '14px' }} lineHeight="1.5">
                   <Box as="span" fontWeight="bold" fontSize={{ base: '15px', md: '19px' }}>
-                    100+
+                    {COURSE_COUNT}
                   </Box>
                   {' '}门扬长选修课
                 </Text>
                 <Text fontSize={{ base: '11px', md: '14px' }} lineHeight="1.5" opacity={0.85}>
-                  据校方及公开报道
+                  {TOP_AWARD_LINE}
                 </Text>
               </Flex>
 
@@ -381,6 +465,11 @@ export default function HomePage(_props: HomePageProps) {
             </Box>
           </Flex>
         )}
+
+        {/* 一风三训条（2026-11-06 主任 docx：放在 hero"一"内容下面） */}
+        <Box px={isPortraitBoard ? 8 : { base: 4, md: 12, lg: 16 }} pr={isPortraitBoard ? 10 : { base: 4, md: 10 }}>
+          <MottoStrip isPortraitBoard={isPortraitBoard} />
+        </Box>
 
         {/* 新闻/公告栏目：省实官网式两栏；有已核实直链的条目可点击（↗），
             标题行"更多>"进新闻中心（#/news）。手机端每列收紧到 2 条可见
@@ -472,9 +561,9 @@ export default function HomePage(_props: HomePageProps) {
             })}
           </Box>
 
-          {/* 公告与通知：红wash 日期 chip + 标题 + 面向对象 */}
+          {/* 公告与通知：红wash 日期 chip + 标题 + 面向对象（"更多"进通知公告独立页） */}
           <Box flex="1" minW={0}>
-            <SectionTitle isPortraitBoard={isPortraitBoard} onMore={goNews}>
+            <SectionTitle isPortraitBoard={isPortraitBoard} onMore={goNotices}>
               公告与通知
             </SectionTitle>
             {announcements.slice(0, ANNOUNCE_COUNT).map((item, idx) => {
