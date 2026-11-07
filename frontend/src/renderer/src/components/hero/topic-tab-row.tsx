@@ -4,7 +4,7 @@
  * 与专题页（campus-knowledge）顶部导航同款式：手机端一行横向滑动、桌面端居右换行，
  * 滑动与点击效果保持一致；首页与新页面均可复用。
  */
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Box, Button, Flex, HStack, Text } from '@chakra-ui/react';
 import { FiBookOpen, FiClock, FiAward, FiUsers } from 'react-icons/fi';
 import type { IconType } from 'react-icons';
@@ -37,6 +37,20 @@ export function navSizing(isPortraitBoard: boolean) {
   };
 }
 
+/**
+ * 滑动红框指示器开关（2026-11-06 用户反馈：选中红框改为来回平滑滑动，
+ * 选项本身不动）：手机/一体机/竖屏大屏（单行形态）开启；lg+ 桌面换行布局
+ * 不开（跨行滑动轨迹怪异，维持按钮自身红底）。kiosk 陷阱同 NavDropdown：
+ * 一体机的 Chakra lg 断点被顶到 9992px 永远不达，但裸 matchMedia 看物理
+ * 视口（1080）会为 true——必须先排除 IS_KIOSK 再信 matchMedia。
+ */
+export function navIndicatorOn(isPortraitBoard: boolean): boolean {
+  if (isPortraitBoard) return true;
+  if (IS_KIOSK) return true;
+  if (typeof window === 'undefined') return false;
+  return !window.matchMedia('(min-width: 1024px)').matches;
+}
+
 const topicIcons: Record<CampusTopicId, IconType> = {
   intro: FiBookOpen,
   history: FiClock,
@@ -64,6 +78,8 @@ export function TopicTabButton({
   // 竖屏大屏：按钮放大（壁挂数字屏远距离触控/观看）
   const isPortraitBoard = usePortraitBoard();
   const s = navSizing(isPortraitBoard);
+  // 滑动红框模式：红底由 TopicTabRow 的滑动指示器承担，按钮自身透明
+  const flat = navIndicatorOn(isPortraitBoard);
   return (
     <Button
       data-testid={`campus-nav-${topic.id}`}
@@ -73,14 +89,16 @@ export function TopicTabButton({
       height={s.height}
       px={s.px}
       borderRadius="md"
-      background={active ? activeBg : 'transparent'}
+      position="relative"
+      zIndex={flat ? 1 : undefined}
+      background={active && !flat ? activeBg : 'transparent'}
       color={active ? 'white' : siteTheme.navy}
       fontFamily={swissFont}
       fontWeight="500"
       fontSize={s.fontSize}
       flexShrink={0}
       _hover={{
-        background: active ? activeBg : hoverWash,
+        background: active && !flat ? activeBg : hoverWash,
         color: active ? 'white' : hoverInk,
       }}
       transition="all 200ms ease"
@@ -117,6 +135,8 @@ export default function TopicTabRow({
   // 竖屏大屏：整行按手机端"单行横滑"形态放大展示（内容列限宽内一行放不下时仍可滑）
   const isPortraitBoard = usePortraitBoard();
   const s = navSizing(isPortraitBoard);
+  // 滑动红框指示器（2026-11-06 用户反馈）：单行形态开启
+  const flat = navIndicatorOn(isPortraitBoard);
 
   // 一体机兜底：Chrome 95 在 transform:scale() 包装盒内不认触摸横滑手势，
   // overflowX:auto 的行真实手指划不动（CDP 完整手势可滚、原始触摸序列
@@ -155,8 +175,82 @@ export default function TopicTabRow({
     };
   }, []);
 
+  /* ── 滑动红框指示器（2026-11-06 用户反馈）──────────────────────────
+     选中红底改为独立绝对定位 pill（zIndex 0，按钮 zIndex 1 压其上），切换
+     选中项时 pill 以 transform/left+width 过渡平滑滑到新按钮下方，选项
+     本身纹丝不动。测量用 getBoundingClientRect 差值 ÷ 包裹盒实际缩放比
+     （一体机 --kiosk-css-scale 的 transform:scale 会放大视觉坐标，gBCR 差
+     ÷ scale 还原为布局 px，pill 与按钮同处缩放子树内，布局 px 自洽）。
+     无 framer-motion 依赖；纯 CSS transition GPU 合成不卡顿（Chrome 95 也支持）。 */
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [pill, setPill] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const pillSeenRef = useRef(false);
+
+  const measurePill = useCallback(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const btn = wrap.querySelector<HTMLButtonElement>('button[aria-current="page"]');
+    if (!btn) {
+      if (pillSeenRef.current) {
+        pillSeenRef.current = false;
+        setPill(null);
+      }
+      return;
+    }
+    const wr = wrap.getBoundingClientRect();
+    const br = btn.getBoundingClientRect();
+    const scale =
+      wr.width > 0 && wrap.offsetWidth > 0 ? wr.width / wrap.offsetWidth : 1;
+    const next = {
+      left: (br.left - wr.left) / scale,
+      top: (br.top - wr.top) / scale,
+      width: br.width / scale,
+      height: br.height / scale,
+    };
+    pillSeenRef.current = true;
+    setPill((prev) =>
+      prev &&
+      Math.abs(prev.left - next.left) < 0.5 &&
+      Math.abs(prev.top - next.top) < 0.5 &&
+      Math.abs(prev.width - next.width) < 0.5 &&
+      Math.abs(prev.height - next.height) < 0.5
+        ? prev
+        : next
+    );
+  }, []);
+
+  // aria-current 随 activeNav 渲染移动后测量；字体加载/窗口缩放/横滑都会
+  // 改变按钮几何，一并重测。items/leading/trailing 每次父组件渲染都是新
+  // JSX（依赖变化即触发），measurePill 幂等去重，无多余渲染。
+  useLayoutEffect(() => {
+    measurePill();
+    const wrap = wrapRef.current;
+    const row = rowRef.current;
+    window.addEventListener('resize', measurePill);
+    row?.addEventListener('scroll', measurePill, { passive: true });
+    let ro: ResizeObserver | undefined;
+    if (typeof ResizeObserver !== 'undefined' && wrap) {
+      ro = new ResizeObserver(() => measurePill());
+      ro.observe(wrap);
+    }
+    // 字体晚到会改文字宽度 → 到位后重测一次
+    document.fonts?.ready?.then(() => measurePill()).catch(() => {});
+    return () => {
+      window.removeEventListener('resize', measurePill);
+      row?.removeEventListener('scroll', measurePill);
+      ro?.disconnect();
+    };
+  }, [measurePill, activeTopicId, leading, trailing, items, flat]);
+
   return (
     <Box
+      ref={wrapRef}
+      position={flat ? 'relative' : undefined}
       flexShrink={0}
       px={s.rowPx}
       py={isPortraitBoard ? '12px' : { base: '8px', md: '10px' }}
@@ -165,14 +259,37 @@ export default function TopicTabRow({
       borderBottom="1px solid"
       borderColor={siteTheme.hairline}
     >
-      {/* 手机端/竖屏大屏一行横向滑动；桌面端保持换行布局（与专题页一致） */}
+      {/* 滑动红框（2026-11-06）：位置完全由测量驱动，mounted 后才有 → 无首帧跳变 */}
+      {flat && pill && (
+        <Box
+          data-testid="nav-slide-indicator"
+          aria-hidden="true"
+          position="absolute"
+          borderRadius="md"
+          background={siteTheme.red}
+          zIndex={0}
+          pointerEvents="none"
+          style={{
+            left: pill.left,
+            top: pill.top,
+            width: pill.width,
+            height: pill.height,
+            transition: pillSeenRef.current
+              ? 'left 260ms cubic-bezier(0.4, 0, 0.2, 1), width 260ms cubic-bezier(0.4, 0, 0.2, 1), top 260ms cubic-bezier(0.4, 0, 0.2, 1)'
+              : 'none',
+          }}
+        />
+      )}
+      {/* 手机端/竖屏大屏一行横向滑动；桌面端保持换行布局（与专题页一致）。
+          2026-11-06 用户反馈「菜单栏还是可以左右滑动」：压缩预算本就 ≤375
+          一页放满，base 直接 overflowX hidden 钉死不滑动（竖屏大屏保留 auto） */}
       <Flex
         ref={rowRef}
         align="center"
         justify={isPortraitBoard ? 'flex-start' : { base: 'flex-start', lg: 'flex-end' }}
         gap={s.rowGap}
         flexWrap={isPortraitBoard ? 'nowrap' : { base: 'nowrap', lg: 'wrap' }}
-        overflowX={isPortraitBoard ? 'auto' : { base: 'auto', lg: 'visible' }}
+        overflowX={isPortraitBoard ? 'auto' : { base: 'hidden', lg: 'visible' }}
         css={{ '&::-webkit-scrollbar': { display: 'none' } }}
       >
         {leading}

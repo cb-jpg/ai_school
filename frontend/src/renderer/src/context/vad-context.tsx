@@ -51,6 +51,12 @@ interface VADState {
   /** Stop microphone and VAD */
   stopMic: () => void;
 
+  /** 按住说话松开：把缓冲中的语音送出后再收音（push-to-talk 用） */
+  releaseMic: (timeoutMs?: number) => void;
+
+  /** 按住说话按住/松开标记：按住期间 speech-end 不触发自动收音 */
+  setMicHold: (holding: boolean) => void;
+
   /** Previous speech probability value */
   previousTriggeredProbability: number;
 
@@ -110,6 +116,14 @@ export function VADProvider({ children }: { children: React.ReactNode }) {
   const vadRef = useRef<MicVAD | null>(null);
   const previousTriggeredProbabilityRef = useRef(0);
   const previousAiStateRef = useRef<AiState>('idle');
+  /* 按住说话代际守卫（2026-11-06 说明.txt：录音按钮改按住录音）：快速点按-
+   松开时，startMic 的异步初始化（首次要拉模型）可能在松开之后才完成——
+   若不设防，迟到的新 VAD 会把麦克风重新打开并卡在「无人说话」状态。
+   每次 start/stop 递增代数，迟到的初始化发现自己代数过期即自毁。 */
+  const micGenRef = useRef(0);
+  // 按住说话进行中（push-to-talk）：按住期间 speech-end 的自动收音要让路，
+  // 否则说到一半的句间停顿（>redemptionFrames）会把麦克风掐断、后半句全丢
+  const micHoldRef = useRef(false);
 
   // Persistent state management (改为不持久化，每次重新启动时默认关闭)
   const [micOn, setMicOn] = useState(DEFAULT_VAD_STATE.micOn);
@@ -232,11 +246,12 @@ export function VADProvider({ children }: { children: React.ReactNode }) {
     console.log('Speech ended');
     audioTaskQueue.clearQueue();
 
-    if (autoStopMicRef.current || IS_KIOSK) {
-      // 一体机无条件自动收音：即使本地存储残留过 OFF 也强制生效（11.5 测试反馈）
+    if ((autoStopMicRef.current || IS_KIOSK) && !micHoldRef.current) {
+      // 一体机无条件自动收音：即使本地存储残留过 OFF 也强制生效（11.5 测试反馈）。
+      // 按住说话（2026-11-06）例外：手指还按着就继续听，松开由 releaseMic 收音
       stopMic();
     } else {
-      console.log('Auto stop mic is OFF, keeping mic active');
+      console.log('Auto stop mic is OFF (or push-to-talk held), keeping mic active');
     }
 
     setPreviousTriggeredProbability(0);
@@ -273,8 +288,10 @@ export function VADProvider({ children }: { children: React.ReactNode }) {
 
   /**
    * Initialize new VAD instance
+   * @param gen 代际号（startMic 传入）；初始化是异步的，期间若用户已松开
+   *        （stopMic 递增代数），迟到的实例直接销毁，不再接管麦克风
    */
-  const initVAD = async () => {
+  const initVAD = async (gen: number) => {
     const newVAD = await MicVAD.new({
       model: "v5",
       preSpeechPadFrames: 20,
@@ -290,6 +307,15 @@ export function VADProvider({ children }: { children: React.ReactNode }) {
       onVADMisfire: handleVADMisfire,
     });
 
+    if (micGenRef.current !== gen) {
+      console.log('VAD init superseded (released during init) — discarding');
+      try {
+        newVAD.destroy();
+      } catch {
+        /* 销毁失败不致命 */
+      }
+      return;
+    }
     vadRef.current = newVAD;
     newVAD.start();
   };
@@ -298,17 +324,21 @@ export function VADProvider({ children }: { children: React.ReactNode }) {
    * Start microphone and VAD processing
    */
   const startMic = useCallback(async () => {
+    const gen = ++micGenRef.current;
     try {
       if (!vadRef.current) {
         console.log('Initializing VAD');
-        await initVAD();
+        await initVAD(gen);
       } else {
         console.log('Starting VAD');
         vadRef.current.start();
       }
-      setMicOn(true);
+      if (micGenRef.current === gen) {
+        setMicOn(true);
+      }
     } catch (error) {
       console.error('Failed to start VAD:', error);
+      if (micGenRef.current !== gen) return;
       const errName = (error as { name?: string })?.name ?? '';
       let hintKey = '';
       if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
@@ -329,6 +359,7 @@ export function VADProvider({ children }: { children: React.ReactNode }) {
    * Stop microphone and VAD processing
    */
   const stopMic = useCallback(() => {
+    micGenRef.current += 1; // 作废所有在途的 startMic 初始化
     console.log('Stopping VAD');
     if (vadRef.current) {
       vadRef.current.pause();
@@ -341,6 +372,37 @@ export function VADProvider({ children }: { children: React.ReactNode }) {
     }
     setMicOn(false);
     isProcessingRef.current = false;
+  }, []);
+
+  /**
+   * 按住说话·松开收音（2026-11-06 说明.txt：录音按钮改按住录音，像手机输入法）。
+   * stopMic 直接 pause+destroy，缓冲中尚未判完句尾的语音会被丢弃（onSpeechEnd
+   * 不再触发）。松开时若 VAD 正处语句中，等它因静默（redemptionFrames）自然
+   * 触发 onSpeechEnd 把语音送出后再收音；超时兜底强停（用户一直出声不放的
+   * 极端情形，等价于把截断处的语音送出）。未在语句中（按住期间没说话/误触发）
+   * 立即收音。
+   */
+  const releaseMic = useCallback(
+    (timeoutMs = 1600) => {
+      micHoldRef.current = false;
+      if (!vadRef.current || !isProcessingRef.current) {
+        stopMic();
+        return;
+      }
+      const started = Date.now();
+      const timer = window.setInterval(() => {
+        if (!isProcessingRef.current || Date.now() - started > timeoutMs) {
+          window.clearInterval(timer);
+          stopMic();
+        }
+      }, 80);
+    },
+    [stopMic],
+  );
+
+  /** 按住说话按住标记：进入/退出按住态（松开走 releaseMic，会一并清标记） */
+  const setMicHold = useCallback((holding: boolean) => {
+    micHoldRef.current = holding;
   }, []);
 
   /**
@@ -373,6 +435,8 @@ export function VADProvider({ children }: { children: React.ReactNode }) {
       setAutoStopMic,
       startMic,
       stopMic,
+      releaseMic,
+      setMicHold,
       previousTriggeredProbability: previousTriggeredProbabilityRef.current,
       setPreviousTriggeredProbability,
       settings,
@@ -386,6 +450,7 @@ export function VADProvider({ children }: { children: React.ReactNode }) {
       micOn,
       startMic,
       stopMic,
+      releaseMic,
       settings,
       updateSettings,
     ],

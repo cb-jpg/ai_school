@@ -37,6 +37,88 @@ interface NewsPageProps {
   view?: "all" | "notices";
 }
 
+/** 列表分页步长（2026-11-06 用户反馈：学校新闻下拉太长，默认 10 条 + 「加载更多」） */
+const NEWS_PAGE_SIZE = 10;
+
+/** 新闻中心页顶部的「学校新闻 | 通知公告」切换入口（2026-11-06 用户反馈：
+ *  通知公告除了首页「更多」外没有别的入口；在新闻页里给出对等的 tab 切换，
+ *  hash #/news ↔ #/notices 直接驱动 App.tsx 的路由条件，无新增状态） */
+function ViewTabs({ active }: { active: "news" | "notices" }) {
+  const tabs: { key: "news" | "notices"; label: string; hash: string }[] = [
+    { key: "news", label: "学校新闻", hash: "#/news" },
+    { key: "notices", label: "通知公告", hash: "#/notices" },
+  ];
+  return (
+    <HStack gap="2" mb="6">
+      {tabs.map((tab) => {
+        const isActive = tab.key === active;
+        return (
+          <Box
+            key={tab.key}
+            data-testid={`news-tab-${tab.key}`}
+            as="button"
+            onClick={() => {
+              if (!isActive) window.location.hash = tab.hash;
+            }}
+            aria-current={isActive ? "page" : undefined}
+            px={{ base: "14px", md: "18px" }}
+            py="7px"
+            borderRadius="full"
+            fontSize={{ base: "13px", md: "14px" }}
+            fontWeight={isActive ? "600" : "500"}
+            fontFamily={swissFont}
+            background={isActive ? accent : "transparent"}
+            color={isActive ? "white" : ink}
+            border="1px solid"
+            borderColor={isActive ? accent : hairline}
+            transition="all 160ms ease"
+            whiteSpace="nowrap"
+            _hover={
+              isActive
+                ? undefined
+                : { borderColor: accent, color: accent, background: accentWash }
+            }
+          >
+            {tab.label}
+          </Box>
+        );
+      })}
+    </HStack>
+  );
+}
+
+/** 「加载更多」按钮（每点一次多显示 NEWS_PAGE_SIZE 条；括号里是剩余条数） */
+function LoadMore({
+  remaining,
+  onClick,
+  testId,
+}: {
+  remaining: number;
+  onClick: () => void;
+  testId: string;
+}) {
+  return (
+    <Flex justify="center" mt="4">
+      <Button
+        data-testid={testId}
+        onClick={onClick}
+        variant="outline"
+        height="38px"
+        px="24px"
+        borderRadius="full"
+        color={accent}
+        borderColor={hairline}
+        background={paper}
+        fontFamily={swissFont}
+        fontSize="13px"
+        _hover={{ background: accentWash, borderColor: accent }}
+      >
+        加载更多（还有 {remaining} 条）
+      </Button>
+    </Flex>
+  );
+}
+
 function NewsRow({
   title,
   date,
@@ -139,6 +221,12 @@ export default function NewsPage({ onNavigateHome, view = "all" }: NewsPageProps
   // 图说石实：校园实景轮换（静态取前 3 张，手机取 2 张由布局裁剪）
   const [photoIndex] = useState(0);
   const galleryPhotos = CAMPUS_PHOTOS.slice(photoIndex, photoIndex + 3);
+  // 分页显示（2026-11-06 用户反馈：列表太长下拉吃力）——默认 10 条，
+  // 「加载更多」每次多显 10 条；列表数据变化（后台新发）时收敛到合法区间
+  const [newsLimit, setNewsLimit] = useState(NEWS_PAGE_SIZE);
+  const [noticeLimit, setNoticeLimit] = useState(NEWS_PAGE_SIZE);
+  const visibleNews = news.slice(0, newsLimit);
+  const visibleAnnouncements = announcements.slice(0, noticeLimit);
 
   return (
     <Box
@@ -212,12 +300,15 @@ export default function NewsPage({ onNavigateHome, view = "all" }: NewsPageProps
                 color={muted}
                 fontSize={{ base: "13px", md: "14px" }}
                 lineHeight="1.7"
-                mb="7"
+                mb="5"
               >
                 {isNoticesOnly
                   ? "学校通知公告。带 ↗ 的条目可点击查看（政府/媒体公开报道或站内发布文章）；更多图文请关注学校微信公众号\"石实\"。"
-                  : "学校新闻与通知公告。带 ↗ 的条目可点击查看（政府/媒体公开报道或站内发布文章）；更多图文请关注学校微信公众号\"石实\"。"}
+                  : "学校新闻。带 ↗ 的条目可点击查看（政府/媒体公开报道或站内发布文章）；更多图文请关注学校微信公众号\"石实\"。"}
               </Text>
+
+              {/* 学校新闻 / 通知公告切换入口（2026-11-06 用户反馈：新闻页里进不去通知公告页） */}
+              <ViewTabs active={isNoticesOnly ? "notices" : "news"} />
 
               {/* 学校新闻（通知公告独立页不渲染） */}
               {!isNoticesOnly && (
@@ -234,7 +325,7 @@ export default function NewsPage({ onNavigateHome, view = "all" }: NewsPageProps
                   >
                     学校新闻
                   </Text>
-                  {news.map((item) => (
+                  {visibleNews.map((item) => (
                     <NewsRow
                       key={item.id}
                       testId={`news-row-${item.id}`}
@@ -246,6 +337,13 @@ export default function NewsPage({ onNavigateHome, view = "all" }: NewsPageProps
                       source={item.source}
                     />
                   ))}
+                  {news.length > newsLimit && (
+                    <LoadMore
+                      testId="news-load-more"
+                      remaining={news.length - newsLimit}
+                      onClick={() => setNewsLimit((n) => n + NEWS_PAGE_SIZE)}
+                    />
+                  )}
                 </>
               )}
 
@@ -263,7 +361,7 @@ export default function NewsPage({ onNavigateHome, view = "all" }: NewsPageProps
               >
                 通知公告
               </Text>
-              {announcements.map((item) => (
+              {visibleAnnouncements.map((item) => (
                 <NewsRow
                   key={item.id}
                   testId={`news-row-${item.id}`}
@@ -279,6 +377,13 @@ export default function NewsPage({ onNavigateHome, view = "all" }: NewsPageProps
                   source={item.source}
                 />
               ))}
+              {announcements.length > noticeLimit && (
+                <LoadMore
+                  testId="news-load-more-notices"
+                  remaining={announcements.length - noticeLimit}
+                  onClick={() => setNoticeLimit((n) => n + NEWS_PAGE_SIZE)}
+                />
+              )}
 
               <Text mt="6" color={muted} fontSize="11px" lineHeight="1.7">
                 注：新闻与公告由学校后台统一发布（2026-09-29 起，无需重新发版即生效）；

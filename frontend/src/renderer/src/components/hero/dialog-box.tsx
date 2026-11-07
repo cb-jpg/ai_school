@@ -77,7 +77,7 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
   const { wsState } = useWebSocket();
   const { aiState } = useAiState();
   const { subtitleText } = useSubtitleDisplay();
-  const { micOn, startMic, stopMic, autoStopMic, setAutoStopMic } = useVAD();
+  const { micOn, startMic, stopMic, releaseMic, setMicHold, autoStopMic, setAutoStopMic } = useVAD();
   const { messages, historyList } = useChatHistory();
   const { modelInfo, isLoading: modelLoading } = useLive2DConfig();
   const { createNewHistory } = useSidebar();
@@ -483,7 +483,9 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
             }}
           />
 
-          {/* 麦克风 / 发送 切换键（悬浮于输入框右缘居中；竖屏大屏放大为远距触控尺寸） */}
+          {/* 麦克风 / 发送 切换键（悬浮于输入框右缘居中；竖屏大屏放大为远距触控尺寸）。
+              麦克风为按住说话（2026-11-06 说明.txt：像手机输入法一样按住录音、
+              松开结束；按下即打断播报——机器闭嘴，讲解声不再灌进麦克风） */}
           {hasInputText ? (
             <Box
               as="button"
@@ -511,18 +513,27 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
           ) : (
             <Box
               as="button"
-              onClick={async () => {
+              onPointerDown={(e) => {
+                // 按住开始：捕获指针（手指滑出按钮仍能收到 up）+ 长按禁掉系统菜单
+                e.preventDefault();
                 try {
-                  if (micOn) {
-                    stopMic();
-                  } else {
-                    await startMic();
-                  }
-                } catch (error) {
-                  console.error('麦克风切换失败:', error);
+                  (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+                } catch {
+                  /* 部分老内核不支持捕获，pointerup 照常可达（按住不离手） */
                 }
+                // 录音即打断（说明.txt 问题1）：TTS 一停，机器讲解声不再进麦克风
+                interrupt();
+                setMicHold(true); // 按住期间 speech-end 自动收音让路，说完整段
+                startMic();
               }}
-              aria-label={micOn ? '停止录音' : '开始录音'}
+              onPointerUp={() => {
+                releaseMic();
+              }}
+              onPointerCancel={() => {
+                releaseMic();
+              }}
+              onContextMenu={(e) => e.preventDefault()}
+              aria-label={micOn ? '松开结束录音' : '按住说话'}
               position="absolute"
               right={isPortraitBoard ? 3 : 2}
               top="50%"
@@ -538,7 +549,12 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
               transition="all 0.2s ease"
               _hover={{ bg: siteTheme.redDark }}
               _active={{ transform: 'translateY(-50%) scale(0.92)' }}
-              style={{ cursor: 'pointer' }}
+              style={{
+                cursor: 'pointer',
+                // 按住说话：禁掉触摸滚动/长按选择，避免按住时页面抢手势
+                touchAction: 'none',
+                userSelect: 'none',
+              }}
             >
               {micOn ? <BsMicFill size={isPortraitBoard ? 24 : 18} /> : <BsMic size={isPortraitBoard ? 24 : 18} />}
             </Box>

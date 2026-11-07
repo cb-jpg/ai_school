@@ -11,7 +11,7 @@
 import { useState } from 'react';
 import { Box, Button, Flex, HStack, Image, Text } from '@chakra-ui/react';
 import { FiChevronDown, FiHome, FiMessageCircle, FiSettings } from 'react-icons/fi';
-import TopicTabRow, { navSizing } from './topic-tab-row';
+import TopicTabRow, { navIndicatorOn, navSizing } from './topic-tab-row';
 import { SCHOOL_CONFIG } from './school-config';
 import { kaiFont, swissFont, siteTheme } from './site-theme';
 import { useInterrupt } from '@/hooks/utils/use-interrupt';
@@ -20,7 +20,7 @@ import { usePortraitBoard } from '@/hooks/utils/use-portrait-board';
 import { useAuth } from '@/context/auth-context';
 import { CampusTopicId } from '@/data/campus-knowledge';
 import { SiteColumnId, siteColumns } from '@/data/site-columns';
-import { IS_KIOSK } from '@/utils/device-profile';
+import { IS_KIOSK, isPhoneStyleViewport } from '@/utils/device-profile';
 
 export type SiteNavActive =
   | 'home'
@@ -59,12 +59,15 @@ function NavDropdown({
   active,
   items,
   isPortraitBoard,
+  flat,
   testId,
 }: {
   label: string;
   active: boolean;
   items: DropdownItem[];
   isPortraitBoard: boolean;
+  /** 滑动红框模式：按钮自身不带红底（红底由 TopicTabRow 的滑动指示器承担） */
+  flat: boolean;
   testId: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -101,14 +104,16 @@ function NavDropdown({
         height={s.height}
         px={s.px}
         borderRadius="md"
-        background={active ? siteTheme.red : 'transparent'}
+        position={flat ? 'relative' : undefined}
+        zIndex={flat ? 1 : undefined}
+        background={active && !flat ? siteTheme.red : 'transparent'}
         color={active ? 'white' : siteTheme.navy}
         fontFamily={swissFont}
         fontWeight="500"
         fontSize={s.fontSize}
         flexShrink={0}
         _hover={{
-          background: active ? siteTheme.red : siteTheme.redWash,
+          background: active && !flat ? siteTheme.red : siteTheme.redWash,
           color: active ? 'white' : siteTheme.red,
         }}
         transition="all 200ms ease"
@@ -190,6 +195,11 @@ export default function SiteHeader({
   const isStaff = user?.role === 'admin' || user?.role === 'editor';
   // 手机/一体机导航压缩尺寸（11.5 测试反馈视频2：菜单栏缩小字体弄成一页版）
   const s = navSizing(isPortraitBoard);
+  // 滑动红框模式：单行形态下选中红底由 TopicTabRow 的滑动指示器承担，按钮透明
+  const flatNav = navIndicatorOn(isPortraitBoard);
+  // 手机/一体机压缩档删按钮内图标（2026-11-06 用户反馈「可以考虑把图标删了」：
+  // 一页版更清爽，预算更宽裕）
+  const compact = !isPortraitBoard && isPhoneStyleViewport();
 
   const goHash = (hash: string) => {
     interrupt();
@@ -329,20 +339,23 @@ export default function SiteHeader({
             height={s.height}
             px={s.px}
             borderRadius="md"
-            background={activeNav === 'home' ? siteTheme.red : 'transparent'}
+            position={flatNav ? 'relative' : undefined}
+            zIndex={flatNav ? 1 : undefined}
+            background={activeNav === 'home' && !flatNav ? siteTheme.red : 'transparent'}
             color={activeNav === 'home' ? 'white' : '#586174'}
             fontFamily={swissFont}
             fontWeight="500"
             fontSize={s.fontSize}
             flexShrink={0}
             _hover={{
-              background: activeNav === 'home' ? siteTheme.red : siteTheme.redWash,
+              background:
+                activeNav === 'home' && !flatNav ? siteTheme.red : siteTheme.redWash,
               color: activeNav === 'home' ? 'white' : siteTheme.red,
             }}
             transition="all 200ms ease"
           >
             <HStack gap={s.innerGap}>
-              <FiHome size={s.icon} />
+              {!compact && <FiHome size={s.icon} />}
               <Text>首页</Text>
             </HStack>
           </Button>
@@ -356,6 +369,7 @@ export default function SiteHeader({
                 label={column.navLabel}
                 active={activeNav === column.id}
                 isPortraitBoard={isPortraitBoard}
+                flat={flatNav}
                 items={column.articles.map((article) => ({
                   label: article.title,
                   active: activeNav === column.id,
@@ -368,6 +382,7 @@ export default function SiteHeader({
               label="新闻中心"
               active={activeNav === 'news' || activeNav === 'notices'}
               isPortraitBoard={isPortraitBoard}
+              flat={flatNav}
               items={[
                 { label: '学校新闻', active: activeNav === 'news', onClick: goNews },
                 { label: '通知公告', active: activeNav === 'notices', onClick: goNotices },
@@ -388,17 +403,22 @@ export default function SiteHeader({
             borderRadius="md"
             variant="ghost"
             flexShrink={0}
-            background={activeNav === 'dialog' ? siteTheme.red : 'transparent'}
+            position={flatNav ? 'relative' : undefined}
+            zIndex={flatNav ? 1 : undefined}
+            background={activeNav === 'dialog' && !flatNav ? siteTheme.red : 'transparent'}
             color={activeNav === 'dialog' ? 'white' : '#586174'}
             fontFamily={swissFont}
             fontWeight="500"
             fontSize={s.fontSize}
             _hover={{
-              background: activeNav === 'dialog' ? siteTheme.red : siteTheme.redWash,
+              background:
+                activeNav === 'dialog' && !flatNav ? siteTheme.red : siteTheme.redWash,
               color: activeNav === 'dialog' ? 'white' : siteTheme.red,
             }}
           >
-            <FiMessageCircle size={s.icon} style={{ marginRight: s.innerGap }} />
+            {!compact && (
+              <FiMessageCircle size={s.icon} style={{ marginRight: s.innerGap }} />
+            )}
             对话
           </Button>
         }

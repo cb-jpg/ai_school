@@ -187,15 +187,17 @@ export default function HomePage(_props: HomePageProps) {
     window.location.hash = '#/notices';
   };
 
-  /* hero banner 高度：页头实际高（base≈94px / md≈112px）+ banner 区高。
-     banner 背景层从页头顶端铺起（页头自身不透明，盖住 banner 顶部即可对齐）。
-     高度走 var(--app-vh)（2026-11-06 首页乱修复②）：kiosk ROM 的 100vh 缩水
-     曾致 banner/背景高度错位；--app-vh 仅一体机写入，手机/桌面回退 100vh 不变。 */
+  /* hero banner 高度：页头实际高（base≈94px / md≈112px）+ 背景层覆盖高。
+     2026-11-06 用户反馈「内容太多撑出背景板」：红面板 minHeight 化后随内容
+     长高（手机上 ≈400px+），背景层若只铺到 hero 区（0.38/0.40vh）会在面板
+     中途硬切出一条「背景板边缘」。改为把背景层加高到铺过面板+一风三训区
+     （0.60/0.62vh），再用底部渐变把照片完全溶进下方 wash 底色——边缘彻底
+     消失，内容再多也只是「浮在更深的照片上」而非「撑破背景板」。 */
   const bannerBgHeight = isPortraitBoard
     ? undefined
     : {
-        base: 'calc(96px + 0.38 * var(--app-vh, 100vh))',
-        md: 'calc(114px + 0.40 * var(--app-vh, 100vh))',
+        base: 'calc(96px + 0.60 * var(--app-vh, 100vh))',
+        md: 'calc(114px + 0.62 * var(--app-vh, 100vh))',
       };
   const heroSectionHeight = isPortraitBoard
     ? undefined
@@ -244,7 +246,9 @@ export default function HomePage(_props: HomePageProps) {
           <Box
             position="absolute"
             inset={0}
-            background="linear-gradient(90deg, rgba(13,34,65,0.30) 0%, rgba(13,34,65,0.10) 45%, rgba(13,34,65,0) 70%), linear-gradient(180deg, rgba(250,247,242,0) 78%, rgba(250,247,242,0.95) 100%)"
+            /* 左→右压暗保文字对比；底→上用 wash 色多段渐变把照片下缘完全
+               溶进页面底色（86% 处即全实色，边缘零接缝——2026-11-06 背景融合） */
+            background="linear-gradient(90deg, rgba(13,34,65,0.30) 0%, rgba(13,34,65,0.10) 45%, rgba(13,34,65,0) 70%), linear-gradient(180deg, rgba(250,247,242,0) 40%, rgba(250,247,242,0.58) 64%, rgba(250,247,242,1) 86%)"
           />
         </Box>
       )}
