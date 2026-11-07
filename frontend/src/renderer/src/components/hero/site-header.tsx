@@ -112,9 +112,16 @@ function NavDropdown({
         fontWeight="500"
         fontSize={s.fontSize}
         flexShrink={0}
+        /* flat 模式 hover/active 全透明：手机点按后 :hover 粘住不消，近白
+           redWash 底画在透明按钮上盖住红框（2026-11-07 用户反馈） */
         _hover={{
-          background: active && !flat ? siteTheme.red : siteTheme.redWash,
+          background:
+            active && !flat ? siteTheme.red : flat ? 'transparent' : siteTheme.redWash,
           color: active ? 'white' : siteTheme.red,
+        }}
+        _active={{
+          background:
+            active && !flat ? siteTheme.red : flat ? 'transparent' : siteTheme.redWash,
         }}
         transition="all 200ms ease"
       >
@@ -349,8 +356,20 @@ export default function SiteHeader({
             flexShrink={0}
             _hover={{
               background:
-                activeNav === 'home' && !flatNav ? siteTheme.red : siteTheme.redWash,
+                activeNav === 'home' && !flatNav
+                  ? siteTheme.red
+                  : flatNav
+                    ? 'transparent'
+                    : siteTheme.redWash,
               color: activeNav === 'home' ? 'white' : siteTheme.red,
+            }}
+            _active={{
+              background:
+                activeNav === 'home' && !flatNav
+                  ? siteTheme.red
+                  : flatNav
+                    ? 'transparent'
+                    : siteTheme.redWash,
             }}
             transition="all 200ms ease"
           >
@@ -412,8 +431,20 @@ export default function SiteHeader({
             fontSize={s.fontSize}
             _hover={{
               background:
-                activeNav === 'dialog' && !flatNav ? siteTheme.red : siteTheme.redWash,
+                activeNav === 'dialog' && !flatNav
+                  ? siteTheme.red
+                  : flatNav
+                    ? 'transparent'
+                    : siteTheme.redWash,
               color: activeNav === 'dialog' ? 'white' : siteTheme.red,
+            }}
+            _active={{
+              background:
+                activeNav === 'dialog' && !flatNav
+                  ? siteTheme.red
+                  : flatNav
+                    ? 'transparent'
+                    : siteTheme.redWash,
             }}
           >
             {!compact && (

@@ -17,6 +17,7 @@ import {
   Spinner,
 } from '@chakra-ui/react';
 import { Switch } from '@/components/ui/switch';
+import { toaster } from '@/components/ui/toaster';
 import { BsMicFill, BsMic } from 'react-icons/bs';
 import { FiClock, FiPlus, FiHome, FiPause } from 'react-icons/fi';
 import { IoSend } from 'react-icons/io5';
@@ -93,6 +94,28 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showHistory, setShowHistory] = useState(false);
   const prevMessageCountRef = useRef(messages.length);
+  // 按住说话按压态（2026-11-06 说明.txt 改按住录音；2026-11-07 用户反馈
+  // 「长按没反应/没提示」）：VAD 初始化（首按要拉模型+开麦）完成前毫无
+  // 视觉变化=像坏了。按下立刻进按压态（变色+脉冲圈+气泡），松开时若麦克风
+  // 尚未真正开启（快速点按）给手势提示。
+  const [pressing, setPressing] = useState(false);
+
+  // 松开收音：麦克风已实际开启 → releaseMic（等 VAD 判完句尾把语音送出再收）；
+  // 尚未开启（快速点按/首按初始化未完成——本次没录到任何东西）→ 直接收掉并
+  // 给一条手势提示，教会「按住说话，松开结束」这个交互
+  const endPress = () => {
+    setPressing(false);
+    if (!micOn) {
+      stopMic();
+      toaster.create({
+        title: '请按住说话，松开结束录音',
+        type: 'info',
+        duration: 2500,
+      });
+      return;
+    }
+    releaseMic();
+  };
 
   // 继续对话时自动收起历史面板（新消息一到即收）
   useEffect(() => {
@@ -524,16 +547,13 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
                 // 录音即打断（说明.txt 问题1）：TTS 一停，机器讲解声不再进麦克风
                 interrupt();
                 setMicHold(true); // 按住期间 speech-end 自动收音让路，说完整段
+                setPressing(true); // 即刻视觉反馈，不等 VAD 初始化
                 startMic();
               }}
-              onPointerUp={() => {
-                releaseMic();
-              }}
-              onPointerCancel={() => {
-                releaseMic();
-              }}
+              onPointerUp={endPress}
+              onPointerCancel={endPress}
               onContextMenu={(e) => e.preventDefault()}
-              aria-label={micOn ? '松开结束录音' : '按住说话'}
+              aria-label={micOn || pressing ? '松开结束录音' : '按住说话'}
               position="absolute"
               right={isPortraitBoard ? 3 : 2}
               top="50%"
@@ -541,7 +561,7 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
               width={isPortraitBoard ? '56px' : '40px'}
               height={isPortraitBoard ? '56px' : '40px'}
               rounded="full"
-              bg={micOn ? schoolColors.secondary : schoolColors.primary}
+              bg={micOn || pressing ? schoolColors.secondary : schoolColors.primary}
               color="white"
               display="flex"
               alignItems="center"
@@ -549,6 +569,20 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
               transition="all 0.2s ease"
               _hover={{ bg: siteTheme.redDark }}
               _active={{ transform: 'translateY(-50%) scale(0.92)' }}
+              css={
+                pressing || micOn
+                  ? {
+                      // 录音中脉冲圈（按下即起，不依赖 VAD 就绪；emotion 内联
+                      // keyframes，老内核也支持）
+                      animation: 'micHoldPulse 1.3s ease-out infinite',
+                      '@keyframes micHoldPulse': {
+                        '0%': { boxShadow: '0 0 0 0 rgba(144, 27, 53, 0.40)' },
+                        '70%': { boxShadow: '0 0 0 10px rgba(144, 27, 53, 0)' },
+                        '100%': { boxShadow: '0 0 0 0 rgba(144, 27, 53, 0)' },
+                      },
+                    }
+                  : undefined
+              }
               style={{
                 cursor: 'pointer',
                 // 按住说话：禁掉触摸滚动/长按选择，避免按住时页面抢手势
@@ -556,7 +590,29 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
                 userSelect: 'none',
               }}
             >
-              {micOn ? <BsMicFill size={isPortraitBoard ? 24 : 18} /> : <BsMic size={isPortraitBoard ? 24 : 18} />}
+              {/* 按压态气泡提示（2026-11-07 用户反馈「长按没提示/没反应」） */}
+              {pressing && (
+                <Box
+                  position="absolute"
+                  bottom="calc(100% + 8px)"
+                  right="0"
+                  background="rgba(13, 34, 65, 0.92)"
+                  color="white"
+                  fontSize={isPortraitBoard ? '16px' : '11px'}
+                  px="8px"
+                  py="4px"
+                  borderRadius="md"
+                  whiteSpace="nowrap"
+                  pointerEvents="none"
+                >
+                  聆听中 · 松开结束
+                </Box>
+              )}
+              {micOn || pressing ? (
+                <BsMicFill size={isPortraitBoard ? 24 : 18} />
+              ) : (
+                <BsMic size={isPortraitBoard ? 24 : 18} />
+              )}
             </Box>
           )}
         </Box>

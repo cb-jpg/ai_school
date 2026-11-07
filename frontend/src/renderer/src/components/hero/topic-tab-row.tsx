@@ -51,6 +51,16 @@ export function navIndicatorOn(isPortraitBoard: boolean): boolean {
   return !window.matchMedia('(min-width: 1024px)').matches;
 }
 
+/** 滑动红框几何（模块级跨实例记忆，2026-11-07 用户反馈「点首页/对话没有
+ *  滑动动画」）：页头 SiteHeader 在首页/对话/栏目页/新闻页是各自页面的独立
+ *  实例（home-page/hero-landing/campus-knowledge/App 各渲染一份），切路由时
+ *  整个页头重挂载、pillSeenRef 归零 → 直接定位无动画。把上一次 pill 存进
+ *  模块级变量：新实例首帧先画在旧位置（过渡已开启），下一帧 rAF 再实测真实
+ *  位置 → 跨重挂载照样滑过去。key=包裹盒布局宽：手机(~378)与一体机(scale
+ *  子树布局宽 ~240)坐标不通用，宽度不同不互借。 */
+type PillRect = { left: number; top: number; width: number; height: number };
+let savedPill: { key: number; pill: PillRect } | null = null;
+
 const topicIcons: Record<CampusTopicId, IconType> = {
   intro: FiBookOpen,
   history: FiClock,
@@ -97,9 +107,15 @@ export function TopicTabButton({
       fontWeight="500"
       fontSize={s.fontSize}
       flexShrink={0}
+      /* flat 模式 hover/active 全透明：手机点按后 :hover 粘住不消，近白
+         redWash 底会画在透明按钮上盖住 z0 红框（2026-11-07 用户反馈
+         「有层白色盖在上面」），红底只由滑动指示器承担 */
       _hover={{
-        background: active && !flat ? activeBg : hoverWash,
+        background: active && !flat ? activeBg : flat ? 'transparent' : hoverWash,
         color: active ? 'white' : hoverInk,
+      }}
+      _active={{
+        background: active && !flat ? activeBg : flat ? 'transparent' : hoverWash,
       }}
       transition="all 200ms ease"
     >
@@ -183,12 +199,7 @@ export default function TopicTabRow({
      ÷ scale 还原为布局 px，pill 与按钮同处缩放子树内，布局 px 自洽）。
      无 framer-motion 依赖；纯 CSS transition GPU 合成不卡顿（Chrome 95 也支持）。 */
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [pill, setPill] = useState<{
-    left: number;
-    top: number;
-    width: number;
-    height: number;
-  } | null>(null);
+  const [pill, setPill] = useState<PillRect | null>(null);
   const pillSeenRef = useRef(false);
 
   const measurePill = useCallback(() => {
@@ -212,6 +223,7 @@ export default function TopicTabRow({
       width: br.width / scale,
       height: br.height / scale,
     };
+    savedPill = { key: wrap.offsetWidth, pill: next };
     pillSeenRef.current = true;
     setPill((prev) =>
       prev &&
@@ -228,8 +240,23 @@ export default function TopicTabRow({
   // 改变按钮几何，一并重测。items/leading/trailing 每次父组件渲染都是新
   // JSX（依赖变化即触发），measurePill 幂等去重，无多余渲染。
   useLayoutEffect(() => {
-    measurePill();
     const wrap = wrapRef.current;
+    // 本实例首次测量：有跨页记忆（模块级 savedPill）先画旧位置、下一帧
+    // rAF 再实测 → 重挂载也有滑动动画；无记忆（冷加载）直接定位，避免
+    // 从 0 处飞入。pillSeenRef 置位后此分支不再进（后续渲染只重测）。
+    if (!pillSeenRef.current && wrap) {
+      const saved =
+        savedPill && savedPill.key === wrap.offsetWidth ? savedPill.pill : null;
+      if (saved) {
+        pillSeenRef.current = true;
+        setPill(saved);
+        requestAnimationFrame(() => measurePill());
+      } else {
+        measurePill();
+      }
+    } else {
+      measurePill();
+    }
     const row = rowRef.current;
     window.addEventListener('resize', measurePill);
     row?.addEventListener('scroll', measurePill, { passive: true });
@@ -259,23 +286,31 @@ export default function TopicTabRow({
       borderBottom="1px solid"
       borderColor={siteTheme.hairline}
     >
-      {/* 滑动红框（2026-11-06）：位置完全由测量驱动，mounted 后才有 → 无首帧跳变 */}
+      {/* 滑动红框（2026-11-06）：位置完全由测量驱动，mounted 后才有 → 无首帧跳变。
+          2026-11-07 修「很卡」：动画从 left/top/width 改为 transform translate3d +
+          width——transform 走合成器不逐帧重排（老内核上 left 动画是主因），width
+          是绝对定位出流元素仅自身重排。zIndex 保持 0（按钮 z1 之下）：按钮文字
+          必须浮在红框上方才可读；「白色盖住红框」的根因是手机点按后 :hover 粘住
+          不消、近白 redWash hover 底画在透明按钮上——flat 模式 hover/active 已改
+          全透明（按钮与 NavDropdown/首页/对话四处），底色源头清除。 */}
       {flat && pill && (
         <Box
           data-testid="nav-slide-indicator"
           aria-hidden="true"
           position="absolute"
+          left={0}
+          top={0}
           borderRadius="md"
           background={siteTheme.red}
           zIndex={0}
           pointerEvents="none"
           style={{
-            left: pill.left,
-            top: pill.top,
+            transform: `translate3d(${pill.left}px, ${pill.top}px, 0)`,
             width: pill.width,
             height: pill.height,
+            willChange: 'transform, width',
             transition: pillSeenRef.current
-              ? 'left 260ms cubic-bezier(0.4, 0, 0.2, 1), width 260ms cubic-bezier(0.4, 0, 0.2, 1), top 260ms cubic-bezier(0.4, 0, 0.2, 1)'
+              ? 'transform 260ms cubic-bezier(0.4, 0, 0.2, 1), width 260ms cubic-bezier(0.4, 0, 0.2, 1)'
               : 'none',
           }}
         />
@@ -286,7 +321,16 @@ export default function TopicTabRow({
       <Flex
         ref={rowRef}
         align="center"
-        justify={isPortraitBoard ? 'flex-start' : { base: 'flex-start', lg: 'flex-end' }}
+        /* 单行 flat 模式（手机/一体机）内容居中：一页版内容宽 ≤ 视口，flex-start
+           右侧留白肉眼可见（一体机 ~50px），用户反馈「菜单栏不太对称」——居中
+           后左右留白均等。竖屏大屏内容可能溢出（保持滚动）与桌面 lg+ 换行右对齐
+           布局不变。注意 flat 时 base overflowX hidden，若极窄视口溢出会两侧裁切
+           （预算 349≤375，正常机型不会发生） */
+        justify={
+          isPortraitBoard
+            ? 'flex-start'
+            : { base: flat ? 'center' : 'flex-start', lg: 'flex-end' }
+        }
         gap={s.rowGap}
         flexWrap={isPortraitBoard ? 'nowrap' : { base: 'nowrap', lg: 'wrap' }}
         overflowX={isPortraitBoard ? 'auto' : { base: 'hidden', lg: 'visible' }}

@@ -347,42 +347,46 @@ export default function NewsPage({ onNavigateHome, view = "all" }: NewsPageProps
                 </>
               )}
 
-              {/* 通知公告 */}
-              <Text
-                data-testid="news-list-announcements"
-                color={accent}
-                fontSize="15px"
-                fontWeight="700"
-                mt={isNoticesOnly ? undefined : "8"}
-                mb="2"
-                pb="3"
-                borderBottom="2px solid"
-                borderColor={accent}
-              >
-                通知公告
-              </Text>
-              {visibleAnnouncements.map((item) => (
-                <NewsRow
-                  key={item.id}
-                  testId={`news-row-${item.id}`}
-                  title={item.title}
-                  date={item.date}
-                  tag={
-                    item.audience === "全体" || !item.audience
-                      ? "通知"
-                      : `${item.audience}·通知`
-                  }
-                  href={portalItemHref(item)}
-                  external={Boolean(item.url)}
-                  source={item.source}
-                />
-              ))}
-              {announcements.length > noticeLimit && (
-                <LoadMore
-                  testId="news-load-more-notices"
-                  remaining={announcements.length - noticeLimit}
-                  onClick={() => setNoticeLimit((n) => n + NEWS_PAGE_SIZE)}
-                />
+              {/* 通知公告（只在独立页渲染；2026-11-07 用户反馈「学校新闻拉到
+                  下面还是有通知公告」——新闻页不再混排，公告走顶部 tab 切换） */}
+              {isNoticesOnly && (
+                <>
+                  <Text
+                    data-testid="news-list-announcements"
+                    color={accent}
+                    fontSize="15px"
+                    fontWeight="700"
+                    mb="2"
+                    pb="3"
+                    borderBottom="2px solid"
+                    borderColor={accent}
+                  >
+                    通知公告
+                  </Text>
+                  {visibleAnnouncements.map((item) => (
+                    <NewsRow
+                      key={item.id}
+                      testId={`news-row-${item.id}`}
+                      title={item.title}
+                      date={item.date}
+                      tag={
+                        item.audience === "全体" || !item.audience
+                          ? "通知"
+                          : `${item.audience}·通知`
+                      }
+                      href={portalItemHref(item)}
+                      external={Boolean(item.url)}
+                      source={item.source}
+                    />
+                  ))}
+                  {announcements.length > noticeLimit && (
+                    <LoadMore
+                      testId="news-load-more-notices"
+                      remaining={announcements.length - noticeLimit}
+                      onClick={() => setNoticeLimit((n) => n + NEWS_PAGE_SIZE)}
+                    />
+                  )}
+                </>
               )}
 
               <Text mt="6" color={muted} fontSize="11px" lineHeight="1.7">

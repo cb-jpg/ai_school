@@ -1,6 +1,6 @@
 {
   "name": "open-llm-vtuber",
-  "version": "2.63.0",
+  "version": "2.64.0",
   "description": "An Electron application with React and TypeScript",
   "main": "./out/main/index.js",
   "author": "example.com",

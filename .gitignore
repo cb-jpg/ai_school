@@ -132,3 +132,9 @@ scripts/knowledge_data/docs_text_v3/
 
 # 本地部署打包产物（勿入库）
 *_deploy_web_*.tar.gz
+
+# 本地产物/临时文件（2026-11-07 v2.64 提交清扫）
+tmp_*/
+*.tar.gz
+probe_*.py
+screenshots/
