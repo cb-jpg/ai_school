@@ -5,8 +5,8 @@
  *   页头（SiteHeader，与栏目页/对话页同款）
  *   → hero banner：校园实景照铺底（zIndex base1/md0，压在 Live2D 画布下——
  *     人物从画布透出"站在照片上"，位置=用户手绘红圈 banner 右侧）
- *   → 左侧绛红理念面板（z20 内容层：楷体理念大标题 + 校训三行 + 亮点行 +
- *     "开始对话"CTA，首屏保底可达）
+ *   → 左侧绛红理念面板（z20 内容层：楷体理念大标题 + 一训三风格子 +
+ *     亮点行 + "开始对话"CTA，首屏保底可达）
  *   → 新闻/公告两栏（有已核实直链的条目可点击跳转，"更多>"进新闻中心）
  *   → 页脚条（地址/电话/版权，省实页脚式一行小字）
  * 竖屏大屏（壁挂数字屏）：保留已真机调优的"限宽 840 内容列 + 人物居中站下方"
@@ -30,7 +30,7 @@ import {
 } from '@/services/portal-content-api';
 import campusGate from '@/assets/school/campus-gate.jpg';
 
-// 亮点数据（2026-10-08 校方口径；2026-11-06 主任 docx 更新选修课数与一等奖行）：
+// 亮点数据（2026-10-08 校方口径；2026-11-08 主任反馈排序：一等奖→13保送43录取→130+）：
 // 建校以来 43 位学子录取清北，其中 13 位凭信息学特长保送清北（南方+曾报道
 // 《佛山唯一！保送北大！》），每学期 130+ 门扬长选修课，连续 3 年区高质量发展一等奖
 const ADMITTED_COUNT = '43';
@@ -109,26 +109,36 @@ function SectionTitle({
   );
 }
 
-/** 一风三训条（校训/校风/教风/学风）：手机 2×2、桌面一行四格；竖屏大屏走 2×2 大字版 */
-function MottoStrip({ isPortraitBoard }: { isPortraitBoard: boolean }) {
+/** 一风三训条（校训/校风/教风/学风）：手机 2×2、桌面一行四格；竖屏大屏走 2×2 大字版。
+    onRed：首页红面板内的红底变体（2026-11-08 主任反馈：一训三风挪进面板）——
+    固定 2×2、半透明白卡 + 纸白标签红字 + 纸白正文（替代原校训两行位置）。 */
+function MottoStrip({
+  isPortraitBoard,
+  onRed = false,
+}: {
+  isPortraitBoard: boolean;
+  onRed?: boolean;
+}) {
+  // onRed 只出现在非竖屏的面板里，统一走紧凑尺寸；big=竖屏大屏大字版
+  const big = isPortraitBoard && !onRed;
   return (
     <SimpleGrid
       data-testid="home-mottos"
-      columns={isPortraitBoard ? 2 : { base: 2, md: 4 }}
-      gap={isPortraitBoard ? '14px' : { base: '6px', md: '10px' }}
-      mt={isPortraitBoard ? 5 : { base: 2, md: 3 }}
+      columns={onRed ? 2 : isPortraitBoard ? 2 : { base: 2, md: 4 }}
+      gap={big ? '14px' : onRed ? '6px' : { base: '6px', md: '10px' }}
+      mt={big ? 5 : onRed ? { base: 1.5, md: 3 } : { base: 2, md: 3 }}
     >
       {MOTTO_LINES.map(([label, text]) => (
         <Flex
           key={label}
-          align={isPortraitBoard ? 'flex-start' : 'center'}
+          align={big ? 'flex-start' : 'center'}
           gap="8px"
-          px={isPortraitBoard ? '14px' : '8px'}
-          py={isPortraitBoard ? '10px' : '5px'}
+          px={big ? '14px' : '8px'}
+          py={big ? '10px' : '5px'}
           borderRadius="md"
-          background="rgba(255, 255, 255, 0.62)"
+          background={onRed ? 'rgba(255, 255, 255, 0.14)' : 'rgba(255, 255, 255, 0.62)'}
           border="1px solid"
-          borderColor={siteTheme.hairline}
+          borderColor={onRed ? 'rgba(255, 255, 255, 0.28)' : siteTheme.hairline}
         >
           <Box
             as="span"
@@ -136,20 +146,20 @@ function MottoStrip({ isPortraitBoard }: { isPortraitBoard: boolean }) {
             px="7px"
             py="1px"
             borderRadius="sm"
-            background={siteTheme.redWash}
+            background={onRed ? siteTheme.paper : siteTheme.redWash}
             color={siteTheme.red}
             fontFamily={kaiFont}
             fontWeight="700"
-            fontSize={isPortraitBoard ? '18px' : { base: '10.5px', md: '12px' }}
-            mt={isPortraitBoard ? '2px' : 0}
+            fontSize={big ? '18px' : { base: '10.5px', md: '12px' }}
+            mt={big ? '2px' : 0}
           >
             {label}
           </Box>
           <Text
             fontFamily={kaiFont}
-            color={siteTheme.navy}
+            color={onRed ? siteTheme.paper : siteTheme.navy}
             fontWeight="600"
-            fontSize={isPortraitBoard ? '22px' : { base: '11px', md: '12.5px' }}
+            fontSize={big ? '22px' : { base: '11px', md: '12.5px' }}
             lineHeight="1.45"
             /* keep-all：格窄时只在词间空格处换行（「勤教勤学 开拓进取」断成
                两截整词），禁止 CJK 任意断字出现「开/拓进取」式半词换行 */
@@ -190,9 +200,10 @@ export default function HomePage(_props: HomePageProps) {
   /* hero banner 高度：页头实际高（base≈94px / md≈112px）+ 背景层覆盖高。
      2026-11-06 用户反馈「内容太多撑出背景板」：红面板 minHeight 化后随内容
      长高（手机上 ≈400px+），背景层若只铺到 hero 区（0.38/0.40vh）会在面板
-     中途硬切出一条「背景板边缘」。改为把背景层加高到铺过面板+一风三训区
-     （0.60/0.62vh），再用底部渐变把照片完全溶进下方 wash 底色——边缘彻底
-     消失，内容再多也只是「浮在更深的照片上」而非「撑破背景板」。 */
+     中途硬切出一条「背景板边缘」。改为把背景层加高到铺过整个红面板
+     （0.60/0.62vh；2026-11-08 一训三风挪进面板后总高近似不变，公式沿用），
+     再用底部渐变把照片完全溶进下方 wash 底色——边缘彻底消失，内容再多
+     也只是「浮在更深的照片上」而非「撑破背景板」。 */
   const bannerBgHeight = isPortraitBoard
     ? undefined
     : {
@@ -310,21 +321,6 @@ export default function HomePage(_props: HomePageProps) {
               </Text>
             </Box>
             <Box maxW="640px">
-              <Text
-                mt={4}
-                color={siteTheme.textBody}
-                fontFamily={kaiFont}
-                fontSize="22px"
-                lineHeight="1.7"
-              >
-                “扬长教育、人人出彩”
-                <Box as="span" display="block">
-                  “以爱治校、尊重你我”
-                </Box>
-                <Box as="span" display="block">
-                  “任重道远、毋忘奋斗”
-                </Box>
-              </Text>
               <Flex mt={6} align="center" gap={6}>
                 <Text
                   color={siteTheme.red}
@@ -348,7 +344,8 @@ export default function HomePage(_props: HomePageProps) {
                 </Box>
               </Flex>
               <Box mt={6} width="96px" height="3px" bg="rgba(144, 27, 53, 0.35)" />
-              {/* 2026-11-06 主任 docx：亮点数据补全（43录取/130+选修/一等奖） */}
+              {/* 亮点小字行（2026-11-08 主任反馈顺序对齐红面板：一等奖→43录取→130+；
+                  13保送已由上方大数字块承载，不重复） */}
               <Text
                 mt={4}
                 color={siteTheme.navy}
@@ -356,9 +353,9 @@ export default function HomePage(_props: HomePageProps) {
                 fontWeight="600"
                 lineHeight="1.6"
               >
-                43位学子录取清北 · {COURSE_COUNT}门扬长选修课
+                {TOP_AWARD_LINE}
                 <Box as="span" display="block" mt="2px">
-                  {TOP_AWARD_LINE}
+                  43位学子录取清北 · {COURSE_COUNT}门扬长选修课
                 </Box>
               </Text>
               {/* 一风三训（2026-11-06 主任 docx：放在"一"内容下面） */}
@@ -408,21 +405,11 @@ export default function HomePage(_props: HomePageProps) {
                 让每一个石实学子都闪闪发光
               </Text>
 
-              {/* 校训三行（楷体小字） */}
-              <Text
-                fontFamily={kaiFont}
-                fontSize={{ base: '11.5px', md: '14px' }}
-                lineHeight="1.75"
-                mt={{ base: 1.5, md: 3 }}
-                opacity={0.92}
-              >
-                扬长教育、人人出彩 · 以爱治校、尊重你我
-                <Box as="span" display="block">
-                  任重道远、毋忘奋斗
-                </Box>
-              </Text>
+              {/* 一训三风（2026-11-08 主任反馈：原「扬长教育…任重道远」两行挪出，
+                  完整一训三风以红底变体格子上移到这个位置） */}
+              <MottoStrip isPortraitBoard={false} onRed />
 
-              {/* 亮点行（紧凑单行） */}
+              {/* 亮点行（紧凑单行；2026-11-08 主任反馈顺序：一等奖→13保送43录取→130+） */}
               <Flex
                 mt={{ base: 2, md: 4 }}
                 pt={{ base: 2, md: 3 }}
@@ -430,7 +417,14 @@ export default function HomePage(_props: HomePageProps) {
                 gap={{ base: 3, md: 6 }}
                 flexWrap="wrap"
               >
+                <Text fontSize={{ base: '11px', md: '14px' }} lineHeight="1.5" opacity={0.85}>
+                  {TOP_AWARD_LINE}
+                </Text>
                 <Text fontSize={{ base: '11px', md: '14px' }} lineHeight="1.5">
+                  <Box as="span" fontWeight="bold" fontSize={{ base: '15px', md: '19px' }}>
+                    {HIGHLIGHT_COUNT}
+                  </Box>
+                  {' '}位学子通过信息学保送清北，
                   <Box as="span" fontWeight="bold" fontSize={{ base: '15px', md: '19px' }}>
                     {ADMITTED_COUNT}
                   </Box>
@@ -438,18 +432,9 @@ export default function HomePage(_props: HomePageProps) {
                 </Text>
                 <Text fontSize={{ base: '11px', md: '14px' }} lineHeight="1.5">
                   <Box as="span" fontWeight="bold" fontSize={{ base: '15px', md: '19px' }}>
-                    {HIGHLIGHT_COUNT}
-                  </Box>
-                  {' '}位学子通过信息学保送清北
-                </Text>
-                <Text fontSize={{ base: '11px', md: '14px' }} lineHeight="1.5">
-                  <Box as="span" fontWeight="bold" fontSize={{ base: '15px', md: '19px' }}>
                     {COURSE_COUNT}
                   </Box>
                   {' '}门扬长选修课
-                </Text>
-                <Text fontSize={{ base: '11px', md: '14px' }} lineHeight="1.5" opacity={0.85}>
-                  {TOP_AWARD_LINE}
                 </Text>
               </Flex>
 
@@ -483,11 +468,6 @@ export default function HomePage(_props: HomePageProps) {
             </Box>
           </Flex>
         )}
-
-        {/* 一风三训条（2026-11-06 主任 docx：放在 hero"一"内容下面） */}
-        <Box px={isPortraitBoard ? 8 : { base: 4, md: 12, lg: 16 }} pr={isPortraitBoard ? 10 : { base: 4, md: 10 }}>
-          <MottoStrip isPortraitBoard={isPortraitBoard} />
-        </Box>
 
         {/* 新闻/公告栏目：省实官网式两栏；有已核实直链的条目可点击（↗），
             标题行"更多>"进新闻中心（#/news）。手机端每列收紧到 2 条可见

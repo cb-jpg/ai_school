@@ -16,6 +16,26 @@ import type { SectionImage } from './campus-images';
 import anniversaryPoster from '@/assets/school/anniversary-poster.jpg';
 import artFestivalGala from '@/assets/school/art-festival-gala.jpg';
 import bannerHistory from '@/assets/school/banner-history.jpg';
+// 校方 2026-11-08「学校建筑照片」压缩包（18 张，原始 3000~7000px 压到 1600px），
+// 用于「校园文化与新貌」配图整体替换
+import photoArtsFestivalFlags from '@/assets/school/campus/arts-festival-flags.jpg';
+import photoArtsFestivalGala from '@/assets/school/campus/arts-festival-gala.jpg';
+import photoArtRoom from '@/assets/school/campus/art-room.jpg';
+import photoBrightClassroom from '@/assets/school/campus/bright-classroom.jpg';
+import photoCanteen from '@/assets/school/campus/canteen.jpg';
+import photoChoirRoom from '@/assets/school/campus/choir-room.jpg';
+import photoDormitory from '@/assets/school/campus/dormitory.jpg';
+import photoFootballField from '@/assets/school/campus/football-field.jpg';
+import photoGate from '@/assets/school/campus/gate.jpg';
+import photoGym from '@/assets/school/campus/gym.jpg';
+import photoKongshengyuan from '@/assets/school/campus/kongshengyuan.jpg';
+import photoLibrary from '@/assets/school/campus/library.jpg';
+import photoMootCourt from '@/assets/school/campus/moot-court.jpg';
+import photoMottoStone from '@/assets/school/campus/motto-stone.jpg';
+import photoRoboticsLab from '@/assets/school/campus/robotics-lab.jpg';
+import photoTeachingBuilding from '@/assets/school/campus/teaching-building.jpg';
+import photoTrackField from '@/assets/school/campus/track-field.jpg';
+import photoXingjianBuilding from '@/assets/school/campus/xingjian-building.jpg';
 import campusChoirRoom from '@/assets/school/campus-choir-room.jpg';
 import campusGate from '@/assets/school/campus-gate.jpg';
 import campusInformaticsLab from '@/assets/school/campus-informatics-lab.jpg';
@@ -31,7 +51,6 @@ import honorYuedu from '@/assets/school/honor-yuedu.jpg';
 import joyFarm from '@/assets/school/joy-farm.jpg';
 import gzhQrCode from '@/assets/school/gzh-qrcode.png';
 import kongshengyuan from '@/assets/school/kongshengyuan.jpg';
-import masterGallery from '@/assets/school/master-gallery.jpg';
 import masterWall from '@/assets/school/master-wall.jpg';
 import mingdeLou from '@/assets/school/mingde-lou.jpg';
 import smartCampus from '@/assets/school/smart-campus.jpg';
@@ -149,6 +168,11 @@ const govSources = {
     publisher: '石实实验学校',
     publishedAt: '2024-01 至 2025-05 印制版',
   },
+  schoolProfileDoc: {
+    title: '学校简介（校方文档）',
+    publisher: '石实实验学校',
+    publishedAt: '2026-11 校方提供',
+  },
   zsjz2026: {
     title: '石实实验学校2026年招生简章（微信公众号"石实"）',
     publisher: '学校微信公众号',
@@ -169,71 +193,79 @@ export const siteColumns: SiteColumn[] = [
         title: '学校简介',
         eyebrow: '学校概况',
         summary:
-          '石实实验学校是一所九年一贯制全日制寄宿制民办实验学校，位于佛山市南海区大沥镇，前身为石门实验学校。',
+          '九年一贯制全日制寄宿制民办实验学校，恪守"任重道远、毋忘奋斗"校训，秉持"扬长教育、人人出彩"办学理念，培育"五有好少年"。',
         paragraphs: [
-          '佛山市南海区石实实验学校原名佛山市南海区石门实验学校，始建于1999年，是一所全日制寄宿制民办实验学校。学校位于佛山市南海区大沥镇太平社区体育南路，由大沥镇教育办公室负责日常业务管理。',
-          '2023年9月8日，经南海区教育局批复，学校正式更名为"佛山市南海区石实实验学校"。2024年起学校复办小学部，成为九年一贯制学校，实现小初一体化培养。',
-          '寄宿制办学为学生提供了全天候的学习生活环境，也让教师陪伴和同伴合作成为校园文化的重要组成部分。学校长期重视信息学特长培养，同时开设体育、艺术、心理等特色社团，为学生提供多样化的成长平台。',
+          '学校恪守"任重道远、毋忘奋斗"校训，秉持"扬长教育、人人出彩"办学理念，弘扬"以爱治校、尊重你我"共同价值观，贯通"寻长—育长—见长—成长"全链条育人体系，培育有志、有为、有识、有恒、有趣的"五有好少年"，让每一个石实学子都能闪闪发光。学校位于佛山市南海区大沥镇太平社区体育南路，2024年复办小学部，实现小初一体化培养。',
+          '办学实力有据可查：近五年先后获评首批全国健康学校建设单位等国家级荣誉2项、广东省中小学科学教育示范区示范校等省级荣誉6项、市级荣誉4项，连续三年蝉联南海区初中教育高质量发展先进学校一等奖、英才培养先进单位"鲲鹏奖"等区级荣誉10余项，"扬长教育"特色品牌多次登上《中小学德育》《中小学管理》《中国教育报》《广东教育》等权威媒体。学校师资力量雄厚：280余名专任教师中有正高级教师4人、特级教师2人、博士教师2人，市区级学科带头人、名师、名班主任逾百人，并聘请国际宇航科学院何质彬院士等4位行业大咖担任教育顾问，邀请入选全球前2%顶尖科学家榜单的华南理工大学博士生导师钟竞辉教授担任科学副校长、未来科创学院荣誉院长。',
+          '学校以卓越育人实力，铸就升学与竞赛双高峰：累计43位学子录取清北、13位凭信息学特长保送（校方2026年10月通报口径），连续2年培养佛山市当年唯一清北保送生陈哲章、梁宝烨，2024年诞生佛山唯一理科类高考屏蔽生；机器人专训队勇夺国际、亚洲及全国赛事一等奖并创下新赛季世界纪录；近三年超百名学子在全国信息学CSP-J/S认证测试中获一等奖，获奖人数稳居佛山第一；数百名学生被港大、港中大、哈佛、剑桥、牛津等国际顶级学府录取。',
+          '学校构建"两主两翼三阶八域"特色课程体系，推行"大学式选课"，每学期开设上百门特色课程，覆盖语言、人文、艺术、运动、健康、社会、科学、数理强基八大素养领域；作为"佛山市规范化家长学校领航工程示范点"，打造"1+2+3+N模式"家长学校，先后组建家长讲师团、星光家长艺术团等特色队伍，构建起规范高效的家校共育"石实模式"。',
         ],
         facts: [
-          '现用全称：佛山市南海区石实实验学校',
-          '曾用名：佛山市南海区石门实验学校',
-          '建校时间：1999年',
           '办学类型：九年一贯制 · 全日制寄宿制民办实验学校',
-          '所属区域：佛山市南海区大沥镇',
-          '日常管理：大沥镇教育办公室负责',
+          '育人体系："寻长—育长—见长—成长"全链条，培育"五有好少年"',
+          '荣誉：近五年国家级2项、省级6项、市级4项、区级10余项',
+          '师资：专任教师280余名，正高级4人、特级2人、博士2人',
+          '升学：43位学子录取清北、13位凭信息学特长保送（校方2026-10通报）',
+          '竞赛：近三年超百名学子获信息学CSP-J/S全国一等奖，稳居佛山第一',
+          '课程："两主两翼三阶八域"体系，每学期开设上百门特色课程',
+          '家校社：佛山市规范化家长学校领航工程示范点，"1+2+3+N"家长学校',
         ],
         images: [
           { src: mingdeLou, variant: 'card', caption: '明德楼与校门广场（大沥太平校区）' },
           { src: campusTrack, variant: 'card', caption: '田径运动场（2026 校方实景）' },
         ],
         narration:
-          '欢迎了解佛山市南海区石实实验学校。学校原名石门实验学校，始建于1999年，是一所全日制寄宿制民办实验学校。2023年经南海区教育局批复更名为石实实验学校，2024年起复办小学部，成为九年一贯制学校。学校位于大沥镇，以"让每一个石实学子都闪闪发光"为育人追求，为学生提供优质的教育服务。',
-        sources: [govSources.baike, govSources.rename],
+          '欢迎了解佛山市南海区石实实验学校。学校恪守任重道远、毋忘奋斗的校训，秉持扬长教育、人人出彩的办学理念，贯通寻长、育长、见长、成长的全链条育人体系，培育五有好少年。近五年学校获得国家级荣誉两项、省级六项、市级四项、区级十余项；两百八十多名专任教师中有正高级教师、特级教师和博士教师，并请来何质彬院士等大咖担任教育顾问。升学与竞赛双高峰：累计四十三位学子录取清北，其中十三位凭信息学特长保送；近三年超百名学子获信息学全国一等奖，人数稳居佛山第一。',
+        sources: [govSources.schoolProfileDoc, govSources.rename, govSources.baike],
       },
       {
         id: 'overview-philosophy',
         title: '办学理念',
         eyebrow: '育人追求',
-        summary: '学校秉承"任重道远、毋忘奋斗"校训，坚持"扬长教育、人人出彩"办学理念，"五育并举"全面育人。',
+        summary:
+          '"扬长教育、人人出彩"的办学观，"以爱治校、尊重你我"的价值观，"成长比成绩更重要"的育人观。',
         paragraphs: [
-          '学校始终秉承"任重道远、毋忘奋斗"的校训，坚持"扬长教育、人人出彩"的办学理念，弘扬"以爱治校、尊重你我"的共同价值观，"五育并举"全面育人。',
-          '办学理念的核心，是"扬长教育、人人出彩"，让每一个石实学子都闪闪发光：不仅关注学业成绩，更注重学生的品格养成、能力提升和兴趣发展。学校通过寄宿制管理与个性化培养相结合，为不同特点的学生提供适合的成长路径。',
-          '在具体育人场景中，学校把中华传统文化熏陶、劳动教育、科学教育融入日常：孔圣园祭孔仪式、名生长廊与名人文化、爱乐农场劳动实践等，都成为理念落地的校园现场。',
+          '学校秉持"扬长教育、人人出彩"的办学观：扬长教育是符合人的发展的全人教育，因材施教、以长促全，追求校内教育公平，个性化地大面积提升学生核心素养。',
+          '学校弘扬"以爱治校、尊重你我"的共同价值观：尊重教育规律，以"爱"为根本保证。同时坚持"成长比成绩更重要"的育人观：全面发展、个性成长，让每个石实学子闪闪发光——求真、求美、求善，向前、向上、向深、向宽发展。',
+          '一训三风是理念的日常表达：校训"任重道远、毋忘奋斗"，校风"从严要求、全面发展，勤教勤学、开拓进取"，教风"科学、协作、拼搏"，学风"尊师、爱校、勤学、俭朴"。孔圣园祭孔仪式、名生长廊与名人文化、爱乐农场劳动实践等，都是理念落地的校园现场。',
         ],
         facts: [
+          '办学观：扬长教育、人人出彩（全人教育 · 因材施教以长促全）',
+          '价值观：以爱治校、尊重你我（尊重教育规律，以爱为根本保证）',
+          '育人观：成长比成绩更重要（求真求美求善，向前向上向深向宽发展）',
           '校训：任重道远、毋忘奋斗',
-          '办学理念：扬长教育、人人出彩',
-          '共同价值观：以爱治校、尊重你我',
-          '育人路径："五育并举"全面育人',
-          '培养目标：让每一个石实学子都闪闪发光',
+          '校风：从严要求 全面发展 · 勤教勤学 开拓进取',
+          '教风：科学 协作 拼搏',
+          '学风：尊师 爱校 勤学 俭朴',
         ],
         images: [
           { src: kongshengyuan, variant: 'card', caption: '孔圣园祭孔仪式' },
           { src: joyFarm, variant: 'card', caption: '爱乐农场：学生、家长与教师并肩劳作' },
         ],
         narration:
-          '石实实验学校秉承"任重道远、毋忘奋斗"的校训，坚持"扬长教育、人人出彩"的办学理念，弘扬"以爱治校、尊重你我"的共同价值观，五育并举全面育人。学校希望让每一个孩子都能成长、成才、成功，通过寄宿制管理和个性化培养相结合，为不同特点的学生提供适合的成长路径。',
-        sources: [govSources.brochure],
+          '石实实验学校秉持扬长教育、人人出彩的办学观，这是符合人的发展的全人教育：因材施教、以长促全，追求校内教育公平。学校弘扬以爱治校、尊重你我的共同价值观，尊重教育规律，以爱为根本保证；坚持成长比成绩更重要的育人观，让每个石实学子求真求美求善，向前向上向深向宽发展。校训任重道远、毋忘奋斗，校风从严要求、全面发展，教风科学协作拼搏，学风尊师爱校勤学俭朴。',
+        sources: [govSources.schoolProfileDoc],
       },
       {
         id: 'overview-history',
         title: '历史沿革',
         eyebrow: '校史',
         summary:
-          '沿着创办、迁址、更名、复办小学与25周年校庆的节点，了解这所大沥寄宿制学校的发展轨迹。',
+          '创办、迁址、转制更名、复办小学、全学段招生——沿着节点了解这所大沥寄宿制学校的发展轨迹。',
         paragraphs: [
-          '公开资料记载，学校始建于一九九九年，最初以"石门实验学校"的名称开展办学。寄宿制办学让学校形成了学习、生活和成长相互融合的校园节奏。',
-          '2019年前后，学校从大沥黄岐迁往大沥太平新校区。新校区为教学、住宿、体育和综合实践提供了更大的空间，也让学校开始用更完整的场景承载学习与生活。',
-          '2023年9月8日，南海区教育局正式批复学校更名："石门实验学校"变更为"石实实验学校"，日常业务管理仍由大沥镇教育办公室负责。"石实"既保留了原有的学校记忆，也成为面向新阶段的校园标识。',
-          '2024年，学校复办小学部，九年一贯制办学格局形成。2024年11月，学校举行25周年校庆系列活动，两万余名校友共叙情谊，校庆晚会大咖云集，成为全校师生与校友的共同记忆。',
+          '石实实验学校（原石门实验学校）创办于1999年，是佛山市第一所实验类学校，原校址与石门中学一脉相连，深度传承卓越教育基因。寄宿制办学让学校形成了学习、生活和成长相互融合的校园节奏。',
+          '2019年，学校迁址大沥太平，校园占地120亩。2023年学校顺利转制，并经南海区教育局批复（2023年9月8日）更名为"佛山市南海区石实实验学校"，日常业务管理由大沥镇教育办公室负责。',
+          '2024年，学校复办小学部；2025年实现小学一年级至初中九年级全学段招生，办学规模达到4000人，目前设有93个教学班。2026年，学校硬件设施和校园文化全面升级，高标准建设现代化、信息化、智能化校园。',
+          '历经27载耕耘，学校培养了两万多名毕业生。据校方简介文档，40名优秀毕业生入读清华大学、北京大学，38名入读香港大学、香港中文大学，40余名入读哈佛、剑桥、牛津、康奈尔、新加坡国立等国际顶尖院校（另据校方2026年10月通报，办学以来累计43位学子录取清北，两处口径注记并存）。',
         ],
         facts: [
-          '1999年：始建，原名石门实验学校',
-          '2019年前后：迁入大沥太平新校区',
-          '2023年9月8日：经南海区教育局批复更名"石实实验学校"',
-          '2024年：复办小学部，形成九年一贯制办学',
-          '2024年11月：举行25周年校庆系列活动',
+          '1999年：创办（原石门实验学校），佛山市第一所实验类学校',
+          '2019年：迁址大沥太平，校园占地120亩',
+          '2023年9月8日：转制并经南海区教育局批复更名"石实实验学校"',
+          '2024年：复办小学部，九年一贯制格局形成',
+          '2025年：实现小学一年级至初三全学段招生，办学规模达4000人',
+          '现在：93个教学班；2026年硬件设施与校园文化全面升级',
+          '桃李：27载培养两万多名毕业生（校方简介文档：40名清北/38名港大港中大/40余名国际顶尖）',
         ],
         images: [{ src: bannerHistory, variant: 'card', caption: '校园记忆' }],
         video: {
@@ -242,38 +274,52 @@ export const siteColumns: SiteColumn[] = [
           caption: '25周年校庆晚会现场实拍（舞狮表演）',
         },
         narration:
-          '欢迎来到石实实验学校校史篇。学校始建于一九九九年，原名石门实验学校；二零一九年前后迁入大沥太平新校区；二零二三年九月八日经南海区教育局批复更名为石实实验学校；二零二四年复办小学部，并在当年十一月举行二十五周年校庆。从黄岐到太平，从石门到石实，变化的是校园与名称，不变的是让每一个孩子成长、成才、成功的追求。',
-        sources: [govSources.rename, govSources.baike],
+          '欢迎来到石实实验学校校史篇。学校创办于一九九九年，原名石门实验学校，是佛山市第一所实验类学校，原校址与石门中学一脉相连。二零一九年迁址大沥太平，校园占地一百二十亩；二零二三年学校顺利转制，并经南海区教育局批复更名为石实实验学校。二零二四年复办小学部，二零二五年实现小学一年级至初中九年级全学段招生，办学规模达到四千人，目前设有九十三个教学班。二十七载耕耘，学校培养了两万多名毕业生，一大批学子进入清华、北大和世界顶尖学府。',
+        sources: [govSources.schoolProfileDoc, govSources.rename, govSources.baike],
       },
       {
         id: 'overview-culture',
         title: '校园文化与新貌',
         eyebrow: '今日石实',
         summary:
-          '孔圣园、名生长廊、智慧校园指挥中心、体艺节大舞台——传统文化与现代治理在校园里交汇。',
+          '120亩校园实拍：从校门、行健楼到体育馆、图书馆，从孔圣园到体艺节大舞台——看今日石实的成长现场。',
         paragraphs: [
-          '校园里，中华传统文化的熏陶随处可见：孔圣园的祭孔仪式让学生在礼乐中理解"任重道远"；名生长廊与名人文化柱把校史与时代楷模的故事立在每日经过的路上；明德楼取"大学之道，在明明德"之意，是校园文化地标。',
-          '现代化学苦治理同样在推进：智慧校园指挥中心把校园安全、教学与后勤数据汇于一屏；校园食堂获评食品安全卫生等级 A 级单位，"阳光厨房"守护每一餐。',
+          '2019年迁址大沥太平后，学校在120亩校园里完整承载教学、住宿与运动：校门与校训石迎接每一位师生，教学楼与行健楼里是明亮的常规教室，孔圣园让"任重道远"的校训在礼乐中可感可触。',
+          '运动与阅读场景一应俱全：400米标准跑道田径场、足球场、体育馆支撑每天的运动量；图书馆是广东省最美阅读空间，合唱室、美术室、机器人专训室、模拟法庭等功能室让扬长课程有真正的落地场景；宿舍与A级阳光饭堂守护寄宿生活的每一天。',
           '学生的舞台则更加广阔：第26届体艺节精品节目展演以"以爱筑未来·扬长共出彩"为主题，超3000名学生同台表演；首届数学文化周暨科技节开放日吸引近万人打卡；扬长大舞台让学生自编自导自演，绽放个人风采。',
         ],
         facts: [
+          '校园：占地120亩，93个教学班、4000人办学规模',
           '孔圣园：祭孔仪式等中华传统文化活动',
-          '名生长廊 / 名人文化柱：校史与榜样教育',
-          '智慧校园指挥中心：数字化校园治理',
-          '食堂获评食品安全卫生等级 A 级单位',
+          '400米跑道田径场 / 足球场 / 体育馆：每天运动有场地',
+          '图书馆：广东省最美阅读空间',
+          '功能室：合唱室 / 美术室 / 机器人专训室 / 模拟法庭',
+          '宿舍与饭堂：寄宿生活配套，食堂获评食品安全卫生等级 A 级单位',
           '第26届体艺节：超3000名学生同台展演',
-          '首届数学文化周暨科技节开放日：近万人打卡',
         ],
         images: [
-          { src: masterGallery, variant: 'card', caption: '名生长廊（"任重道远·毋忘奋斗"）' },
-          { src: masterWall, variant: 'card', caption: '名人文化柱廊（时代楷模画像）' },
-          { src: smartCampus, variant: 'card', caption: '智慧校园指挥中心' },
-          { src: artFestivalGala, variant: 'card', caption: '第26届体艺节精品节目展演（2025.11）' },
-          { src: stemOpenDay, variant: 'card', caption: '首届数学文化周暨科技节开放日（2026.03）' },
+          { src: photoGate, variant: 'card', caption: '校门' },
+          { src: photoTeachingBuilding, variant: 'card', caption: '教学楼' },
+          { src: photoXingjianBuilding, variant: 'card', caption: '行健楼' },
+          { src: photoMottoStone, variant: 'card', caption: '校训石' },
+          { src: photoKongshengyuan, variant: 'card', caption: '孔圣园' },
+          { src: photoTrackField, variant: 'card', caption: '400米跑道田径场' },
+          { src: photoFootballField, variant: 'card', caption: '足球场' },
+          { src: photoGym, variant: 'card', caption: '体育馆' },
+          { src: photoLibrary, variant: 'card', caption: '图书馆' },
+          { src: photoBrightClassroom, variant: 'card', caption: '明亮教室' },
+          { src: photoChoirRoom, variant: 'card', caption: '合唱室' },
+          { src: photoArtRoom, variant: 'card', caption: '美术室' },
+          { src: photoRoboticsLab, variant: 'card', caption: '机器人专训室' },
+          { src: photoMootCourt, variant: 'card', caption: '模拟法庭' },
+          { src: photoDormitory, variant: 'card', caption: '学生宿舍' },
+          { src: photoCanteen, variant: 'card', caption: '学生饭堂' },
+          { src: photoArtsFestivalFlags, variant: 'card', caption: '体艺节现场' },
+          { src: photoArtsFestivalGala, variant: 'card', caption: '体艺节晚会' },
         ],
         narration:
-          '在石实实验学校的校园里，传统文化与现代治理交相辉映：孔圣园的祭孔仪式、名生长廊与名人文化柱承载着学校的精神底色；智慧校园指挥中心和阳光厨房守护着每天的校园生活；体艺节晚会超三千名学生同台表演，数学文化周暨科技节开放日吸引近万人打卡。校园不只是上课的地方，更是阅读、运动、表达和发现兴趣的成长现场。',
-        sources: [govSources.brochure],
+          '欢迎来到今日石实。校园占地一百二十亩：校门与校训石迎来送往，教学楼与行健楼里书声琅琅，孔圣园让校训在礼乐中可感可触。四百米跑道田径场、足球场和体育馆支撑每天的运动，图书馆是最美阅读空间，合唱室、美术室、机器人专训室、模拟法庭让扬长课程有真正的落地场景，宿舍与阳光饭堂守护寄宿生活的每一天。体艺节晚会上，三千多名学生同台绽放。校园不只是上课的地方，更是阅读、运动、表达和发现兴趣的成长现场。',
+        sources: [govSources.schoolProfileDoc, govSources.brochure],
       },
     ],
   },
