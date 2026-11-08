@@ -581,7 +581,60 @@ export default function ColumnPage({
                       key={idx}
                       align="flex-start"
                       gap="2"
-                      mb={idx === article.facts.length - 1 ? 0 : 2}
+                      mb={
+                        idx === article.facts.length - 1 && !article.wechatQr
+                          ? 0
+                          : 2
+                      }
+                    >
+                      <Box
+                        mt="2"
+                        width="4"
+                        height="4"
+                        flexShrink={0}
+                        background={accent}
+                        borderRadius="full"
+                      />
+                      <Text color={muted} fontSize="13px" lineHeight="1.7">
+                        {fact}
+                      </Text>
+                    </Flex>
+                  ))}
+                  {/* 公众号二维码行（2026-11-08 用户反馈：公众号文字条换成可扫码）。
+                      100px 加白底留静区；微信内长按识别也够用。 */}
+                  {article.wechatQr && (
+                    <Flex
+                      align="center"
+                      gap="3"
+                      mb={(article.factsAfterQr?.length ?? 0) > 0 ? 3 : 0}
+                    >
+                      <Image
+                        src={article.wechatQr.src}
+                        alt={article.wechatQr.caption}
+                        boxSize="100px"
+                        borderRadius="md"
+                        border="1px solid"
+                        borderColor={hairline}
+                        background="white"
+                        padding="6px"
+                        flexShrink={0}
+                      />
+                      <Box>
+                        <Text color={muted} fontSize="13px" fontWeight="500">
+                          {article.wechatQr.caption}
+                        </Text>
+                        <Text color={muted} fontSize="12px" opacity="0.8" mt="1">
+                          微信扫码，了解学校动态与招生信息
+                        </Text>
+                      </Box>
+                    </Flex>
+                  )}
+                  {(article.factsAfterQr ?? []).map((fact, idx) => (
+                    <Flex
+                      key={`after-${idx}`}
+                      align="flex-start"
+                      gap="2"
+                      mb={idx === (article.factsAfterQr?.length ?? 0) - 1 ? 0 : 2}
                     >
                       <Box
                         mt="2"

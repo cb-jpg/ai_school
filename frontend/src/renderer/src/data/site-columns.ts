@@ -29,6 +29,7 @@ import honorKunpeng from '@/assets/school/honor-kunpeng.jpg';
 import honorXinxixue from '@/assets/school/honor-xinxixue.jpg';
 import honorYuedu from '@/assets/school/honor-yuedu.jpg';
 import joyFarm from '@/assets/school/joy-farm.jpg';
+import gzhQrCode from '@/assets/school/gzh-qrcode.png';
 import kongshengyuan from '@/assets/school/kongshengyuan.jpg';
 import masterGallery from '@/assets/school/master-gallery.jpg';
 import masterWall from '@/assets/school/master-wall.jpg';
@@ -64,6 +65,12 @@ export interface ColumnArticle {
   summary: string;
   paragraphs: string[];
   facts: string[];
+  /** 微信公众号二维码行（2026-11-08 用户反馈「报读咨询的公众号文字条换成二维码」）：
+   *  渲染在 facts 之后、factsAfterQr 之前，同一要点卡片内。src 走打包资源
+   *  （同源，老 WebView 不拦 <img>，v2.56 教训）。 */
+  wechatQr?: { src: string; caption: string };
+  /** 排在二维码行之后的事实要点（如"学校地址"保持压尾） */
+  factsAfterQr?: string[];
   images: SectionImage[];
   video?: ColumnVideo;
   /** 数字人"讲解本文"播报词 */
@@ -543,7 +550,11 @@ export const siteColumns: SiteColumn[] = [
           '初中招生办咨询电话：18925911573（蔡老师）',
           '小学招生办咨询电话：18927205583（蔡老师）',
           '学校邮箱：18925911573@163.com',
-          '学校微信公众号：石实',
+        ],
+        // 2026-11-08 用户反馈「这个地方换成学校的微信公众号的二维码」（图4：
+        // 报读咨询卡片里的"学校微信公众号：石实"文字条 → 可扫的二维码）
+        wechatQr: { src: gzhQrCode, caption: '学校微信公众号「石实」' },
+        factsAfterQr: [
           '学校地址：佛山市南海区大沥镇太平社区体育南路20号',
         ],
         images: [],
