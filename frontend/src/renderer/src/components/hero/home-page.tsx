@@ -131,8 +131,12 @@ function MottoStrip({
       {MOTTO_LINES.map(([label, text]) => (
         <Flex
           key={label}
-          align={big ? 'flex-start' : 'center'}
-          gap="8px"
+          align={big ? 'flex-start' : onRed ? { base: 'flex-start', md: 'center' } : 'center'}
+          /* onRed 手机（base）竖排卡：标签置顶、正文独占整卡宽——2026-11-09 真机
+             反馈 360~390px 窄屏横排（标签+正文同行）时半句 ≈94px 装不下、四格
+             全出框；竖排后半句 < 整卡宽 ≈130px，两行对仗完整放下（md+ 横排不变） */
+          flexDir={onRed ? { base: 'column', md: 'row' } : undefined}
+          gap={onRed ? { base: '5px', md: '8px' } : '8px'}
           px={big ? '14px' : '8px'}
           py={big ? '10px' : '5px'}
           borderRadius="md"
@@ -166,14 +170,15 @@ function MottoStrip({
             wordBreak="keep-all"
           >
             {/* 2026-11-09 校方反馈：「·」格窄时单独成行很难看——以「·」为界
-                拆成上下两行平行短句（各半句 nowrap 整体换行），点号不再上屏；
-                无「·」的条目单行渲染不受影响 */}
+                拆成上下两行平行短句，点号不再上屏；无「·」的条目单行不受影响。
+                不加 nowrap：块级 span 已保证半句从新行起，真机大字号下宁可在
+                半句内部空格处优雅断行，也不溢出卡外（v2.67 nowrap 出框教训） */}
             {text
               .split('·')
               .map((part) => part.trim())
               .filter(Boolean)
               .map((part, i) => (
-                <Box as="span" key={i} display="block" whiteSpace="nowrap">
+                <Box as="span" key={i} display="block">
                   {part}
                 </Box>
               ))}
