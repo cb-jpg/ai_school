@@ -94,27 +94,41 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showHistory, setShowHistory] = useState(false);
   const prevMessageCountRef = useRef(messages.length);
-  // 按住说话按压态（2026-11-06 说明.txt 改按住录音；2026-11-07 用户反馈
-  // 「长按没反应/没提示」）：VAD 初始化（首按要拉模型+开麦）完成前毫无
-  // 视觉变化=像坏了。按下立刻进按压态（变色+脉冲圈+气泡），松开时若麦克风
-  // 尚未真正开启（快速点按）给手势提示。
+  // 点击录音态（2026-11-09 说明.txt 急需1：第一次按下开始录音，第二次按下
+  // 结束录音，中间松开录音继续——替换 2026-11-06 的按住说话；2026-11-07 的
+  // 「要有反馈」教训保留：按下即变色+脉冲圈+气泡，不等 VAD 初始化）。
   const [pressing, setPressing] = useState(false);
 
-  // 松开收音：麦克风已实际开启 → releaseMic（等 VAD 判完句尾把语音送出再收）；
-  // 尚未开启（快速点按/首按初始化未完成——本次没录到任何东西）→ 直接收掉并
-  // 给一条手势提示，教会「按住说话，松开结束」这个交互
-  const endPress = () => {
-    setPressing(false);
-    if (!micOn) {
+  // 开麦失败兜底：录音态挂起 8s micOn 仍为 false（权限拒绝/无设备——startMic
+  // 已弹过错误 toast）→ 收掉录音态，别让「聆听中」气泡挂死
+  useEffect(() => {
+    if (!pressing || micOn) return;
+    const timer = setTimeout(() => {
       stopMic();
+      setPressing(false);
       toaster.create({
-        title: '请按住说话，松开结束录音',
+        title: '麦克风开启失败，请重试',
         type: 'info',
         duration: 2500,
       });
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, [pressing, micOn, stopMic]);
+
+  // 第二按下结束：releaseMic（等 VAD 判完句尾把语音送出再收，1.6s 兜底强停）；
+  // 首按初始化未完成就点第二下 → vadRef 尚空 → releaseMic 内部走 stopMic 立即
+  // 收掉（代际守卫作废在途初始化），本次没录到东西、也不会误发空语音
+  const toggleMic = () => {
+    if (pressing || micOn) {
+      setPressing(false);
+      releaseMic();
       return;
     }
-    releaseMic();
+    // 第一按下开始：录音即打断播报（说明.txt 问题1）——机器闭嘴，讲解声不进麦
+    interrupt();
+    setMicHold(true); // 录音会话期间 speech-end 的自动收音让路，说完整段再收
+    setPressing(true);
+    startMic();
   };
 
   // 继续对话时自动收起历史面板（新消息一到即收）
@@ -507,8 +521,8 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
           />
 
           {/* 麦克风 / 发送 切换键（悬浮于输入框右缘居中；竖屏大屏放大为远距触控尺寸）。
-              麦克风为按住说话（2026-11-06 说明.txt：像手机输入法一样按住录音、
-              松开结束；按下即打断播报——机器闭嘴，讲解声不再灌进麦克风） */}
+              麦克风为点击录音（2026-11-09 说明.txt 急需1：按一下开录、再按一下
+              结束，中间松开继续录；首按即打断播报——机器闭嘴，讲解声不进麦） */}
           {hasInputText ? (
             <Box
               as="button"
@@ -537,23 +551,13 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
             <Box
               as="button"
               onPointerDown={(e) => {
-                // 按住开始：捕获指针（手指滑出按钮仍能收到 up）+ 长按禁掉系统菜单
+                // 点击开/关录音 + 长按禁掉系统菜单；松开（up/cancel）不接线——
+                // 「中间松开录音继续」是本交互的定义行为
                 e.preventDefault();
-                try {
-                  (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-                } catch {
-                  /* 部分老内核不支持捕获，pointerup 照常可达（按住不离手） */
-                }
-                // 录音即打断（说明.txt 问题1）：TTS 一停，机器讲解声不再进麦克风
-                interrupt();
-                setMicHold(true); // 按住期间 speech-end 自动收音让路，说完整段
-                setPressing(true); // 即刻视觉反馈，不等 VAD 初始化
-                startMic();
+                toggleMic();
               }}
-              onPointerUp={endPress}
-              onPointerCancel={endPress}
               onContextMenu={(e) => e.preventDefault()}
-              aria-label={micOn || pressing ? '松开结束录音' : '按住说话'}
+              aria-label={micOn || pressing ? '点击结束录音' : '点击开始录音'}
               position="absolute"
               right={isPortraitBoard ? 3 : 2}
               top="50%"
@@ -585,12 +589,12 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
               }
               style={{
                 cursor: 'pointer',
-                // 按住说话：禁掉触摸滚动/长按选择，避免按住时页面抢手势
+                // 禁掉触摸滚动/长按选择/双击缩放，避免录音开关被页面手势抢走
                 touchAction: 'none',
                 userSelect: 'none',
               }}
             >
-              {/* 按压态气泡提示（2026-11-07 用户反馈「长按没提示/没反应」） */}
+              {/* 录音态气泡提示（2026-11-07 用户反馈「长按没提示/没反应」教训） */}
               {pressing && (
                 <Box
                   position="absolute"
@@ -605,7 +609,7 @@ const DialogBox = memo(({ description }: DialogBoxProps) => {
                   whiteSpace="nowrap"
                   pointerEvents="none"
                 >
-                  聆听中 · 松开结束
+                  聆听中 · 再次点击结束
                 </Box>
               )}
               {micOn || pressing ? (

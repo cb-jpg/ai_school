@@ -41,7 +41,7 @@ const features: FeatureItem[] = [
   {
     icon: FiMic,
     title: '语音互动',
-    description: '按住麦克风说话'
+    description: '点击麦克风说话，再点一下结束'
   },
   {
     icon: FiBook,

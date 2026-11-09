@@ -44,16 +44,41 @@ import campusVexLab from '@/assets/school/campus-vex-lab.jpg';
 import honorFangzhen from '@/assets/school/honor-fangzhen.jpg';
 import honorGaozhiliang from '@/assets/school/honor-gaozhiliang.jpg';
 import honorJiankang from '@/assets/school/honor-jiankang.jpg';
-import honorJiaoshi from '@/assets/school/honor-jiaoshi.jpg';
 import honorKunpeng from '@/assets/school/honor-kunpeng.jpg';
 import honorXinxixue from '@/assets/school/honor-xinxixue.jpg';
 import honorYuedu from '@/assets/school/honor-yuedu.jpg';
 import joyFarm from '@/assets/school/joy-farm.jpg';
 import gzhQrCode from '@/assets/school/gzh-qrcode.png';
 import kongshengyuan from '@/assets/school/kongshengyuan.jpg';
-import masterWall from '@/assets/school/master-wall.jpg';
 import mingdeLou from '@/assets/school/mingde-lou.jpg';
-import smartCampus from '@/assets/school/smart-campus.jpg';
+// 2026-11-09 校方按主题提供的办学成果实景图（27 张，1600px q80）
+import achInfo1 from '@/assets/school/achievements/ach-info-1.jpg';
+import achInfo2 from '@/assets/school/achievements/ach-info-2.jpg';
+import achStem1 from '@/assets/school/achievements/ach-stem-1.jpg';
+import achStem2 from '@/assets/school/achievements/ach-stem-2.jpg';
+import achStem3 from '@/assets/school/achievements/ach-stem-3.jpg';
+import achStem4 from '@/assets/school/achievements/ach-stem-4.jpg';
+import achMath1 from '@/assets/school/achievements/ach-math-1.jpg';
+import achMath2 from '@/assets/school/achievements/ach-math-2.jpg';
+import achMath3 from '@/assets/school/achievements/ach-math-3.jpg';
+import achMath4 from '@/assets/school/achievements/ach-math-4.jpg';
+import achMath5 from '@/assets/school/achievements/ach-math-5.jpg';
+import achCourse1 from '@/assets/school/achievements/ach-course-1.jpg';
+import achCourse2 from '@/assets/school/achievements/ach-course-2.jpg';
+import achCourse3 from '@/assets/school/achievements/ach-course-3.jpg';
+import achCourse4 from '@/assets/school/achievements/ach-course-4.jpg';
+import achCourse5 from '@/assets/school/achievements/ach-course-5.jpg';
+import achCourse6 from '@/assets/school/achievements/ach-course-6.jpg';
+import achTeach1 from '@/assets/school/achievements/ach-teach-1.jpg';
+import achTeach2 from '@/assets/school/achievements/ach-teach-2.jpg';
+import achTeach3 from '@/assets/school/achievements/ach-teach-3.jpg';
+import achTeach4 from '@/assets/school/achievements/ach-teach-4.jpg';
+import achTeach5 from '@/assets/school/achievements/ach-teach-5.jpg';
+import achTeach6 from '@/assets/school/achievements/ach-teach-6.jpg';
+import achTeach7 from '@/assets/school/achievements/ach-teach-7.jpg';
+import achTeach8 from '@/assets/school/achievements/ach-teach-8.jpg';
+import achTeach9 from '@/assets/school/achievements/ach-teach-9.jpg';
+import achTeach10 from '@/assets/school/achievements/ach-teach-10.jpg';
 import stemOpenDay from '@/assets/school/stem-open-day.jpg';
 import stuChenManhan from '@/assets/school/stu-chen-manhan.jpg';
 import stuChenZhezhang from '@/assets/school/stu-chen-zhezhang.jpg';
@@ -383,7 +408,8 @@ export const siteColumns: SiteColumn[] = [
         ],
         images: [
           { src: campusInformaticsLab, variant: 'card', caption: '信息学专训室（2026 校方实景）' },
-          { src: campusVexLab, variant: 'card', caption: 'VEX机器人专训室（2026 校方实景）' },
+          { src: achInfo1, variant: 'card', caption: '信息学课堂：教练机房一对一指导（校方供图）' },
+          { src: achInfo2, variant: 'card', caption: '信息学课堂：上机训练与讲评（校方供图）' },
         ],
         narration:
           '在信息学方向，石实实验学校形成了长期培养的公开口碑。南方加二零二五年报道提到，学校近年来已有十三位学子凭信息学特长保送清华、北大；校方最新通报显示，办学以来累计四十三位学子录取清华、北大，其中十三位凭信息学特长保送。竞赛方面，GDOI二零二五省队选拔赛中学校三十四人获全国一等奖，并包揽区赛两个特等奖。比数字更重要的，是兴趣通过持续训练变成真正能力的过程。',
@@ -410,7 +436,10 @@ export const siteColumns: SiteColumn[] = [
         ],
         images: [
           { src: campusVexLab, variant: 'card', caption: 'VEX机器人专训室（2026 校方实景）' },
-          { src: smartCampus, variant: 'card', caption: '智慧校园指挥中心' },
+          { src: achStem1, variant: 'card', caption: '校园科技活动：人形机器人展演（校方供图）' },
+          { src: achStem2, variant: 'card', caption: 'VEX机器人亚洲公开赛全国邀请赛（佛山站）获奖合影（校方供图）' },
+          { src: achStem3, variant: 'card', caption: 'VEX机器人亚洲公开赛全国邀请赛（佛山站）颁奖典礼（校方供图）' },
+          { src: achStem4, variant: 'card', caption: 'VEX机器人赛场实操（校方供图）' },
         ],
         narration:
           '在科创方向，学校设有科创集训中心，建有VEX机器人专训室。机器人战队在二零二五到二零二六赛季夺得VEX机器人亚洲公开赛总决赛创星组团队冠军和技能赛亚军，还在二零二四年五月美国VEX机器人世界锦标赛上获得世界级一等奖；无人机战队首次征战就拿下全国青少年球形无人机攻防对抗赛全国一等奖。从搭建、编程到赛场博弈，同学们在真实的工程问题中把兴趣练成真正的能力。',
@@ -436,7 +465,11 @@ export const siteColumns: SiteColumn[] = [
         ],
         images: [
           { src: stemOpenDay, variant: 'card', caption: '首届数学文化周暨科技节开放日（2026.03）' },
-          { src: campusInformaticsLab, variant: 'card', caption: '专训室（2026 校方实景）' },
+          { src: achMath1, variant: 'card', caption: '数学课堂：学生探究与讲评（校方供图）' },
+          { src: achMath2, variant: 'card', caption: '数学课堂板书互动（校方供图）' },
+          { src: achMath3, variant: 'card', caption: '小学数学展示课《分数的前世今生》（赵建华执教，校方供图）' },
+          { src: achMath4, variant: 'card', caption: '数学展示课现场（校方供图）' },
+          { src: achMath5, variant: 'card', caption: '数学游戏挑战：魔方速拧（校方供图）' },
         ],
         narration:
           '学校设有数学强基集训中心，是招生简章里四大集训中心之一，由王海瀚、朱雄伟、赵建华等竞赛教练和特级教师长期带队，面向九年一贯制的小初一体化拔尖培养。学校还是佛山市中小学数学教育高质量发展实验校。二零二六年三月举办的首届数学文化周暨科技节开放日，吸引了近万人进校打卡。扎实的数学基础，既是竞赛能力的地基，也是长程培养的起点。',
@@ -490,8 +523,12 @@ export const siteColumns: SiteColumn[] = [
           '爱乐农场：劳动教育实践基地',
         ],
         images: [
-          { src: joyFarm, variant: 'card', caption: '爱乐农场劳动教育课程' },
-          { src: campusChoirRoom, variant: 'card', caption: '合唱室（2026 校方实景）' },
+          { src: achCourse1, variant: 'card', caption: '花艺扬长课（校方供图）' },
+          { src: achCourse2, variant: 'card', caption: '扬长课：小组协作探究（校方供图）' },
+          { src: achCourse3, variant: 'card', caption: '创意手工扬长课（校方供图）' },
+          { src: achCourse4, variant: 'card', caption: '扬长课堂讲读（校方供图）' },
+          { src: achCourse5, variant: 'card', caption: '低年级书写练习（校方供图）' },
+          { src: achCourse6, variant: 'card', caption: '扬长课：师生个别指导（校方供图）' },
         ],
         narration:
           '"扬长教育、人人出彩"是学校的办学理念。按校方二零二六年十一月的口径，学校每学期开设一百三十多门扬长选修课，让学生按兴趣选课、按特长发展。课程体系的高地是信息学、数学强基、人文与科学素养、科创四大集训中心，九年一贯制让长程培养从小学起步。课后还有体育、艺术、心理等特色社团，爱乐农场里同学们和老师家长一起劳作。每个孩子都能找到愿意投入的舞台。',
@@ -516,8 +553,16 @@ export const siteColumns: SiteColumn[] = [
           '教师案例入选全国班主任基本功展示交流活动典型经验',
         ],
         images: [
-          { src: honorJiaoshi, variant: 'card', caption: '南海区教育发展研究中心首个基地学校' },
-          { src: masterWall, variant: 'card', caption: '名人文化柱廊（榜样教育）' },
+          { src: achTeach1, variant: 'card', caption: '教师年度考核"优秀"表彰（校方供图）' },
+          { src: achTeach2, variant: 'card', caption: '名师工作室主持人聘任（校方供图）' },
+          { src: achTeach3, variant: 'card', caption: '新教师导师聘书颁发（校方供图）' },
+          { src: achTeach4, variant: 'card', caption: '新教师拜师礼（校方供图）' },
+          { src: achTeach5, variant: 'card', caption: '教师集体宣誓（校方供图）' },
+          { src: achTeach6, variant: 'card', caption: '教师大会现场宣誓（校方供图）' },
+          { src: achTeach7, variant: 'card', caption: '青年教师宣誓（校方供图）' },
+          { src: achTeach8, variant: 'card', caption: '全体教师宣誓（校方供图）' },
+          { src: achTeach9, variant: 'card', caption: '教师荣誉时刻（校方供图）' },
+          { src: achTeach10, variant: 'card', caption: '教师合影：聘书与荣誉（校方供图）' },
         ],
         narration:
           '石实实验学校拥有一支高水平的教师队伍：两百八十多名专任教师中，有正高级教师、特级教师和博士教师，市区级学科带头人、名师、名班主任等中坚力量超过百人。南海区教育局公开报道还显示，学校教师的育人故事、带班方略和主题班会案例入选了全国中小学班主任基本功展示交流活动典型经验。好的教育成果，往往从教师愿意研究学生、理解班级开始。',
