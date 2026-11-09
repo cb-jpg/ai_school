@@ -165,7 +165,18 @@ function MottoStrip({
                两截整词），禁止 CJK 任意断字出现「开/拓进取」式半词换行 */
             wordBreak="keep-all"
           >
-            {text}
+            {/* 2026-11-09 校方反馈：「·」格窄时单独成行很难看——以「·」为界
+                拆成上下两行平行短句（各半句 nowrap 整体换行），点号不再上屏；
+                无「·」的条目单行渲染不受影响 */}
+            {text
+              .split('·')
+              .map((part) => part.trim())
+              .filter(Boolean)
+              .map((part, i) => (
+                <Box as="span" key={i} display="block" whiteSpace="nowrap">
+                  {part}
+                </Box>
+              ))}
           </Text>
         </Flex>
       ))}
@@ -409,7 +420,8 @@ export default function HomePage(_props: HomePageProps) {
                   完整一训三风以红底变体格子上移到这个位置） */}
               <MottoStrip isPortraitBoard={false} onRed />
 
-              {/* 亮点行（紧凑单行；2026-11-08 主任反馈顺序：一等奖→13保送43录取→130+） */}
+              {/* 亮点行（2026-11-08 主任反馈顺序：一等奖→13保送43录取→130+；
+                  2026-11-09 校方反馈逗号扎眼→13/43 删逗号硬换两行堆叠） */}
               <Flex
                 mt={{ base: 2, md: 4 }}
                 pt={{ base: 2, md: 3 }}
@@ -424,11 +436,13 @@ export default function HomePage(_props: HomePageProps) {
                   <Box as="span" fontWeight="bold" fontSize={{ base: '15px', md: '19px' }}>
                     {HIGHLIGHT_COUNT}
                   </Box>
-                  {' '}位学子通过信息学保送清北，
-                  <Box as="span" fontWeight="bold" fontSize={{ base: '15px', md: '19px' }}>
-                    {ADMITTED_COUNT}
+                  {' '}位学子通过信息学保送清北
+                  <Box as="span" display="block">
+                    <Box as="span" fontWeight="bold" fontSize={{ base: '15px', md: '19px' }}>
+                      {ADMITTED_COUNT}
+                    </Box>
+                    {' '}位学子录取清北
                   </Box>
-                  {' '}位学子录取清北
                 </Text>
                 <Text fontSize={{ base: '11px', md: '14px' }} lineHeight="1.5">
                   <Box as="span" fontWeight="bold" fontSize={{ base: '15px', md: '19px' }}>
